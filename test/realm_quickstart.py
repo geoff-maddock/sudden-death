@@ -1,8 +1,10 @@
-# Realm Quick start (w112): the simple how-to for each sport, at the top of How to play. Six tabs (golf, baseball,
-# football, boxing, basketball, hockey), one pane showing at a time; every step's screenshot is in W_QUICK_IMG and
+# Realm Quick start (w112): the simple how-to for each sport, at the top of How to play. Nine sports' tabs (golf,
+# bowling, curling, jousting, baseball, football, boxing, basketball, hockey) and pets, one pane showing at a time; every step's screenshot is in W_QUICK_IMG and
 # loads; every pane has its keys and a link to that sport's full rules, which is there. Each sport's bar has a Quick
 # start button that opens How to play on its tab (golf's checked from a real round; baseball's beside Back to the
-# world). Asserts; exits nonzero on failure.
+# world). Jousting (issue #117, phase 13): six steps (the plan, the spur, the couch, the aim, the seat, between
+# courses), every key the Lists hear (Space, 1 2 3, Q W, E R, G, L, the arrows, P K U M), the phone's tap, hold, drag and
+# Lean; the Lists' Quick start button opens How to play on Jousting and the match waits. Asserts; exits nonzero on failure.
 import asyncio, json, sys, os, subprocess
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 sys.path.insert(0, os.path.dirname(__file__))
@@ -37,7 +39,7 @@ async def main():
         pg0 = await pg.evaluate("""(() => { const q = document.getElementById('wQuick'), help = document.getElementById('wHelp');
           return { first: q.compareDocumentPosition(help) & Node.DOCUMENT_POSITION_FOLLOWING ? true : false, tabs: [...q.querySelectorAll('[data-wq]')].map(b => b.dataset.wq),
             shown: [...q.querySelectorAll('[data-wqp]')].filter(p => !p.hidden).map(p => p.dataset.wqp) }; })()""")
-        check(pg0['first'] and pg0['tabs'] == ['links', 'lanes', 'shed', 'ball', 'grid', 'ring', 'court', 'rink', 'pets'] and pg0['shown'] == ['links'], 'Quick start is at the top of How to play: eight sports and pets, golf showing', pg0)
+        check(pg0['first'] and pg0['tabs'] == ['links', 'lanes', 'shed', 'lists', 'ball', 'grid', 'ring', 'court', 'rink', 'pets'] and pg0['shown'] == ['links'], 'Quick start is at the top of How to play: nine sports and pets, golf showing', pg0)
         await pg.click('#wQuick [data-wq="rink"]')
         sw = await pg.evaluate("[...document.querySelectorAll('#wQuick [data-wqp]')].filter(p => !p.hidden).map(p => p.dataset.wqp)")
         check(sw == ['rink'], 'a tab shows its sport and hides the others', sw)
@@ -49,12 +51,19 @@ async def main():
         check(im['missing'] == [] and im['shown'] == im['want'] and im['broken'] == 0, 'every step has its screenshot, and each one loads', im)
         ln = await pg.evaluate("""W_QUICK.map(s => ({ id: s.id, steps: s.steps.length, keys: s.keys.length, more: !!document.getElementById(s.more), phone: !!s.phone }))""")
         check(all(s['steps'] >= 2 and s['keys'] >= 3 and s['more'] and s['phone'] for s in ln), 'each sport has steps, its keys, a word for phones, and a link to its full rules', ln)
+        jt = await pg.evaluate("""(() => { const Q = W_QUICK.find(s => s.id === 'lists'), keys = Q.keys.map(k => k[0]).join(' '), words = Q.keys.map(k => k[1]).join(' ');
+          return { steps: Q.steps.map(s => s.img), keys: ['Space', '1, 2, 3', 'Q, W', 'E, R', 'G', 'L', 'Arrows', 'P, K, U, M'].filter(k => !keys.includes(k)),
+            say: ['spur', 'couch', 'aim', 'lean', 'rut'].filter(w => !(words + ' ' + Q.lede).toLowerCase().includes(w)),
+            phone: ['tap', 'hold', 'drag', 'Lean'].filter(w => !Q.phone.includes(w)), pane: (document.querySelector('#wQuick [data-wqp="lists"]') || {}).textContent || '' }; })()""")
+        check(jt['steps'] == ['lists-plan', 'lists-spur', 'lists-couch', 'lists-aim', 'lists-seat', 'lists-between'], 'jousting: six steps, the plan to between courses, each with its picture', jt['steps'])
+        check(jt['keys'] == [] and jt['say'] == [], 'jousting: every key the Lists hear is in its keys (Space, 1 2 3, Q W, E R, G, L, the arrows, P K U M)', jt)
+        check(jt['phone'] == [] and 'Tilting Lists' in jt['pane'] and 'Jousting: how it works' in jt['pane'], 'jousting: the phone\'s tap, hold, drag and Lean in plain words; the pane names the Lists and links the full rules', {k: jt[k] for k in ('phone',)})
         await pg.click('#wQuick [data-wqmore="wRinkHow"]')
         top = await pg.evaluate("Math.round(document.getElementById('wRinkHow').getBoundingClientRect().top)")
         check(abs(top) < 60, 'the full rules link goes to that sport\'s rules', top)
 
         # ---------- the buttons on each sport's bar ----------
-        bt = await pg.evaluate("['links', 'lanes', 'shed', 'ball', 'grid', 'ring', 'court', 'rink'].map(id => !!document.getElementById('wQuick_' + id))")
+        bt = await pg.evaluate("['links', 'lanes', 'shed', 'lists', 'ball', 'grid', 'ring', 'court', 'rink'].map(id => !!document.getElementById('wQuick_' + id))")
         check(all(bt), 'every sport\'s bar has a Quick start button', bt)
         await pg.evaluate("showPage('play')")
         await pg.evaluate("wLinksGame({ seed: 3, mode: 'play' })")
@@ -63,6 +72,16 @@ async def main():
         op = await pg.evaluate("""(() => ({ page: document.getElementById('pg-help') && !document.getElementById('pg-help').hidden, shown: [...document.querySelectorAll('#wQuick [data-wqp]')].filter(p => !p.hidden).map(p => p.dataset.wqp),
           top: Math.round(document.getElementById('wQuick').getBoundingClientRect().top) }))()""")
         check(op['page'] and op['shown'] == ['links'] and abs(op['top']) < 60, 'Quick start on the golf bar opens How to play on golf', op)
+        await pg.evaluate("showPage('play')")
+        await pg.evaluate("(() => { W_LISTS_MODE = 'play'; wListsGame({ seed: 5, mode: 'play' }); })()")
+        await pg.wait_for_function("UI.view === 'lists' && wJT.phase === 'plan'", timeout=20000)
+        await pg.click('#wQuick_lists')
+        jo = await pg.evaluate("""(() => ({ page: document.getElementById('pg-help') && !document.getElementById('pg-help').hidden, shown: [...document.querySelectorAll('#wQuick [data-wqp]')].filter(p => !p.hidden).map(p => p.dataset.wqp),
+          top: Math.round(document.getElementById('wQuick').getBoundingClientRect().top), waits: wJT.paused, beside: document.getElementById('wQuick_lists').nextElementSibling.id }))()""")
+        check(jo == {'page': True, 'shown': ['lists'], 'top': jo['top'], 'waits': True, 'beside': 'wListsHowBtn'} and abs(jo['top']) < 60, 'the Lists\' Quick start button, beside How to play, opens How to play on Jousting, and the match waits', jo)
+        await pg.evaluate("showPage('play')")
+        back = await pg.evaluate("wJT.paused")
+        check(back is False, 'back from How to play, the match goes on', back)
 
         check(not errs, 'no page errors', errs[:5])
         await br.close()

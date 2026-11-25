@@ -53,7 +53,7 @@ wListsRows = function () {
   const show = !!g && !$('wListsRows').hidden && V.ph === 'plan' && !!V.sel;
   row.hidden = !show; if (!show) return;
   const s = V.you, cur = V.sel.line === 'side' ? 'side' : 'rut', r = x => g.rut[x] < .04 ? 'smooth' : `a ${Math.round(100 * g.rut[x])}% rut`;
-  const p = g.push[s], wind = Math.abs(p || 0) < .6 ? `${g.words}` : `${g.words}: it pushes your tip ${Math.round(Math.abs(p) * 10) / 10} inches ${p > 0 ? 'toward their body' : 'toward their shield arm'}`;
+  const p = g.push[s], wind = Math.abs(p || 0) < .6 ? `${g.words}` : `${g.words}: it pushes your tip ${Math.round(Math.abs(p) * 10) / 10} inch${Math.round(Math.abs(p) * 10) === 10 ? '' : 'es'} ${p > 0 ? 'toward their body' : 'toward their shield arm'}`;
   $('wListsLine').innerHTML = Object.entries(W_JTLINE).map(([k, [n, t]]) => `<button class="ghost${k === cur ? ' on' : ''}" data-jf="line" data-jv="${k}" title="${esc(t)}">${n}</button>`).join(' ')
     + ` <small class="hint">Your lane: ${r(s)}. ${esc(wind)}.</small>`;
 };
