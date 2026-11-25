@@ -187,6 +187,8 @@ src/realm/w146-ballpark.js
 src/realm/w147-lists.js
 # jousting ratings, the four (two riders, two squires), the mounts, the Lists tab (issue #117, phase 3)
 src/realm/w148-listsfour.js
+# the plan and the read: the herald's card, your squire's reason (issue #117, phase 4)
+src/realm/w149-listscall.js
 src/realm/w132-pets.js
 src/realm/w133-petegg.js
 src/realm/w134-petshop.js

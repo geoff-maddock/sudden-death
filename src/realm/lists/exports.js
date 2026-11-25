@@ -32,7 +32,11 @@
    [squire, job], corner }) sets your squires' jobs on Play, before you ride.
    Phase 2's review: hold(vx, vy) is a held button (the Lean buttons) as the arrows are; nudge is overwritten each frame
    by the arrows and the held buttons. seat(st, d, lean, rnd, own) takes the rider's own strike (a tip that went high
-   and didn't break leaves them reaching). start(opts) also takes guardBy (lab only: a guard a side, or null). */
+   and didn't break leaves them reaching). start(opts) also takes guardBy (lab only: a guard a side, or null).
+   Phase 4 is the plan and the read: card(s) (the herald's card for side s: the other side's rider, name, kind, mount
+   and skill, counts of what their side has ridden this match, their last four courses, their usual mix, the read and
+   the card in words), counts(s) (what side s has ridden); the squire's word now says, in plain words, what they have
+   ridden and what it makes each choice. G.plans entries carry ri (the rider) and tilt. */
 return {
   rules: JSON.parse(JSON.stringify(JT_RULES)), at: JSON.parse(JSON.stringify(JT_AT)), get G() { return G; },
   newMatch: o => jtNewMatch(o), riders: () => jtRiders(), inTilt: () => jtInTilt(), left: () => jtLeft(),
@@ -45,6 +49,7 @@ return {
   rate: k => jtRate(k), rs: k => jtRs(k), zoneAt: (x, y, g) => jtZoneAt(x, y, g), edge: (z, x, y, g) => jtEdge(z, x, y, g),
   sway: o => jtSway(o), rideSpeed: o => jtSpeed(o), charge: (o, rnd) => jtCharge(o, rnd || Math.random), strike: (a, d, rnd) => jtStrike(a, d, rnd || Math.random),
   seat: (st, d, lean, rnd, own) => jtSeat(st, d, lean, rnd || Math.random, own), impact: (rides, leans, rnd) => jtImpact(rides, leans || [.5, .5], rnd || Math.random),
+  card: s => jtCard(s == null ? 0 : s), counts: s => G && G.teams ? jtCounts(s) : null,
   planMix: s => G && G.teams && !G.over ? JT_PLANS.map((p, i) => Object.assign({ share: jtMixNow(s)[i] }, p)) : null, habit: s => G && G.teams && !G.over ? jtHabitOf(s) : null,
   start: o => { jtStart(o); jtPlayStart(o); return G; }, turn: () => GP && ['charge', 'seat'].includes(GP.ph) ? null : jtTurn(), rideCourse: (p, r, l) => G && G.teams ? jtRideCourse(p, r, l) : null, plan: s => G && G.teams && !G.over ? jtPlan(s) : null,
   summary: () => jtSummary(), simMatch: o => jtSimMatch(o),

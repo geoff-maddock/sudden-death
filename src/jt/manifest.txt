@@ -14,3 +14,5 @@ src/jt/parts/07-play.js
 src/jt/parts/08-draw.js
 # phase 3: the four and their roles, the arm, the shake, the squires' corner, pressure and nerve
 src/jt/parts/09-squad.js
+# phase 4: the plan and the read: the herald's card, your squire's reason
+src/jt/parts/10-read.js

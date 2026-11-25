@@ -996,6 +996,10 @@ body.wgwide main,body.wgwide .top{max-width:max(1240px,min(2400px,calc((100vh - 
   #wListsRowGo small.hint{display:none}
   #v-lists{padding-bottom:72px}
 }
+/* the herald's card at the Lists (issue #117, phase 4) */
+.wjtcard{display:flex;flex-wrap:wrap;gap:3px 10px;align-items:baseline;min-width:0;overflow-wrap:anywhere}
+.wjtcard .wjtcl,.wjtcard .hint{flex-basis:100%}
+.wjtlast{flex-basis:100%;margin:2px 0;padding-left:18px;font-size:.92em}
 /* w9: Realm phase 4 styles (road events, levels, ambush, meals, enchanter, card shops), added after w0.css */
 .wpglv{font-size:15px;color:var(--dim)}
 .wambush{font-size:17px;color:#ff8a7a;border-left:3px solid #ff5a4a;padding-left:10px}
@@ -46978,7 +46982,7 @@ const JT_AIMS = ['shield', 'body', 'helm'], JT_PACES = ['canter', 'gallop'], JT_
 const JT_PLANS = []; for (const aim of JT_AIMS) for (const pace of JT_PACES) for (const guard of JT_GUARDS) JT_PLANS.push({ aim, pace, guard });
 // how much an Archmage's read leans on what it expects (prior courses' worth), the step its read is rounded to, the
 // least share of a Knight's mix it rides, and how long the game is solved for
-const JT_READ = { prior: 4, step: .1, min: .04, iters: 3000, look: .8 };
+const JT_READ = { prior: 2, step: .1, min: .04, iters: 3000, look: .8 };
 // a Squire's plan, as an Archmage reckons it (its random plan's shares)
 const JT_SQUIRE_HABIT = { angled: .5, gallop: .5, aim: { shield: .4, body: .35, helm: .25 } };
 // the weights the score calls for: even, behind with too few courses left (riding for the points), well ahead
@@ -47131,7 +47135,8 @@ function jtPlanOwn(s, o) {
   let pick = null;
   for (const i of JT_PLANS) { const now = jtAgainst(O, i, h, W), v = now + aheadP[i.pace]; if (!pick || v > pick.v + 1e-9) pick = { aim: i.aim, pace: i.pace, guard: i.guard, v, now }; }
   let otherNow = -9; for (const i of JT_PLANS) if (i.pace !== pick.pace) otherNow = Math.max(otherNow, jtAgainst(O, i, h, W));
-  return { aim: pick.aim, guard: pick.guard, pace: pick.pace, why: jtWhy(s, look ? 2 : 'word', Q, Object.assign(pick, { otherNow }), need, safe, them, h) };
+  Object.assign(pick, { otherNow });
+  return { aim: pick.aim, guard: pick.guard, pace: pick.pace, why: look ? jtWhy(s, 2, Q, pick, need, safe, them, h) : jtWordWhy(s, pick, h, Q, need, safe) };
 }
 // the reason, true to what the plan does and why
 function jtWhy(s, sk, Q, P, need, safe, them, H) {
@@ -47238,7 +47243,7 @@ function jtCourseClose(P, leans) {
     else if (sk.at === 'glance') B.glances++; else if (sk.at === 'miss') B.misses++; else { B.fouls++; Pp.fouls = (Pp.fouls || 0) + 1; }
     if (imp.res[s].unhorse) { B.unhorse++; Pp.unhorse++; G.st[1 - s].unhorsed++; const Q = G.pst[1 - s][riders[1 - s]]; Q.unhorsed = (Q.unhorsed || 0) + 1; }
     if (se.rocked) { B.rocked++; Pp.rocked = (Pp.rocked || 0) + 1; if (!se.unhorse) { B.kept++; Pp.kept = (Pp.kept || 0) + 1; } }
-    G.plans[s].push({ aim: plans[s].aim, guard: plans[s].guard, pace: plans[s].pace, why: plans[s].why || '', heat, course, at: sk.at, lead: lead[s] });
+    G.plans[s].push({ aim: plans[s].aim, guard: plans[s].guard, pace: plans[s].pace, why: plans[s].why || '', heat, course, at: sk.at, lead: lead[s], ri: riders[s], tilt });
   });
   G.n++;
   const ev = { heat, course, tilt, riders, plans, rides, lean, imp, rule };
@@ -48086,6 +48091,65 @@ function jtSquadView() {
     shaken: (G.shaken || [0, 0]).slice(), girth: (G.girth || [0, 0]).slice(), press: [jtPressure(0), jtPressure(1)], due: (G.cornerDue || [false, false]).slice(),
     corner: [0, 1].map(s => { const c = (G.corners || [[], []])[s]; return c.length ? JSON.parse(JSON.stringify(c[c.length - 1])) : null; }), mounts: JSON.parse(JSON.stringify(G.mounts)) };
 }
+/* The Tilting Lists: the plan and the read (issue #117, phase 4). The plan is three choices that play off each other
+   (04-course.js): an angled shield turns a strike on it into a glance but leaves the body beside it and the helm open;
+   a square shield takes the hit and keeps you on; the helm is two points on a small mark, and a lance that misses it
+   leaves you reaching; a gallop hits harder and rocks them more, but the tip sways more and the mount tires.
+   The herald's card (jtCard): before each course, what the other side's riders have really ridden this match (each
+   course's plan and where its lance went, and the counts of each guard, aim and pace), their usual mix (the mix their
+   rider would ride by the odds; a Squire's anything) and the read an Archmage takes from both (jtHabitOf).
+   The CPU's read by skill: a Squire reads nothing (a plan at random); a Knight rides its mix, which can't be read, and
+   reads the score and the heat; an Archmage reads the other side's habits (jtHabitOf) and rides against them, so a
+   rider who always rides the same plan is punished more by an Archmage than by a Knight.
+   Your squire's word (jtSuggest, 05-cpu.js): the best plan by the odds against the read, and its reason in plain
+   words (jtWordWhy): what they have ridden, and what that makes the plan. */
+
+// what side o has ridden this match: the counts of each choice, and its last courses (newest last)
+function jtCounts(o) {
+  const P = (G && G.plans && G.plans[o]) || [], c = { n: P.length, angled: 0, square: 0, shield: 0, body: 0, helm: 0, canter: 0, gallop: 0 };
+  for (const p of P) { c[p.guard]++; c[p.aim]++; c[p.pace]++; }
+  return c;
+}
+/* the herald's card for side s: the other side's riders as side s's corner sees them */
+function jtCard(s) {
+  if (!G || !G.teams) return null;
+  const o = 1 - s, ri = (jtRiders() || [])[o], m = ri != null ? G.teams[o].roster[ri] : null, slot = ri != null ? G.riders[o].indexOf(ri) : -1;
+  const sk = clamp(G.skill[o] | 0, 0, 2), mix = sk <= 0 ? null : jtMixOf(o), usual = mix ? jtMarg(mix) : JT_SQUIRE_HABIT;
+  const P = (G.plans[o] || []).slice(-4).map(p => ({ aim: p.aim, guard: p.guard, pace: p.pace, at: p.at, heat: p.heat, course: p.course, tilt: !!p.tilt, n: ri != null && p.ri === ri ? 'this rider' : (G.teams[o].roster[p.ri] || {}).n || '' }));
+  const r2 = v => Math.round(v * 100) / 100;
+  return { side: o, name: m ? m.n : '', kind: m ? m.kind || '' : '', mount: slot >= 0 ? JT_MOUNT[G.mounts[o][slot]].n : '', skill: JT_SKILL[sk].n, counts: jtCounts(o), last: P,
+    usual: { angled: r2(usual.angled), gallop: r2(usual.gallop), aim: Object.fromEntries(JT_AIMS.map(a => [a, r2(usual.aim[a])])) }, read: jtHabitOf(s), text: jtCardText(s) };
+}
+// the card in the herald's words: one line on their guard, one on their aim, one on their pace
+function jtCardText(s) {
+  const o = 1 - s, C = jtCounts(o), n = C.n;
+  if (!n) return 'Nothing ridden yet this match.';
+  const most = (ks, w) => ks.slice().sort((a, b) => C[b] - C[a])[0], top = most(JT_AIMS);
+  return `Their shield angled ${C.angled} of ${n}, square ${C.square}. Their lance at the ${top} ${C[top]} of ${n}${JT_AIMS.filter(a => a !== top && C[a]).map(a => `, the ${a} ${C[a]}`).join('')}. At a gallop ${C.gallop} of ${n}.`;
+}
+const jtTimes = (k, n) => k === n ? (n === 1 ? 'once' : n === 2 ? 'both times' : `all ${n} times`) : `${k} of ${n}`;
+/* your squire's reason for plan P (the best by the odds against the read h), in plain words: what they have ridden,
+   and what it makes each of your three choices */
+function jtWordWhy(s, P, h, Q, need, safe) {
+  const o = 1 - s, C = jtCounts(o), n = C.n, read = n > 0;
+  const ang = read ? C.angled / n : h.angled, aimMost = JT_AIMS.slice().sort((a, b) => (read ? C[b] - C[a] : h.aim[b] - h.aim[a]))[0];
+  const say = [];
+  if (!read) say.push(`nothing to read yet: their rider usually ${h.angled >= .5 ? 'angles' : 'squares'} the shield and aims at the ${aimMost}`);
+  // the aim, by their guard
+  if (P.aim === 'body') say.push(ang >= .5 ? `${read ? `they've had the shield angled ${jtTimes(C.angled, n)}, so ` : ''}aim for the body, open beside an angled shield` : 'aim for the body, the surest break');
+  else if (P.aim === 'shield') say.push(ang < .5 ? `${read ? `their shield has been square ${jtTimes(C.square, n)}, so ` : ''}aim for the shield: square, it breaks clean` : 'aim for the shield, the biggest mark');
+  else say.push(need ? 'you need the points, and the helm is worth two' : ang >= .5 ? `${read ? `they've angled the shield ${jtTimes(C.angled, n)}, ` : ''}which leaves the helm open: go for it` : 'go for the helm');
+  // the guard, by their aim
+  const shieldAims = read ? C.shield / n : h.aim.shield;
+  if (P.guard === 'angled') say.push(shieldAims >= .5 && read ? `they've aimed at your shield ${jtTimes(C.shield, n)}: angle it to turn their lance` : 'angle your shield to turn their lance');
+  else say.push(read && C.body + C.helm > C.shield ? `they've gone past your shield ${jtTimes(C.body + C.helm, n)}: keep it square, take the hit and stay on` : 'keep your shield square, take the hit and stay on');
+  // the pace
+  if (Q.tilt) say.push(`at ${JT_PLAN.pace[P.pace].n}, for the crown`);
+  else if (P.pace === 'gallop') say.push(Q.after ? 'gallop to hit harder' : 'gallop: no more courses this heat to save the wind for');
+  else say.push(safe ? 'canter: you\'re ahead, keep it steady' : 'canter for a steadier tip, and save the wind');
+  const t = say.join('; ');
+  return t[0].toUpperCase() + t.slice(1);
+}
 /* The Lists' page in the Realm (issue #117, phase 2). A canvas in #v-lists, after the Shed's, and a frame loop that
    runs only while it is on screen (show/hide): it moves the match on (jtTick) and draws it (jtDraw), at the screen's
    density. The engine's parts don't touch the page; this file is the only one that does.
@@ -48223,7 +48287,11 @@ for (const ev of ['pointerup', 'pointercancel', 'lostpointercapture']) JTP.cv.ad
    [squire, job], corner }) sets your squires' jobs on Play, before you ride.
    Phase 2's review: hold(vx, vy) is a held button (the Lean buttons) as the arrows are; nudge is overwritten each frame
    by the arrows and the held buttons. seat(st, d, lean, rnd, own) takes the rider's own strike (a tip that went high
-   and didn't break leaves them reaching). start(opts) also takes guardBy (lab only: a guard a side, or null). */
+   and didn't break leaves them reaching). start(opts) also takes guardBy (lab only: a guard a side, or null).
+   Phase 4 is the plan and the read: card(s) (the herald's card for side s: the other side's rider, name, kind, mount
+   and skill, counts of what their side has ridden this match, their last four courses, their usual mix, the read and
+   the card in words), counts(s) (what side s has ridden); the squire's word now says, in plain words, what they have
+   ridden and what it makes each choice. G.plans entries carry ri (the rider) and tilt. */
 return {
   rules: JSON.parse(JSON.stringify(JT_RULES)), at: JSON.parse(JSON.stringify(JT_AT)), get G() { return G; },
   newMatch: o => jtNewMatch(o), riders: () => jtRiders(), inTilt: () => jtInTilt(), left: () => jtLeft(),
@@ -48236,6 +48304,7 @@ return {
   rate: k => jtRate(k), rs: k => jtRs(k), zoneAt: (x, y, g) => jtZoneAt(x, y, g), edge: (z, x, y, g) => jtEdge(z, x, y, g),
   sway: o => jtSway(o), rideSpeed: o => jtSpeed(o), charge: (o, rnd) => jtCharge(o, rnd || Math.random), strike: (a, d, rnd) => jtStrike(a, d, rnd || Math.random),
   seat: (st, d, lean, rnd, own) => jtSeat(st, d, lean, rnd || Math.random, own), impact: (rides, leans, rnd) => jtImpact(rides, leans || [.5, .5], rnd || Math.random),
+  card: s => jtCard(s == null ? 0 : s), counts: s => G && G.teams ? jtCounts(s) : null,
   planMix: s => G && G.teams && !G.over ? JT_PLANS.map((p, i) => Object.assign({ share: jtMixNow(s)[i] }, p)) : null, habit: s => G && G.teams && !G.over ? jtHabitOf(s) : null,
   start: o => { jtStart(o); jtPlayStart(o); return G; }, turn: () => GP && ['charge', 'seat'].includes(GP.ph) ? null : jtTurn(), rideCourse: (p, r, l) => G && G.teams ? jtRideCourse(p, r, l) : null, plan: s => G && G.teams && !G.over ? jtPlan(s) : null,
   summary: () => jtSummary(), simMatch: o => jtSimMatch(o),
@@ -68514,6 +68583,52 @@ renderHelp = function () {
   wW148RenderHelp();
   const after = $('wHelpLists'); if (!after || $('wHelpListsTab')) return;
   after.insertAdjacentHTML('afterend', `<p class="hint" id="wHelpListsTab"><b>Jousting ratings, riders and squires.</b> Every player also has jousting ratings: lance, couch, seat, shield, ride, nerve and care (1 to ${wJtCap()}). Each level adds a point, mostly to what their kind is good at; pick a player on the Stats tab to see them, or use its Jousting view. The Lists tab on the Team screen sets your four (two riders, a heat each, and two squires) and each rider's mount (Charger, Destrier or Courser). Between courses your squires tend the mount, steady the rider or tighten the girth. The last course when behind, and the tilt for the crown, weigh on a rider's nerve. Practice match there plays your four against the Lists' own riders; nothing is won or lost.</p>`);
+};
+/* w149: the plan and the read at the Tilting Lists (issue #117, phase 4). Before each of your courses in You ride, the
+   herald's card under the lists: the rider you're about to meet (their kind, their skill and their mount), what their
+   side has ridden this match (the counts of each guard, aim and pace, and their last courses with where each lance
+   went), and how they usually ride (the mix their rider would ride by the odds). Your squire's word, in the Ride row
+   and the note, now says what they have ridden and what it makes each of your three choices (wJT's jtWordWhy).
+   Wraps: wListsRows (wW149ListsRows: the card), wListsHowHTML (wW149ListsHow: the plan's three choices, the card and
+   reading the other rider), renderHelp (wW149RenderHelp: #wHelpListsCall). */
+
+const W_JT_CARD = {
+  aim: { shield: 'the shield', body: 'the body', helm: 'the helm' },
+  at: { shield: 'broke on the shield', body: 'broke on the body', helm: 'broke on the helm', glance: 'glanced', miss: 'missed', mount: 'struck the mount', barrier: 'struck the barrier', low: 'struck low' },
+};
+$('wListsRowUp').insertAdjacentHTML('beforebegin', '<div class="wccrow" id="wListsRowCard"><span class="wccl" title="The herald\'s card: the rider you\'re about to meet, and how their side has ridden">Herald</span><span id="wListsCard" class="wjtcard"></span></div>');
+// the card for side s, as HTML
+function wListsCardHTML(s) {
+  const K = wJT.card(s); if (!K) return '';
+  const C = K.counts, U = K.usual, pct = v => Math.round(100 * v);
+  const usualAim = Object.entries(U.aim).sort((a, b) => b[1] - a[1]).filter(([, v]) => v >= .15).map(([a]) => W_JT_CARD.aim[a]).join(' or ');
+  const usual = `${U.angled >= .6 ? 'mostly angled' : U.angled <= .4 ? 'mostly square' : 'either guard'}, at ${usualAim || 'anything'}, ${U.gallop >= .6 ? 'mostly at a gallop' : U.gallop <= .4 ? 'mostly at a canter' : 'either pace'}`;
+  const last = K.last.length ? K.last.slice().reverse().map(p => `<li><small>${p.tilt ? 'Tilt' : `H${p.heat + 1}·${p.course + 1}`}${p.n && p.n !== 'this rider' ? ` (${esc(p.n)})` : ''}</small> ${esc(W_JT_CARD.aim[p.aim])}, ${esc(p.guard)}, ${p.pace === 'gallop' ? 'a gallop' : 'a canter'}: ${esc(W_JT_CARD.at[p.at] || p.at)}</li>`).join('') : '';
+  return `<b>${esc(K.name)}</b> <small>${esc(wKindName(K.kind) || '')}${K.kind ? ', ' : ''}${esc(K.skill)}, on a ${esc(K.mount)}</small>
+    <span class="wjtcl" title="What their side has ridden this match">${esc(K.text)}</span>
+    ${last ? `<ol class="wjtlast">${last}</ol>` : ''}
+    <small class="hint" title="The mix their rider would ride by the odds now${K.skill === 'Squire' ? ' (a Squire picks anything)' : ''}">Their usual: ${esc(usual)} (angled ${pct(U.angled)}%, a gallop ${pct(U.gallop)}%).</small>`;
+}
+const wW149ListsRows = wListsRows;
+wListsRows = function () {
+  wW149ListsRows();
+  const V = WJT && !WJT.over && wJT.G && wJT.G.teams ? wJT.view : null, on = !!(V && V.mode === 'play' && V.ph === 'plan' && V.sel);
+  $('wListsRowCard').hidden = !on;
+  if (on) $('wListsCard').innerHTML = wListsCardHTML(V.you);
+};
+
+/* ---------- How to play ---------- */
+const wW149ListsHow = wListsHowHTML;
+wListsHowHTML = function () {
+  return wW149ListsHow() + `<p class="hint" id="wListsHowRead"><b>How the plan plays off itself.</b> An <b>angled</b> shield turns a lance on it into a glance, but leaves the body beside it open and the helm a bigger mark; a <b>square</b> shield takes the hit and keeps you on. Against an angled shield, aim for the <b>body</b>; against a square one, the <b>shield</b> breaks clean. The <b>helm</b> is two points on a small mark, and a lance that misses it leaves you reaching, so their lance rocks you more. A <b>gallop</b> hits harder and rocks them more, but your tip sways more and the mount tires; a <b>canter</b> aims steadier.</p>
+  <p class="hint"><b>The herald's card</b> (under the lists before each of your courses): the rider you're about to meet, their kind, skill and mount; what their side has ridden this match (how often the shield was angled, where they aimed, how often they galloped) with their last courses and where each lance went; and how they usually ride.</p>
+  <p class="hint"><b>Reading the other rider.</b> Your squire reads the card for you: the plan they suggest is the best by the odds against how the other side has ridden, and they say why ("they've had the shield angled both times, so aim for the body"). The other side reads you too, by skill: a <b>Squire</b> reads nothing; a <b>Knight</b> mixes its plans so it can't be read, and reads the score and the heat; an <b>Archmage</b> reads how you've ridden this match and rides against it. Ride the same plan every course and an Archmage will make you pay for it.</p>`;
+};
+const wW149RenderHelp = renderHelp;
+renderHelp = function () {
+  wW149RenderHelp();
+  const after = $('wHelpListsTab') || $('wHelpLists'); if (!after || $('wHelpListsCall')) return;
+  after.insertAdjacentHTML('afterend', `<p class="hint" id="wHelpListsCall"><b>The plan and the read.</b> Before each of your courses the herald's card shows the rider you're about to meet and how their side has ridden this match. Your squire's plan reads it and says why. An Archmage reads how you ride, so mix your plans against one; a Knight mixes its own so it can't be read.</p>`);
 };
 /* w132: owning pets (issue #104, phase 2). Pets are small monsters at your side in the card battles (the rules and the
    pets are Sudden Death's: engine/pets.js, data/pets.js); the Realm is where you own them.

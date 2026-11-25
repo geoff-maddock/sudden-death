@@ -82,7 +82,7 @@ function jtCourseClose(P, leans) {
     else if (sk.at === 'glance') B.glances++; else if (sk.at === 'miss') B.misses++; else { B.fouls++; Pp.fouls = (Pp.fouls || 0) + 1; }
     if (imp.res[s].unhorse) { B.unhorse++; Pp.unhorse++; G.st[1 - s].unhorsed++; const Q = G.pst[1 - s][riders[1 - s]]; Q.unhorsed = (Q.unhorsed || 0) + 1; }
     if (se.rocked) { B.rocked++; Pp.rocked = (Pp.rocked || 0) + 1; if (!se.unhorse) { B.kept++; Pp.kept = (Pp.kept || 0) + 1; } }
-    G.plans[s].push({ aim: plans[s].aim, guard: plans[s].guard, pace: plans[s].pace, why: plans[s].why || '', heat, course, at: sk.at, lead: lead[s] });
+    G.plans[s].push({ aim: plans[s].aim, guard: plans[s].guard, pace: plans[s].pace, why: plans[s].why || '', heat, course, at: sk.at, lead: lead[s], ri: riders[s], tilt });
   });
   G.n++;
   const ev = { heat, course, tilt, riders, plans, rides, lean, imp, rule };

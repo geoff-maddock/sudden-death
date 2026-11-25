@@ -39,7 +39,7 @@ const JT_AIMS = ['shield', 'body', 'helm'], JT_PACES = ['canter', 'gallop'], JT_
 const JT_PLANS = []; for (const aim of JT_AIMS) for (const pace of JT_PACES) for (const guard of JT_GUARDS) JT_PLANS.push({ aim, pace, guard });
 // how much an Archmage's read leans on what it expects (prior courses' worth), the step its read is rounded to, the
 // least share of a Knight's mix it rides, and how long the game is solved for
-const JT_READ = { prior: 4, step: .1, min: .04, iters: 3000, look: .8 };
+const JT_READ = { prior: 2, step: .1, min: .04, iters: 3000, look: .8 };
 // a Squire's plan, as an Archmage reckons it (its random plan's shares)
 const JT_SQUIRE_HABIT = { angled: .5, gallop: .5, aim: { shield: .4, body: .35, helm: .25 } };
 // the weights the score calls for: even, behind with too few courses left (riding for the points), well ahead
@@ -192,7 +192,8 @@ function jtPlanOwn(s, o) {
   let pick = null;
   for (const i of JT_PLANS) { const now = jtAgainst(O, i, h, W), v = now + aheadP[i.pace]; if (!pick || v > pick.v + 1e-9) pick = { aim: i.aim, pace: i.pace, guard: i.guard, v, now }; }
   let otherNow = -9; for (const i of JT_PLANS) if (i.pace !== pick.pace) otherNow = Math.max(otherNow, jtAgainst(O, i, h, W));
-  return { aim: pick.aim, guard: pick.guard, pace: pick.pace, why: jtWhy(s, look ? 2 : 'word', Q, Object.assign(pick, { otherNow }), need, safe, them, h) };
+  Object.assign(pick, { otherNow });
+  return { aim: pick.aim, guard: pick.guard, pace: pick.pace, why: look ? jtWhy(s, 2, Q, pick, need, safe, them, h) : jtWordWhy(s, pick, h, Q, need, safe) };
 }
 // the reason, true to what the plan does and why
 function jtWhy(s, sk, Q, P, need, safe, them, H) {

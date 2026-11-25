@@ -465,3 +465,7 @@ body.wgwide main,body.wgwide .top{max-width:max(1240px,min(2400px,calc((100vh - 
   #wListsRowGo small.hint{display:none}
   #v-lists{padding-bottom:72px}
 }
+/* the herald's card at the Lists (issue #117, phase 4) */
+.wjtcard{display:flex;flex-wrap:wrap;gap:3px 10px;align-items:baseline;min-width:0;overflow-wrap:anywhere}
+.wjtcard .wjtcl,.wjtcard .hint{flex-basis:100%}
+.wjtlast{flex-basis:100%;margin:2px 0;padding-left:18px;font-size:.92em}
