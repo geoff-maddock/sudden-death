@@ -10,7 +10,10 @@
 # your lean is what the seat is decided with. The keys and the pointer ride too (Space: ride, spur, hold to couch; a
 # tap spurs, a held press couches and a drag aims). No other course can be ridden while yours is under way. Watch and
 # You ride switch mid-match; the match waits under How to play; Back to the world leaves the Lists. At phone width the
-# page doesn't scroll sideways. Asserts; exits nonzero on failure.
+# page doesn't scroll sideways. Found in review: You ride picked while the herald names the riders makes your plan for
+# that course and nothing throws; the frame loop outlives a throw; the Lean buttons lean; the helm's cost goes with
+# where the tip went; a perfect hand rides about as true as an Archmage; You ride to Watch mid-charge hands the rest to
+# the CPU's hands; at phone width Ride, Couch and Lean are on screen. Asserts; exits nonzero on failure.
 import asyncio, json, sys, os, subprocess
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 sys.path.insert(0, os.path.dirname(__file__))
@@ -103,7 +106,7 @@ async def main():
         print('   (well ridden:', {k: round(v, 3) if isinstance(v, float) else v for k, v in g.items()}, ')'); print('   (badly ridden:', {k: round(v, 3) if isinstance(v, float) else v for k, v in b.items()}, ')')
         check(g['q'] > .95 and b['q'] == 0 and g['speed'] > b['speed'] * 1.1, 'spurring on every beat builds speed; no spur leaves it at the bottom of the range', [g, b])
         check(g['couch'] < .05 and b['couch'] > .9, 'a couch at the right moment is clean; one at the last moment is as late as it gets', [g['couch'], b['couch']])
-        check(g['off'] < 3 and b['off'] > g['off'] * 2, 'holding the tip on the mark brings it in on the mark; left to sway, it lands well off', [g['off'], b['off']])
+        check(g['off'] < 5 and b['off'] > g['off'] * 2, 'holding the tip on the mark brings it in near the mark (your rider\'s own miss is still there); left to sway, it lands well off', [g['off'], b['off']])
         check(g['broke'] > b['broke'] + 5, 'the well ridden course breaks its lance far more often', [g['broke'], b['broke']])
         check(r['up'] == [True, 'miss', True], 'a lance never couched comes in high: a miss', r['up'])
         check(r['early'] < -.6 and r['droop'][0] < r['droop'][1] - 2, 'a lance couched too early droops: the tip comes in low', r)
@@ -161,6 +164,52 @@ async def main():
         check(m['held'] and m['how'] == [True] * 4 and m['free'], 'the match waits under How to play, which explains jousting', m)
         check(m['view'] == 'world' and not m['on'], 'Back to the world leaves the Lists and stops its canvas', m)
 
+        # ---------- found in phase 2's review ----------
+        # Watch to You ride while the herald names the riders: your plan is made for this course, nothing throws, and the
+        # frame loop goes on
+        errs0 = len(errs)
+        await pg.evaluate("W_LISTS_MODE = 'watch'; wListsGame({ seed: 7, mode: 'watch' }); wJT.pause(true); __to('herald'); document.querySelector('#wListsModes [data-jmode=\"play\"]').click(); wJT.pause(false)")
+        try: await pg.wait_for_function("wJT.phase === 'plan' && !!wJT.view.sel", timeout=6000); hz = True
+        except Exception: hz = False
+        hv = await pg.evaluate("({ ph: wJT.phase, sel: wJT.view && wJT.view.sel, mode: wJT.mode })")
+        check(hz and hv['sel'] and hv['sel'].get('why') and len(errs) == errs0, 'Watch to You ride while the herald names the riders: your plan, on your squire\'s word, for this course, and nothing throws', [hv, errs[errs0:errs0 + 2]])
+        # the frame loop outlives a throw in a frame: the next frames still run, and Another match still plays
+        await pg.evaluate("wJT.pause(true); W_LISTS_MODE = 'watch'; wListsGame({ seed: 8, mode: 'watch' }); const c = document.querySelector('#v-lists canvas').getContext('2d'), f = c.fillRect; let once = true; c.fillRect = function () { if (once) { once = false; c.fillRect = f; throw new Error('a test throw'); } return f.apply(this, arguments); }; window.__n0 = wJT.G.n; wJT.pause(false)")
+        try: await pg.wait_for_function("wJT.G.n > window.__n0", timeout=15000); fl = True
+        except Exception: fl = False
+        errs[:] = [e for e in errs if 'a test throw' not in e]
+        check(fl, 'the frame loop outlives a throw in one frame: the match rides on', fl)
+        # the Lean buttons lean, through the button's own events and live frames
+        sd = await pg.evaluate("""(() => { for (let s = 400; s < 900; s++) { wListsGame({ seed: s, mode: 'play' }); wJT.pause(true); __to('plan'); wJT.select({ aim: 'shield', guard: 'square', pace: 'canter' }); wJT.press();
+            let n = 0; while (wJT.phase === 'charge' && n++ < 500) wJT.tick(.01); if (wJT.phase === 'seat') return s; } return null; })()""")
+        await pg.evaluate("window.__l0 = wJT.view.seat.lean; wJT.pause(false); $('wListsLeanR').dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }))")
+        try: await pg.wait_for_function("wJT.phase !== 'seat' || wJT.view.seat.lean > window.__l0 + .3", timeout=3000)
+        except Exception: pass
+        lb = await pg.evaluate("(() => { const r = { ph: wJT.phase, lean: wJT.view.seat && wJT.view.seat.lean, l0: window.__l0 }; $('wListsLeanR').dispatchEvent(new PointerEvent('pointerup', { bubbles: true })); return r; })()")
+        check(sd is not None and lb['ph'] == 'seat' and lb['lean'] > lb['l0'] + .3, 'holding the Lean button leans (live frames, the button\'s own events)', [sd, lb])
+        await pg.evaluate("wJT.pause(true)")
+        # the helm's cost is where the tip went, not the plan: a shield plan dragged onto the helm that doesn't break leaves you reaching
+        rc = await pg.evaluate("""(() => { const rs = wJT.rs(''), a = { aim: 'shield', guard: 'square', pace: 'canter', mount: 'destrier', rs, speed: 10, couch: 0, tip: { x: 0, y: 20 } }, d = { guard: 'angled', rs, mount: 'destrier' };
+          let own = null; for (let i = 0; i < 200 && !own; i++) { const st = wJT.strike(a, d, Math.random); if (!st.broke) own = st; }
+          const hit = { broke: true, rock: 1 }, me = { guard: 'square', rs, mount: 'destrier', aim: 'shield' }, low = wJT.strike(Object.assign({}, a, { tip: { x: -4, y: 4 } }), d, () => .99);
+          return { high: own.high, reach: wJT.seat(hit, me, .5, () => .5, own).reach, lowReach: wJT.seat(hit, Object.assign({}, me, { aim: 'helm' }), .5, () => .5, low).reach }; })()""")
+        check(rc == {'high': True, 'reach': True, 'lowReach': False}, 'the helm\'s cost goes with where the tip went: a shield plan dragged high that doesn\'t break leaves you reaching; a helm plan whose tip stayed low doesn\'t', rc)
+        # the best hand play is rewarding but not far beyond an Archmage: a tip held perfectly on the mark (perfect spur and couch)
+        hp = await pg.evaluate("""(() => { const out = {}; for (const [aim, g] of [['shield', 'square'], ['body', 'angled'], ['helm', 'angled']]) { let pts = 0, cpu = 0; const N = 120;
+            const rnd = (() => { let a = 99; return () => { a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; })();
+            // (an Archmage's hands on the same plan, with the same rider and mount, against the guard each course really met)
+            for (let s = 0; s < N; s++) { const L = __ride(6000 + s, { spur: true, couchAt: wJT.playRules.couch.ideal, hold: true }, { aim, guard: 'square', pace: 'canter' }); pts += L.broke[0] ? (L.zone[0] === 'helm' ? 2 : 1) : 0;
+              const G = wJT.G, rs = G.teams[0].roster[L.riders[0]].rs, m = G.mounts[0][0];
+              for (let i = 0; i < 30; i++) { const r = wJT.charge({ plan: { aim, guard: 'square', pace: 'canter' }, rs, mount: m, wind: 1, hands: wJT.skills[2] }, rnd), st = wJT.strike(r, { guard: L.plans[1].guard, rs: G.teams[1].roster[L.riders[1]].rs, mount: G.mounts[1][0] }, rnd); cpu += (st.broke ? (st.zone === 'helm' ? 2 : 1) : 0) / 30; } }
+            out[aim] = [+(pts / N).toFixed(3), +(cpu / N).toFixed(3)]; } return out; })()""")
+        print('   (points a course, a perfect hand v an Archmage\'s hands on the same plan and rider, against the guard each course met:', hp, ')')
+        check(all(v[0] <= v[1] * 1.25 + .05 for v in hp.values()), 'a perfect hand rides about as true as an Archmage (not far beyond)', hp)
+        # You ride to Watch mid-charge: the CPU takes your rider's hands, so the lance comes down and aims
+        mw = await pg.evaluate("""(() => { const at = []; for (let s = 0; s < 20; s++) { W_LISTS_MODE = 'play'; wListsGame({ seed: 800 + s, mode: 'play' }); wJT.pause(true); __to('plan');
+          wJT.press(); wJT.tick(.05); document.querySelector('#wListsModes [data-jmode="watch"]').click(); let n = 0; while (!['after', 'over'].includes(wJT.phase) && n++ < 2000) wJT.tick(.02); at.push(wJT.last.rides[0].up ? 'up' : wJT.last.res[0].at); }
+          return { at, up: at.filter(a => a === 'up').length, broke: at.filter(a => ['shield', 'body', 'helm'].includes(a)).length }; })()""")
+        check(mw['up'] == 0 and mw['broke'] >= 5, 'You ride to Watch mid-charge: the CPU rides the rest with your rider\'s hands (the lance comes down, and breaks as often as a Knight\'s)', mw)
+
         # ---------- a phone ----------
         ph = await br.new_page(viewport={'width': 390, 'height': 844}, is_mobile=True, has_touch=True)
         ph.on('pageerror', lambda e: errs.append('phone: ' + str(e)))
@@ -171,6 +220,14 @@ async def main():
           wJT.press(); __p(.6); wJT.couch(true); const b = document.documentElement.scrollWidth - document.documentElement.clientWidth, cv = document.querySelector('#v-lists canvas').getBoundingClientRect().width;
           return { a, b, cv, strip: !!document.getElementById('wSbLists') }; })()""")
         check(sw['a'] <= 0 and sw['b'] <= 0 and sw['cv'] <= 390, 'at phone width the Lists don\'t scroll sideways, and the canvas fits', sw)
+        # the controls each beat needs are on screen at phone width: Ride in your plan, Couch in the charge, Lean in the balance moment
+        vis = "(id => { const e = document.getElementById(id); if (!e || e.offsetParent === null) return null; const r = e.getBoundingClientRect(); return r.top >= 0 && r.bottom <= innerHeight; })"
+        on = await ph.evaluate("""((vis) => { const V = eval(vis); scrollTo(0, 0); wListsGame({ seed: 402, mode: 'play' }); wJT.pause(true); __to('plan'); scrollTo(0, 0); const ride = V('wListsRideBtn') ?? V('wListsGo');
+          wJT.select({ aim: 'shield', guard: 'square', pace: 'canter' }); wJT.press(); for (let i = 0; i < 40; i++) wJT.tick(.05); scrollTo(0, 0); const couch = V('wListsCouch');
+          let seat = null; for (let s = 400; s < 900 && seat == null; s++) { wListsGame({ seed: s, mode: 'play' }); wJT.pause(true); __to('plan'); wJT.select({ aim: 'shield', guard: 'square', pace: 'canter' }); wJT.press();
+            let n = 0; while (wJT.phase === 'charge' && n++ < 500) wJT.tick(.01); if (wJT.phase === 'seat') { scrollTo(0, 0); seat = V('wListsLeanR'); } }
+          return { ride, couch, seat }; })""" + f"({json.dumps(vis)})")
+        check(on == {'ride': True, 'couch': True, 'seat': True}, 'at phone width the controls each beat needs are on screen: Ride, Couch, Lean', on)
 
         check(not errs, 'no page errors', errs[:5])
         await br.close()

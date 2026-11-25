@@ -989,6 +989,13 @@ body.wgwide main,body.wgwide .top{max-width:max(1240px,min(2400px,calc((100vh - 
 .whpow select{max-width:150px}.whult{display:block;opacity:.8}
 .wrpowbox{display:flex;flex-direction:column;gap:6px;border-top:1px solid var(--seam);padding-top:6px}
 .wrpowbox button small{opacity:.75;margin-left:4px}
+/* the Lists at phone width: the controls each beat needs stay on screen, along the foot of it (Ride, Couch, Lean; issue
+   #117, phase 2's review); the squire's reason is in the note on the bar */
+@media (max-width: 760px){
+  #wListsChargeRow,#wListsSeatRow,#wListsRowGo{position:fixed;left:0;right:0;bottom:0;z-index:40;margin:0;background:#0d0907;border-top:1px solid var(--seam);padding:8px 10px}
+  #wListsRowGo small.hint{display:none}
+  #v-lists{padding-bottom:72px}
+}
 /* w9: Realm phase 4 styles (road events, levels, ambush, meals, enchanter, card shops), added after w0.css */
 .wpglv{font-size:15px;color:var(--dim)}
 .wambush{font-size:17px;color:#ff8a7a;border-left:3px solid #ff5a4a;padding-left:10px}
@@ -46855,13 +46862,14 @@ function jtEdge(zone, x, y, guard) {
    doesn't break, it glances. A strike's rock is how hard it hits the other rider (JT_ROCK).
    The seat (jtSeat): a rider rocked by a broken lance leans against it. Their hold (JT_SEAT: the seat rating, a
    square guard taking the hit, a steady mount, the lean) against the rock, shaken a little: short of it, they are
-   unhorsed. A rider who went for the helm and didn't break it has reached past the head, and sits the other lance
-   worse (JT_SEAT.reach off the hold): a helm aim scores big but its misses cost. On Play the lean is your balance moment (0 to 1); the CPU's comes from its skill (05-cpu.js). Only a
+   unhorsed. A rider whose tip went high (at the head: JT_SEAT.high inches up or more) and didn't break has reached
+   past the head, and sits the other lance worse (JT_SEAT.reach off the hold): a strike at the helm scores big but its
+   misses cost, whatever the plan said (a hand that drags a shield plan onto the helm pays it too: phase 2's review). On Play the lean is your balance moment (0 to 1); the CPU's comes from its skill (05-cpu.js). Only a
    broken lance can unhorse: a glance rocks, no more. */
 const JT_SWAY = { base: 3.6, lance: .35, wind: .5, late: .9, early: .35, droop: 7 };
 const JT_BREAK = { shield: { square: .9, angled: .45 }, body: { square: .95, angled: .95 }, helm: { square: .7, angled: .8 }, edge: .25, shieldR: .2, force: .3 };
 const JT_ROCK = { shield: { square: .8, angled: .6 }, body: 1, helm: 1.15, glance: .3 };
-const JT_SEAT = { reach: .3, base: .72, seat: .45, square: .1, lean: .3, shake: .22, rocked: .7 };
+const JT_SEAT = { reach: .3, high: 15, base: .55, seat: .45, square: .1, lean: .3, shake: .22, rocked: .7 };
 const jtGauss = rnd => { let u = 0, v = 0; while (!u) u = rnd(); while (!v) v = rnd(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); };
 
 // the tip's spread at impact (inches, one sigma) and its droop (inches down), from the pace, the mount and its wind,
@@ -46898,21 +46906,24 @@ function jtCharge(o, rnd) {
 // the force of a ride's strike: its speed against a gallop's, the mount's weight, and a clean couch (0.5 to 1.3 or so)
 const jtForce = a => (a.speed / JT_LISTS.speed) * jtMount(a.mount).hit * (1 - .25 * Math.abs(a.couch || 0));
 
-/* ride a's strike on rider d: { zone, at (for the rules: a zone, 'glance' or 'miss'), broke, force, rock, pb } */
+/* ride a's strike on rider d: { zone, at (for the rules: a zone, 'glance' or 'miss'), broke, force, rock, pb, high (the tip
+   at the head, for the reach) } */
 function jtStrike(a, d, rnd) {
   const g = d.guard === 'angled' ? 'angled' : 'square', zone = jtZoneAt(a.tip.x, a.tip.y, g), force = jtForce(a);
-  if (!JT_RULES.fair.includes(zone)) return { zone, at: zone, broke: false, force, rock: 0, pb: 0 };
+  const high = a.tip.y >= JT_SEAT.high;
+  if (!JT_RULES.fair.includes(zone)) return { zone, at: zone, broke: false, force, rock: 0, pb: 0, high };
   const base = JT_BREAK[zone][g], edge = jtEdge(zone, a.tip.x, a.tip.y, g);
   const shieldK = zone === 'shield' ? 1 + JT_BREAK.shieldR * (.5 - ((d.rs || {}).shield ?? .5)) * 2 : 1;
   const pb = clamp(base * (1 - JT_BREAK.force + JT_BREAK.force * Math.min(1.2, force)) * (1 - JT_BREAK.edge * edge) * shieldK, 0, .98), broke = rnd() < pb;
   const rock = force * (broke ? (zone === 'shield' ? JT_ROCK.shield[g] : JT_ROCK[zone]) : JT_ROCK.glance);
-  return { zone, at: broke ? zone : 'glance', broke, force, rock, pb };
+  return { zone, at: broke ? zone : 'glance', broke, force, rock, pb, high };
 }
 /* rider d's seat against a strike st: lean is their balance (0 to 1); own is d's own strike this course (a rider who
-   went for the helm and didn't break has reached past the head and sits the hit worse: JT_SEAT.reach off the hold).
+   struck high (own.high; with no tip known, a helm aim) and didn't break has reached past the head and sits the hit
+   worse: JT_SEAT.reach off the hold).
    { unhorse, rocked, hold, margin, reach } */
 function jtSeat(st, d, lean, rnd, own) {
-  const r = d.rs || {}, M = jtMount(d.mount), reach = d.aim === 'helm' && !!own && !own.broke;
+  const r = d.rs || {}, M = jtMount(d.mount), reach = !!own && !own.broke && (own.high != null ? !!own.high : d.aim === 'helm');
   // (phase 3: a girth tightened between courses holds them on; a rider still shaken from a rocking hit sits worse)
   const hold = JT_SEAT.base + JT_SEAT.seat * (r.seat ?? .5) + (d.guard === 'angled' ? 0 : JT_SEAT.square) + M.steady + JT_SEAT.lean * clamp(lean ?? .5, 0, 1) - (reach ? JT_SEAT.reach : 0)
     + clamp(+d.girth || 0, 0, .2) - JT_SHAKE.seat * clamp(+d.shaken || 0, 0, 1);
@@ -46930,37 +46941,48 @@ function jtImpact(rides, leans, rnd) {
    Before each course each CPU rider picks a plan (an aim, a guard and a pace), with the reason; then rides it with
    its skill's hands (JT_SKILL: how far its tip strays, how well it times the couch, how well it leans into a hit).
 
-   The odds (jtOdds): what each plan is worth on the model itself, played out JT_ODDS.n times with a stream of its own
-   (so working them out never touches the match's random numbers, and they are the same every time): for each aim and
-   pace against each guard, the points it scores, its chance of a helm break and of an unhorsing; and for each guard
-   (and a helm aim that misses, which leaves the rider reaching), the points the other rider scores on it and the
-   chance of being unhorsed. They are kept by rider, mount, hands and the mount's wind, and not saved.
+   The odds and the course as a game: below (phase 2's review). Every skill reads the score and the heat: behind by
+   more than plain breaks can make up in the courses left (or behind at all in the match's last course), it rides for
+   points (a helm break and an unhorsing count for more, the points against it for less); two or more ahead, it rides
+   to keep its seat (the points against it and an unhorsing count double).
    - A Squire picks a plan at random.
-   - A Knight plays the odds against either guard alike, and its own guard against a rider who aims for the shield
-     or the body. It reads the score and the heat: behind by more than plain breaks can make up in the courses left
-     (or behind at all in the match's last course), it rides for points (a helm break and an unhorsing count for
-     more, the points against it for less); two or more ahead, it rides to keep its seat (the points against it and
-     an unhorsing count double). It gallops whenever a gallop's odds are better now.
-   - An Archmage reads the score as a Knight does and plays the odds too, but against the riders it is facing: how a
-     rider of the other side's skill guards, aims and paces (JT_HABIT: a Squire's anything; a Knight's nearly always
-     angled and mostly at the body). And it looks ahead at its mount's wind: a gallop now is worth what it costs
-     the courses left in the heat, so it saves its gallop for when it pays. (Reading one rider's own habits comes in
-     phase 4: G.plans keeps them.)
-   In the tilt for the crown both ride the plan with the best expected margin over the other lance in the one course.
-   Lab only: a side's plan can be made by another skill's logic (G.lab.planBy), ridden with another skill's hands
-   (G.lab.handsBy) or held to one plan (G.lab.fix), so a lab can tell what a skill's plan is worth from its hands.
+   - A Knight rides the course's mix (jtEquil): no plan always ridden beats it.
+   - An Archmage reads the riders it faces and rides the best plan against its read, looking ahead at its mount's
+     wind (a gallop now is worth what it costs the courses left in the heat, so it saves its gallop for when it pays).
+   In the tilt for the crown both ride for the best expected margin over the other lance in the one course.
+   Lab only: a side's plan can be made by another skill's logic (G.lab.planBy; 'word', your squire's), ridden with another skill's hands
+   (G.lab.handsBy), held to one plan (G.lab.fix) or to one guard (G.lab.guard), so a lab can tell what a skill's plan
+   is worth from its hands.
    A plan is { aim, guard, pace, why }, and its reason is what it did and why. */
 const JT_SKILL = [
   { n: 'Squire', aim: 1.3, couch: .5, lean: .3 },
   { n: 'Knight', aim: 1, couch: .3, lean: .5 },
   { n: 'Archmage', aim: .85, couch: .2, lean: .62 }];
-const JT_ODDS = { n: 700, seed: 117, winds: 5 };
-// how a rider of each skill guards (the share angled) and aims, as the other side's Archmage reckons it
-// (a Squire's are its random plan's; a Knight's what its odds make it ride, by the lab: nearly always angled, mostly at
-// the body, a gallop more often than not; an Archmage's are more mixed, since it reads the side it faces)
-const JT_HABIT = [{ angled: .5, gallop: .5, aim: { shield: .4, body: .35, helm: .25 } }, { angled: .95, gallop: .7, aim: { shield: .05, body: .85, helm: .1 } }, { angled: .6, gallop: .5, aim: { shield: .3, body: .4, helm: .3 } }];
-const JT_ODDS_CACHE = new Map();
+const JT_ODDS = { n: 400, seed: 117, winds: 5 };
+/* The course as a game (phase 2's review). Both riders pick a plan at once, so a plan is only as good as what it
+   meets: the odds (jtOdds) are a rider's strike on a plain rider (A: its points, breaks, helm breaks and unhorsings
+   by its aim and pace against each guard, the other reaching or not) and a plain Knight's strike on them (B), each
+   cell played out JT_ODDS.n times on a stream of its own (the same numbers for every cell, so cells compare fairly;
+   the match's random numbers are never touched). jtVal is one plan against another (points less points against,
+   weighted as the score calls for, JT_W: a helm aim that doesn't break leaves its rider reaching). jtEquil solves the
+   course as a game between the two (fictitious play): the mix of plans nobody can beat by always riding one plan.
+   - A Knight rides that mix (plans under JT_READ.min left out), drawn from the engine's stream: it can't be read, and
+     no plan always ridden beats it.
+   - An Archmage reads the riders it faces (jtHabitOf): from the mix their own rider would ride (a Squire's anything)
+     and what they have really ridden in the match, and rides the plan with the best odds against that read, looking
+     ahead at its mount's wind for the courses left in the heat.
+   - Your squire's word on Play (jtSuggest) is the Archmage's read with a Knight's hands: the best plan by the odds
+     against how the other side rides. */
+const JT_ODDS_CACHE = new Map(), JT_MIX_CACHE = new Map();
 const JT_AIMS = ['shield', 'body', 'helm'], JT_PACES = ['canter', 'gallop'], JT_GUARDS = ['angled', 'square'];
+const JT_PLANS = []; for (const aim of JT_AIMS) for (const pace of JT_PACES) for (const guard of JT_GUARDS) JT_PLANS.push({ aim, pace, guard });
+// how much an Archmage's read leans on what it expects (prior courses' worth), the step its read is rounded to, the
+// least share of a Knight's mix it rides, and how long the game is solved for
+const JT_READ = { prior: 4, step: .1, min: .04, iters: 3000, look: .8 };
+// a Squire's plan, as an Archmage reckons it (its random plan's shares)
+const JT_SQUIRE_HABIT = { angled: .5, gallop: .5, aim: { shield: .4, body: .35, helm: .25 } };
+// the weights the score calls for: even, behind with too few courses left (riding for the points), well ahead
+const JT_W = { even: { mine: 1, helm: 0, unh: .25, theirs: 1, taken: .25, shake: .25 }, need: { mine: 1, helm: 5, unh: 2, theirs: .3, taken: .3, shake: 0 }, safe: { mine: 1, helm: 0, unh: 1, theirs: 2, taken: 2, shake: .5 } };
 // what side s needs: { lead (points ahead, + or -), left (courses still to ride for its riders, this one included), tilt, last, lastOfMatch, after (courses left in this heat after this one) }
 function jtSituation(s) {
   const lead = jtTotal(s) - jtTotal(1 - s), tilt = jtInTilt();
@@ -46968,86 +46990,161 @@ function jtSituation(s) {
   return { lead, left, tilt, last: !tilt && G.course === G.courses - 1, lastOfMatch: !tilt && G.heat === JT_RULES.heats - 1 && G.course === G.courses - 1, after: tilt ? 0 : G.courses - G.course - 1 };
 }
 const jtWindB = w => Math.round(clamp(w, 0, 1) * (JT_ODDS.winds - 1)) / (JT_ODDS.winds - 1);
-/* the odds for a rider (rs, mount) with a skill's hands at a wind, against the other side's aims and paces (mix: { aim, gallop }): { mine:
-   { 'aim|pace|guard': { pts, helm, unh } }, theirs: { 'guard|reach': { pts, unh } } } */
-function jtOdds(rs, mount, hk, wind, mix) {
-  const key = JSON.stringify([rs, mount, hk, jtWindB(wind), mix]);
+const jtCell = (aim, pace, g, reach) => `${aim}|${pace}|${g}|${reach}`;
+/* the odds for a rider (rs, mount) with a skill's hands at a wind, and as they set off (X: the arm, a shake, the girth
+   and the pressure, jtRideX, each rounded): { A, B }, each { 'aim|pace|guard|reach': { pts, brk, helm, unh } } */
+const jtXB = X => { const q = (v, d, k) => Math.round((v ?? d) * k) / k; X = X || {}; return { arm: q(X.arm, 1, 4), shaken: q(X.shaken, 0, 4), girth: q(X.girth, 0, 20), press: X.press ? 1 : 0 }; };
+function jtOdds(rs, mount, hk, wind, X0) {
+  const w = jtWindB(wind), X = jtXB(X0), key = JSON.stringify([rs, mount, hk, w, X]);
   let O = JT_ODDS_CACHE.get(key); if (O) return O;
-  const rnd = engRng(JT_ODDS.seed), H = JT_SKILL[hk], hands = { aim: H.aim, couch: H.couch }, other = jtRs(''), N = JT_ODDS.n, w = jtWindB(wind);
-  const pts = (I, s) => I.res[s].unhorse ? JT_RULES.unhorse : JT_RULES.pts[I.res[s].at] || 0;
-  O = { mine: {}, theirs: {} };
-  for (const aim of JT_AIMS) for (const pace of JT_PACES) for (const g of JT_GUARDS) {
-    let p = 0, hb = 0, un = 0, br = 0;
+  const H = JT_SKILL[hk], hands = { aim: H.aim, couch: H.couch }, other = jtRs(''), N = JT_ODDS.n, own = r => r ? { broke: false, high: true } : { broke: true };
+  O = { A: {}, B: {} };
+  for (const aim of JT_AIMS) for (const pace of JT_PACES) for (const g of JT_GUARDS) for (const reach of [false, true]) {
+    const a = { pts: 0, brk: 0, helm: 0, unh: 0 }, b = { pts: 0, brk: 0, helm: 0, unh: 0 };
+    let rnd = engRng(JT_ODDS.seed);
     for (let i = 0; i < N; i++) {
-      const a = jtCharge({ plan: { aim, guard: 'square', pace }, rs, mount, wind: w, hands }, rnd), d = { guard: g, rs: other, mount: JT_MOUNT_DEF, aim: 'shield' };
-      const st = jtStrike(a, d, rnd), se = jtSeat(st, d, .5, rnd);
-      p += se.unhorse ? JT_RULES.unhorse : JT_RULES.pts[st.at] || 0; if (st.broke) br++; if (st.broke && st.zone === 'helm') hb++; if (se.unhorse) un++;
+      const x = jtCharge({ plan: { aim, guard: 'square', pace }, rs, mount, wind: w, hands, arm: X.arm, shaken: X.shaken, press: X.press }, rnd), d = { guard: g, rs: other, mount: JT_MOUNT_DEF };
+      const st = jtStrike(x, d, rnd), se = jtSeat(st, d, .5, rnd, own(reach));
+      a.pts += se.unhorse ? JT_RULES.unhorse : JT_RULES.pts[st.at] || 0; if (st.broke) a.brk++; if (st.broke && st.zone === 'helm') a.helm++; if (se.unhorse) a.unh++;
     }
-    O.mine[`${aim}|${pace}|${g}`] = { pts: p / N, brk: br / N, helm: hb / N, unh: un / N };
-  }
-  for (const g of JT_GUARDS) for (const reach of [false, true]) {
-    let p = 0, un = 0;
+    rnd = engRng(JT_ODDS.seed + 1);
     for (let i = 0; i < N; i++) {
-      const aim = wpickR(mix.aim, rnd), b = jtCharge({ plan: { aim, guard: 'square', pace: rnd() < mix.gallop ? 'gallop' : 'canter' }, rs: other, mount: JT_MOUNT_DEF, wind: 1, hands: { aim: 1, couch: .3 } }, rnd);
-      const me = { guard: g, rs, mount, aim: reach ? 'helm' : 'shield' }, st = jtStrike(b, me, rnd), se = jtSeat(st, me, JT_SKILL[hk].lean, rnd, reach ? { broke: false } : null);
-      p += se.unhorse ? JT_RULES.unhorse : JT_RULES.pts[st.at] || 0; if (se.unhorse) un++;
+      const y = jtCharge({ plan: { aim, guard: 'square', pace }, rs: other, mount: JT_MOUNT_DEF, wind: 1, hands: { aim: 1, couch: .3 } }, rnd), me = { guard: g, rs, mount, girth: X.girth, shaken: X.shaken };
+      const st = jtStrike(y, me, rnd), se = jtSeat(st, me, H.lean, rnd, own(reach));
+      b.pts += se.unhorse ? JT_RULES.unhorse : JT_RULES.pts[st.at] || 0; if (st.broke) b.brk++; if (st.broke && st.zone === 'helm') b.helm++; if (se.unhorse) b.unh++;
     }
-    O.theirs[`${g}|${reach}`] = { pts: p / N, unh: un / N };
+    for (const k in a) { a[k] /= N; b[k] /= N; }
+    O.A[jtCell(aim, pace, g, reach)] = a; O.B[jtCell(aim, pace, g, reach)] = b;
   }
   JT_ODDS_CACHE.set(key, O);
   return O;
 }
+// plan i against plan j, on the odds O, with the weights W: what i scores less what it lets in
+function jtVal(O, i, j, W) {
+  const A = r => O.A[jtCell(i.aim, i.pace, j.guard, r)], B = r => O.B[jtCell(j.aim, j.pace, i.guard, r)];
+  const reachI = i.aim === 'helm' ? 1 - A(false).brk : 0, reachJ = j.aim === 'helm' ? 1 - B(false).brk : 0;
+  const mix = (x, y, p) => ({ pts: x.pts * (1 - p) + y.pts * p, brk: x.brk * (1 - p) + y.brk * p, helm: x.helm * (1 - p) + y.helm * p, unh: x.unh * (1 - p) + y.unh * p });
+  const m = mix(A(false), A(true), reachJ), t = mix(B(false), B(true), reachI);
+  // (a lance broken on a rider who stays on leaves them shaken for the next course: W.shake a break, either way)
+  return W.mine * m.pts + W.helm * m.helm + W.unh * m.unh * JT_RULES.unhorse - W.theirs * t.pts - W.taken * t.unh * JT_RULES.unhorse + W.shake * (m.brk - m.unh - t.brk + t.unh);
+}
+// the course as a game on the odds O with the weights W: the mix of plans (a share each of JT_PLANS) nobody beats by always riding one
+// pc: what each pace is worth beyond the course (the wind it leaves for the courses after, as both riders reckon it);
+// the mix comes back with its value to the rider (x.v)
+function jtEquil(O, W, wk, pc) {
+  const key = jtOddsKey(O) + '|' + wk + (pc ? '|' + pc.canter.toFixed(3) + '|' + pc.gallop.toFixed(3) : '');
+  let x = JT_MIX_CACHE.get(key); if (x) return x;
+  const n = JT_PLANS.length, f = p => pc ? pc[p.pace] : 0, V = JT_PLANS.map(i => JT_PLANS.map(j => jtVal(O, i, j, W) + f(i) - f(j))), cr = Array(n).fill(0), cc = Array(n).fill(1);
+  for (let t = 0; t < JT_READ.iters; t++) {
+    let bi = 0, bv = -1e9; for (let i = 0; i < n; i++) { let v = 0; for (let j = 0; j < n; j++) v += cc[j] * V[i][j]; if (v > bv + 1e-12) { bv = v; bi = i; } } cr[bi]++;
+    let bj = 0, bw = 1e9; for (let j = 0; j < n; j++) { let v = 0; for (let i = 0; i < n; i++) v += cr[i] * V[i][j]; if (v < bw - 1e-12) { bw = v; bj = j; } } cc[bj]++;
+  }
+  const tot = cr.reduce((a, b) => a + b, 0), ct = cc.reduce((a, b) => a + b, 0);
+  x = cr.map(c => c / tot);
+  let v = 0; for (let i = 0; i < n; i++) for (let j = 0; j < n; j++) v += x[i] * (cc[j] / ct) * V[i][j];
+  x.v = v;
+  JT_MIX_CACHE.set(key, x);
+  return x;
+}
+// (each odds table gets a short name, for the mixes kept)
+const JT_ODDS_ID = new WeakMap(); let JT_ODDS_N = 0;
+const jtOddsKey = O => { if (!JT_ODDS_ID.has(O)) JT_ODDS_ID.set(O, ++JT_ODDS_N); return JT_ODDS_ID.get(O); };
+// the shares of a mix by aim, guard and pace: { angled, gallop, aim: { shield, body, helm } }
+function jtMarg(x) {
+  const out = { angled: 0, gallop: 0, aim: { shield: 0, body: 0, helm: 0 } };
+  JT_PLANS.forEach((p, i) => { if (p.guard === 'angled') out.angled += x[i]; if (p.pace === 'gallop') out.gallop += x[i]; out.aim[p.aim] += x[i]; });
+  return out;
+}
 // a weighted pick from rnd (not the engine's R)
 function wpickR(w, rnd) { let t = 0; for (const k in w) t += Math.max(0, w[k]); let r = rnd() * t; for (const k in w) { r -= Math.max(0, w[k]); if (r <= 0) return k; } return Object.keys(w)[0]; }
-// a plan's worth to side s: what it scores against the guards as reckoned, less what it concedes (with the weights
-// the score calls for), and for an Archmage what the pace costs the courses left in the heat
-function jtWorth(O, aim, pace, guard, angled, W) {
-  const m = g => O.mine[`${aim}|${pace}|${g}`], mn = { pts: 0, brk: 0, helm: 0, unh: 0 };
-  for (const [g, p] of [['angled', angled], ['square', 1 - angled]]) { const x = m(g); for (const k in mn) mn[k] += p * x[k]; }
-  let th = O.theirs[`${guard}|false`];
-  // (a helm aim that doesn't break leaves the rider reaching past the head: their lance is worth more against it)
-  if (aim === 'helm') { const tr = O.theirs[`${guard}|true`], pm = clamp(1 - mn.brk, 0, 1); th = { pts: th.pts * (1 - pm) + tr.pts * pm, unh: th.unh * (1 - pm) + tr.unh * pm }; }
-  return W.mine * mn.pts + W.helm * mn.helm + W.unh * mn.unh * JT_RULES.unhorse - W.theirs * th.pts - W.taken * th.unh * JT_RULES.unhorse;
-}
+// (lab only: a side's guard held, whatever its plan: G.lab.guard)
 function jtPlan(s) {
-  const lab = G.lab || {}, sk = lab.planBy && lab.planBy[s] != null ? lab.planBy[s] : G.skill[s];
-  if (lab.fix && lab.fix[s]) return Object.assign({ why: 'held to one plan (a lab)' }, lab.fix[s]);
-  if (sk <= 0) {
+  const P = jtPlanOwn(s), g = ((G.lab || {}).guard || [])[s];
+  if (g && P.guard !== g) { P.guard = g; P.why += ` (a lab: the shield held ${g})`; }
+  return P;
+}
+// the mix a Knight riding for side s would ride now (the weights its situation calls for): a share each of JT_PLANS
+function jtMixNow(s, hk) {
+  const ri = (jtRiders() || [])[s]; if (ri == null) return null;
+  const Q = jtSituation(s), need = !Q.tilt && Q.lead < 0 && (-Q.lead > Q.left || Q.lastOfMatch), wk = need ? 'need' : !Q.tilt && Q.lead >= 2 ? 'safe' : 'even';
+  const rs = jtRsOf(s, ri), mount = jtMountOf(s), W0 = G.wind[s], X = jtRideX(s), W = JT_W[wk];
+  hk = hk != null ? hk : jtHandsK(s);
+  // (a gallop costs what the wind it spends is worth in the courses after: pc)
+  const pc = Q.after ? Object.fromEntries(JT_PACES.map(p => { const M = jtMount(mount), w1 = clamp(W0 - jtWindCost(p, rs, mount) + M.rec * (.6 + .4 * (rs.ride ?? .5)), 0, 1);
+    return [p, JT_READ.look * Math.min(Q.after, 2) * jtEquil(jtOdds(rs, mount, hk, w1, { arm: X.arm }), W, wk).v]; })) : null;
+  return jtEquil(jtOdds(rs, mount, hk, W0, X), W, wk, pc);
+}
+// the mix side s's rider would ride now, by the course as a game (even weights)
+function jtMixOf(s) {
+  const ri = (jtRiders() || [])[s]; if (ri == null) return null;
+  return jtEquil(jtOdds(jtRsOf(s, ri), jtMountOf(s), jtHandsK(s), G.wind[s], jtRideX(s)), JT_W.even, 'even');
+}
+/* what side s reckons the other side's rider rides: { angled, gallop, aim: { shield, body, helm }, n, read }: the mix
+   that rider would ride by the odds (a Squire's anything), then what the other side has really ridden in the match
+   (G.plans), JT_READ.prior courses' worth of the first against every course of the second (phase 4 builds the
+   herald's card on it) */
+function jtHabitOf(s) {
+  const o = 1 - s, sk = clamp(G.skill[o] | 0, 0, 2), lab = G.lab || {};
+  const H = sk <= 0 && !(lab.planBy && lab.planBy[o] >= 1) ? JT_SQUIRE_HABIT : jtMarg(jtMixOf(o) || JT_PLANS.map(() => 1 / JT_PLANS.length));
+  const P = (G.plans && G.plans[o]) || [], k = JT_READ.prior, n = P.length, q = v => Math.round(v / JT_READ.step) * JT_READ.step;
+  const sh = (f, prior) => (prior * k + P.filter(f).length) / (k + n);
+  const aim = Object.fromEntries(JT_AIMS.map(a => [a, q(sh(p => p.aim === a, H.aim[a]))]));
+  return { angled: q(sh(p => p.guard === 'angled', H.angled)), gallop: q(sh(p => p.pace === 'gallop', H.gallop)), aim, n, read: n > 0 };
+}
+// a plan's worth against a read habit h (the other side's plans taken as aim, guard and pace each by their shares)
+function jtAgainst(O, i, h, W) {
+  let v = 0, t = 0;
+  for (const j of JT_PLANS) { const q = (h.aim[j.aim] || 0) * (j.guard === 'angled' ? h.angled : 1 - h.angled) * (j.pace === 'gallop' ? h.gallop : 1 - h.gallop); if (q > 0) { v += q * jtVal(O, i, j, W); t += q; } }
+  return t ? v / t : 0;
+}
+/* side s's plan: o = { sk: the logic (a skill, or 'word': your squire's), hk: the hands it reckons with, det: no
+   random draw (a Knight rides its likeliest plan; for the corner's sums) } */
+function jtPlanOwn(s, o) {
+  o = o || {};
+  const lab = G.lab || {}, sk = o.sk != null ? o.sk : lab.planBy && lab.planBy[s] != null ? lab.planBy[s] : G.skill[s];
+  if (lab.fix && lab.fix[s] && o.sk == null) return Object.assign({ why: 'held to one plan (a lab)' }, lab.fix[s]);
+  if (sk === 0 || sk === '0') {
+    if (o.det) return Object.assign({ why: 'a plan picked on a whim' }, JT_CORNER.plain);
     const aim = wpick({ shield: 4, body: 3.5, helm: 2.5 }), guard = R() < .5 ? 'angled' : 'square', pace = R() < .5 ? 'gallop' : 'canter';
     return { aim, guard, pace, why: 'a plan picked on a whim' };
   }
-  const Q = jtSituation(s), ri = (jtRiders() || [])[s], rs = jtRsOf(s, ri), mount = jtMountOf(s), hk = jtHandsK(s), W0 = G.wind[s];
-  const them = clamp(G.skill[1 - s] | 0, 0, 2), habit = sk >= 2 ? JT_HABIT[them] : { angled: .5, gallop: .5, aim: { shield: .5, body: .5, helm: 0 } };
-  const O = jtOdds(rs, mount, hk, W0, { aim: habit.aim, gallop: habit.gallop });
-  // the weights the score calls for
-  const need = !Q.tilt && Q.lead < 0 && (-Q.lead > Q.left || Q.lastOfMatch), safe = !Q.tilt && Q.lead >= 2;
-  const W = need ? { mine: 1, helm: 1, unh: 1.5, theirs: .4, taken: .4 } : safe ? { mine: 1, helm: 0, unh: 1, theirs: 2, taken: 2 } : { mine: 1, helm: 0, unh: 1, theirs: 1, taken: 1 };
-  // an Archmage's pace looks ahead: the courses left in the heat ride on what wind this one leaves
-  const ahead = (pace) => {
-    if (sk < 2 || !Q.after) return 0;
-    const M = jtMount(mount), w1 = clamp(W0 - jtWindCost(pace, rs, mount) + M.rec * (.6 + .4 * (rs.ride ?? .5)), 0, 1), O1 = jtOdds(rs, mount, hk, w1, { aim: habit.aim, gallop: habit.gallop });
-    let best = -9; for (const a of JT_AIMS) for (const p of JT_PACES) best = Math.max(best, jtWorth(O1, a, p, 'angled', habit.angled, W));
+  const Q = jtSituation(s), ri = (jtRiders() || [])[s], rs = jtRsOf(s, ri), mount = jtMountOf(s), hk = o.hk != null ? o.hk : jtHandsK(s), W0 = G.wind[s];
+  const need = !Q.tilt && Q.lead < 0 && (-Q.lead > Q.left || Q.lastOfMatch), safe = !Q.tilt && Q.lead >= 2, wk = need ? 'need' : safe ? 'safe' : 'even', W = JT_W[wk];
+  const X = jtRideX(s), O = jtOdds(rs, mount, hk, W0, X), them = clamp(G.skill[1 - s] | 0, 0, 2);
+  if (sk === 1) {
+    // a Knight rides the course's mix (jtMixNow: a gallop costing what the wind it spends is worth in the courses after)
+    const x = jtMixNow(s, hk), keep = x.map(v => v >= JT_READ.min ? v : 0), tot = keep.reduce((a, b) => a + b, 0) || 1;
+    let at = keep.indexOf(Math.max(...keep));
+    if (!o.det) { let r = R() * tot; for (let i = 0; i < keep.length; i++) { r -= keep[i]; if (r <= 0 && keep[i] > 0) { at = i; break; } } }
+    const P = JT_PLANS[at];
+    return { aim: P.aim, guard: P.guard, pace: P.pace, why: jtWhy(s, 1, Q, { aim: P.aim, pace: P.pace, guard: P.guard, share: keep[at] / tot }, need, safe, them, null) };
+  }
+  // an Archmage (and your squire's word): the best odds against the read, looking ahead at the mount's wind
+  const h = jtHabitOf(s), look = sk === 2;
+  const ahead = pace => {
+    if (!look || !Q.after) return 0;
+    const M = jtMount(mount), w1 = clamp(W0 - jtWindCost(pace, rs, mount) + M.rec * (.6 + .4 * (rs.ride ?? .5)), 0, 1), O1 = jtOdds(rs, mount, hk, w1, { arm: X.arm });
+    let best = -9; for (const i of JT_PLANS) best = Math.max(best, jtAgainst(O1, i, h, W));
     return Q.after * best;
   };
+  const aheadP = { canter: ahead('canter'), gallop: ahead('gallop') };
   let pick = null;
-  for (const aim of JT_AIMS) for (const pace of JT_PACES) for (const guard of JT_GUARDS) {
-    const now = jtWorth(O, aim, pace, guard, habit.angled, W), v = now + ahead(pace);
-    if (!pick || v > pick.v + 1e-9) pick = { aim, pace, guard, v, now };
-  }
-  // what the other pace would have been worth now, for the reason
-  let otherNow = -9; for (const a of JT_AIMS) for (const g of JT_GUARDS) otherNow = Math.max(otherNow, jtWorth(O, a, pick.pace === 'gallop' ? 'canter' : 'gallop', g, habit.angled, W));
-  return { aim: pick.aim, guard: pick.guard, pace: pick.pace, why: jtWhy(s, sk, Q, pick, otherNow, need, safe, them) };
+  for (const i of JT_PLANS) { const now = jtAgainst(O, i, h, W), v = now + aheadP[i.pace]; if (!pick || v > pick.v + 1e-9) pick = { aim: i.aim, pace: i.pace, guard: i.guard, v, now }; }
+  let otherNow = -9; for (const i of JT_PLANS) if (i.pace !== pick.pace) otherNow = Math.max(otherNow, jtAgainst(O, i, h, W));
+  return { aim: pick.aim, guard: pick.guard, pace: pick.pace, why: jtWhy(s, look ? 2 : 'word', Q, Object.assign(pick, { otherNow }), need, safe, them, h) };
 }
 // the reason, true to what the plan does and why
-function jtWhy(s, sk, Q, P, otherNow, need, safe, them) {
+function jtWhy(s, sk, Q, P, need, safe, them, H) {
   const aim = JT_PLAN.aim[P.aim].n, pace = JT_PLAN.pace[P.pace].n;
-  let why = Q.tilt ? `the tilt for the crown: ${aim} at ${pace}, the best expected margin over their lance`
-    : need ? `behind by ${-Q.lead} with ${Q.left === 1 ? 'one course' : Q.left + ' courses'} left: ${aim} at ${pace}, riding for the points`
-    : safe ? `ahead by ${Q.lead}: weighing the points against it double, ${aim} at ${pace}`
-    : sk >= 2 ? `against how ${JT_SKILL[them].n}s ride (${JT_HABIT[them].angled > .7 ? 'shields angled' : 'either guard'}, ${JT_HABIT[them].aim.body > .6 ? 'lances at the body' : 'lances anywhere'}): ${aim} at ${pace} has the best odds`
-    : `the best odds against either guard: ${aim} at ${pace}`;
-  if (sk >= 2 && !Q.tilt) {
-    if (P.pace === 'canter' && otherNow > P.now + 1e-9) why += ', saving the mount\'s wind for the courses left in the heat';
+  const read = H ? `${H.read ? `reading their riders (${H.n} course${H.n === 1 ? '' : 's'} so far: ` : `against how their rider rides (`}${H.angled > .7 ? 'shields mostly angled' : H.angled < .3 ? 'shields mostly square' : 'either guard'}, ${H.aim.body > .6 ? 'lances at the body' : H.aim.shield > .6 ? 'lances at the shield' : H.aim.helm > .45 ? 'lances at the helm' : 'lances anywhere'})` : '';
+  const mixed = sk === 1 ? ` (mixing its plans by the odds, so it can't be read: this one ${Math.round(100 * P.share)}% of the time)` : '';
+  let why = Q.tilt ? `the tilt for the crown: ${aim} at ${pace}, the best expected margin over their lance${mixed || (read ? ', ' + read : '')}`
+    : need ? `behind by ${-Q.lead} with ${Q.left === 1 ? 'one course' : Q.left + ' courses'} left: ${aim} at ${pace}, riding for the points${mixed}`
+    : safe ? `ahead by ${Q.lead}: weighing the points against it double, ${aim} at ${pace}${mixed}`
+    : sk === 1 ? `the best odds against any rider: ${aim} at ${pace}${mixed}`
+    : `${read}: ${aim} at ${pace} has the best odds`;
+  if (sk === 2 && !Q.tilt) {
+    if (P.pace === 'canter' && P.otherNow > P.now + 1e-9) why += ', saving the mount\'s wind for the courses left in the heat';
     else if (P.pace === 'gallop' && !Q.after) why += ', with no more courses in the heat to save the wind for';
   }
   return why + (P.guard === 'angled' ? '; the shield angled to turn their lance' : '; the shield square to take it and stay on');
@@ -47091,7 +47188,7 @@ function jtStart(opts) {
   // (lab only: a side planned by another skill's logic, ridden with another skill's hands, or held to one plan)
   const labSide = (L, ok) => Array.isArray(L) ? [0, 1].map(s => ok(L[s]) ? L[s] : null) : null, sk3 = v => v === 0 || v === 1 || v === 2;
   const fixOk = p => !!p && typeof p === 'object' && jtOwn(JT_PLAN.aim, p.aim) && jtOwn(JT_PLAN.guard, p.guard) && jtOwn(JT_PLAN.pace, p.pace);
-  const lab = { planBy: labSide(o.planBy, sk3), handsBy: labSide(o.handsBy, sk3), fix: labSide(o.fix, fixOk) };
+  const lab = { planBy: labSide(o.planBy, v => sk3(v) || v === 'word'), handsBy: labSide(o.handsBy, sk3), fix: labSide(o.fix, fixOk), guard: labSide(o.guardBy, g => g === 'angled' || g === 'square') };
   if (lab.fix) lab.fix = lab.fix.map(p => p && { aim: p.aim, guard: p.guard, pace: p.pace });
   Object.assign(G, { teams, skill: [0, 1].map(s => clamp(((o.skill || [])[s] ?? 1) | 0, 0, 2)), mounts, wind: [1, 1], n: 0, lab,
     st: [jtBox(), jtBox()], pst: teams.map(T => T.roster.map(() => ({ courses: 0, breaks: 0, helms: 0, unhorse: 0, unhorsed: 0, rocked: 0, kept: 0, fouls: 0, jobs: 0 }))), plans: [[], []], last: null });
@@ -47180,12 +47277,13 @@ function jtSimMatch(opts) {
      before the impact and the lance comes up: a miss.
    - the aim: once couched, the tip rides the stride's figure-eight, sway()'s spread times JT_PLAY.aim.eight wide;
      your hand (the arrows, or drag) holds it on your mark. At impact the tip is the mark, plus the eight, plus your
-     hand, plus a little of your rider's own miss (JT_PLAY.aim.noise of the spread), less the droop.
+     hand, plus your rider's own miss (JT_PLAY.aim.noise of the spread: a perfect hand rides about as true as an
+     Archmage's, a little truer at the helm; phase 2's review), less the droop.
    - the impact, then the seat: if their lance broke on you, a short balance moment follows: the rider wobbles and you
      lean against it (the arrows, drag, or the Lean buttons). How well you held it is your lean (0 to 1) for seat().
    Watch: the CPU rides both. You ride: your side's courses are yours (side 0). */
 const JT_PLAY = { charge: 3.6, spur: { until: .42, win: .09, min: .86, beat: { canter: .46, gallop: .34 } }, couch: { ideal: .66, span: .3, high: 40 },
-  aim: { eight: 2.6, noise: .3, reach: 18, key: 40 }, seat: { time: 1.4, amp: 1, key: 2.6 }, pace: { herald: 1.2, after: 2.4, heat: 3.2, over: 3.4 } };
+  aim: { eight: 2.6, noise: .9, reach: 18, key: 40 }, seat: { time: 1.4, amp: 1, key: 2.6 }, pace: { herald: 1.2, after: 2.4, heat: 3.2, over: 3.4 } };
 const JT_HOOK = { onPhase: null, onPick: null, onOver: null };
 const JT_MODES = ['watch', 'play'];
 let GP = null;
@@ -47205,10 +47303,10 @@ const jtSide = s => G.teams[s].name;
 function jtPicked() { if (JT_HOOK.onPick) try { JT_HOOK.onPick(); } catch (e) { console.error(e); } }
 
 /* ---------- your plan ---------- */
-// your squire's word: the plan a Knight would ride here, with the reason
+// your squire's word: the best plan by the odds against how the other side rides (an Archmage's read, a Knight's
+// hands), with the reason (phase 2's review)
 function jtSuggest(s) {
-  const keep = G.skill[s]; G.skill[s] = 1; let P;
-  try { P = jtPlan(s); } finally { G.skill[s] = keep; }
+  const P = jtPlanOwn(s, { sk: 'word', hk: 1 });
   return { aim: P.aim, guard: P.guard, pace: P.pace, why: P.why };
 }
 /* change your plan: { aim, guard, pace, suggest }. Returns '' or why not */
@@ -47266,7 +47364,8 @@ function jtCharge0() {
   // (phase 3: your squires do the jobs you gave them before you set off)
   if (jtYours(GP.you) && GP.jobs && G.cornerDue && G.cornerDue[GP.you]) jtCornerDo(GP.you, GP.jobs, 'your call');
   GP.jobs = null;
-  const plans = [0, 1].map(s => jtYours(s) ? Object.assign({}, GP.sel) : GP.plans[s]);
+  // (a plan always exists for the course: yours, your squire's word when there is none, or the CPU's)
+  const plans = [0, 1].map(s => jtYours(s) ? Object.assign({}, GP.sel || jtSuggest(s)) : (GP.plans && GP.plans[s]) || jtPlan(s));
   // the CPU's rides are drawn as it sets off (the page draws its lance from them); yours is built as you ride
   const cpuRides = [0, 1].map(s => jtYours(s) ? null : jtCharge(jtRideOpts(s, plans[s]), R));
   const mine = jtYours(0) || jtYours(1), s = GP.you;
@@ -47413,9 +47512,21 @@ function jtPlayNext() {
 }
 function jtSetMode(m) {
   if (!GP || !JT_MODES.includes(m)) return;
-  GP.mode = m;
-  // a plan you were making goes back to the CPU in Watch; a charge in progress finishes as it began
+  const was = GP.mode; GP.mode = m;
+  if (m === was) return;
+  // a plan you were making goes back to the CPU in Watch; your course while the herald names the riders (You ride
+  // picked then) is yours, on a plan made for it; a charge of yours handed to Watch is ridden on by the CPU's hands for
+  // your side, and so is the balance moment (phase 2's review)
   if (m !== 'play' && GP.ph === 'plan') jtGo('next');
+  else if (m === 'play' && GP.ph === 'herald') jtGo('next');
+  else if (m !== 'play' && GP.ph === 'charge' && GP.ch && GP.ch.mine) jtHandOver();
+  else if (m !== 'play' && GP.ph === 'seat' && GP.P) { GP.P.lean[GP.you] = jtLean(GP.you); jtFinish(); }
+}
+// your charge handed to the CPU mid-way: its ride for your side, drawn now on your plan (your spur and hands are dropped)
+function jtHandOver() {
+  const C = GP.ch, s = GP.you;
+  GP.cpuRides[s] = jtCharge(jtRideOpts(s, GP.plans[s]), R);
+  C.mine = false; C.down = false; C.downAt = null; C.tipNow = null; GP.keyV = { x: 0, y: 0 };
 }
 // what the page needs, as a copy
 function jtView() {
@@ -47745,9 +47856,9 @@ function jtDraw(c, dt) {
    corner is chosen by the side: on Play by you, your corner suggesting; the CPU by its skill (jtCornerPlan):
    - a Squire's corner picks two jobs at random;
    - a Knight's works out each way of sharing two jobs between its two squires on the model (jtCornerM: the next
-     course ridden from the state the jobs leave, against the plan a Knight would ride, and what lasts, the wind and
-     the arm, for one more course), and takes the best;
-   - an Archmage's does the same against the plan the other side will really ride (its own skill's).
+     course ridden from the state the jobs leave, its rider riding its own plans against a Knight's mix, and what
+     lasts, the wind and the arm, for one more course), and takes the best;
+   - an Archmage's does the same against the plans the other side will really ride (its own skill's).
    Every corner is logged with its reason (G.corners).
    Pressure (jtPressure, 0 or 1): the last course of a heat when the side is behind in the match, and every course of
    the tilt for the crown. Nerve takes it off (jtNerveK): the tip sways more and the couch's timing scatters, less for
@@ -47864,33 +47975,42 @@ function jtAfterJobs(s, jobs) {
   return X;
 }
 /* what one course is worth to side s (its points less the other side's, on average) with its rider in state X, riding
-   the plan it would ride then, against the other rider on plan op: played out JT_CORNER.n times on a stream of its own
-   (the same numbers for every state, so the states are compared fairly; the match's random numbers are never touched) */
-function jtCornerM(s, X, op) {
-  const keep = ['wind', 'arm', 'shaken', 'girth'].map(k => G[k][s]), o = 1 - s, lab = G.lab || {};
-  let mine;
+   the plans it would ride (mine: [{ plan, w }], drawn by their shares) against the other rider's (op, the same):
+   played out JT_CORNER.n times on a stream of its own (the same numbers for every state, so the states are compared
+   fairly; the match's random numbers are never touched) */
+function jtCornerM(s, X, op, mine) {
+  const keep = ['wind', 'arm', 'shaken', 'girth'].map(k => G[k][s]), o = 1 - s;
+  let rides;
   try {
     G.wind[s] = X.wind; G.arm[s] = X.arm; G.shaken[s] = X.shaken; G.girth[s] = X.girth;
-    const psk = lab.planBy && lab.planBy[s] != null ? lab.planBy[s] : G.skill[s];
-    mine = jtRideOpts(s, psk <= 0 && !(lab.fix && lab.fix[s]) ? JT_CORNER.plain : jtPlan(s));
+    rides = mine.map(d => jtRideOpts(s, d.plan));
   } finally { ['wind', 'arm', 'shaken', 'girth'].forEach((k, i) => { G[k][s] = keep[i]; }); }
-  const theirs = jtRideOpts(o, op), rnd = engRng(JT_CORNER.seed), ln = [0, 1].map(x => JT_SKILL[jtHandsK(x)].lean);
+  const theirs = op.map(d => jtRideOpts(o, d.plan)), rnd = engRng(JT_CORNER.seed), ln = [0, 1].map(x => JT_SKILL[jtHandsK(x)].lean);
+  const draw = D => { let r = rnd(); for (let i = 0; i < D.length; i++) { r -= D[i].w; if (r <= 0) return i; } return D.length - 1; };
   const pts = (I, x) => I.res[x].unhorse ? JT_RULES.unhorse : JT_RULES.pts[I.res[x].at] || 0;
   let m = 0;
   for (let i = 0; i < JT_CORNER.n; i++) {
-    const a = jtCharge(mine, rnd), b = jtCharge(theirs, rnd), I = jtImpact(s ? [b, a] : [a, b], ln, rnd);
+    const a = jtCharge(rides[draw(mine)], rnd), b = jtCharge(theirs[draw(op)], rnd), I = jtImpact(s ? [b, a] : [a, b], ln, rnd);
     m += pts(I, s) - pts(I, o) - (I.res[o].unhorse ? JT_CORNER.heat * jtAfterNext() : 0) + (I.res[s].unhorse ? JT_CORNER.heat * jtAfterNext() : 0);
   }
   return m / JT_CORNER.n;
 }
-// the plan the other side's rider is reckoned to ride next: a Knight's corner reckons a Knight's plan; an Archmage's
-// reads the other side's own (a Squire's anything: its plain plan)
-function jtCornerOpp(s, sk) {
-  const o = 1 - s, keep = G.skill[o];
-  if (sk >= 2 && keep <= 0) return JT_CORNER.plain;
-  if (sk < 2) G.skill[o] = 1;
-  try { return jtPlan(o); } finally { G.skill[o] = keep; }
+// a Knight's mix as plans and shares (the shares under JT_READ.min left out)
+function jtMixDist(s) {
+  const x = jtMixNow(s); if (!x) return [{ plan: JT_CORNER.plain, w: 1 }];
+  const D = JT_PLANS.map((p, i) => ({ plan: p, w: x[i] })).filter(d => d.w >= JT_READ.min), t = D.reduce((a, d) => a + d.w, 0);
+  return D.map(d => ({ plan: d.plan, w: d.w / t }));
 }
+// the plans side s (or the other side, as side s's corner reckons them: sk) is reckoned to ride next: a Squire's anything
+// (its plain plan), a Knight's mix, an Archmage's plan; a Knight's corner reckons the other side rides a Knight's mix
+function jtPlansOf(s) {
+  const lab = G.lab || {}, sk = lab.planBy && lab.planBy[s] != null ? lab.planBy[s] : G.skill[s];
+  if (lab.fix && lab.fix[s]) return [{ plan: lab.fix[s], w: 1 }];
+  if (sk === 0) return [{ plan: JT_CORNER.plain, w: 1 }];
+  if (sk === 1) return jtMixDist(s);
+  return [{ plan: jtPlanOwn(s, { det: true }), w: 1 }];
+}
+function jtCornerOpp(s, sk) { return sk >= 2 ? jtPlansOf(1 - s) : jtMixDist(1 - s); }
 /* side s's corner, by a skill: { jobs: [squire 0's job, squire 1's], why } */
 function jtCornerPlan(s, sk, allow) {
   if (sk == null) { const lab = (G.lab || {}).cornerBy; sk = lab && typeof lab[s] === 'number' ? lab[s] : G.skill[s]; }
@@ -47901,11 +48021,11 @@ function jtCornerPlan(s, sk, allow) {
   }
   // each way to share two of the jobs between the two squires: the next course in the state it leaves, and what lasts
   // (the wind and the arm) for one more course when the heat has one (counting every course left did worse: measured)
-  const op = jtCornerOpp(s, sk), after = Math.min(1, jtAfterNext()), base = jtCornerM(s, Object.assign(jtAfterJobs(s, []), { shaken: 0 }), op);
+  const op = jtCornerOpp(s, sk), mine = jtPlansOf(s), after = Math.min(1, jtAfterNext()), base = jtCornerM(s, Object.assign(jtAfterJobs(s, []), { shaken: 0 }), op, mine);
   let best = null;
   for (const a of jobs) for (const b of jobs) {
     if (a === b) continue;
-    const X = jtAfterJobs(s, [a, b]), v = jtCornerM(s, X, op) + (after ? after * JT_CORNER.last * (jtCornerM(s, { wind: X.wind, arm: X.arm, shaken: 0, girth: 0 }, op) - base) : 0);
+    const X = jtAfterJobs(s, [a, b]), v = jtCornerM(s, X, op, mine) + (after ? after * JT_CORNER.last * (jtCornerM(s, { wind: X.wind, arm: X.arm, shaken: 0, girth: 0 }, op, mine) - base) : 0);
     if (!best || v > best.v + 1e-9) best = { jobs: [a, b], v };
   }
   return { jobs: best.jobs, why: jtCornerWhy(s, best.jobs) };
@@ -47991,21 +48111,26 @@ function jtRender(dt) {
   if (d !== JTP.dpr || JTP.cv.width !== Math.round(960 * d)) { JTP.dpr = d; JTP.cv.width = Math.round(960 * d); JTP.cv.height = Math.round(600 * d); }
   const c = JTP.c; c.save(); c.setTransform(d, 0, 0, d, 0, 0); jtDraw(c, dt || 0); c.restore();
 }
+// the arrows and a held button (the Lean buttons: jtHold) move your hand or your lean
 function jtKeysV() {
-  const K = JTP.keys, x = (K.arrowright ? 1 : 0) - (K.arrowleft ? 1 : 0), y = (K.arrowup ? 1 : 0) - (K.arrowdown ? 1 : 0);
+  const K = JTP.keys, B = JTP.btn || { x: 0, y: 0 }, x = (K.arrowright ? 1 : 0) - (K.arrowleft ? 1 : 0) + B.x, y = (K.arrowup ? 1 : 0) - (K.arrowdown ? 1 : 0) + B.y;
   if (!JTP.ptr) jtNudge(x, y);
 }
+function jtHold(vx, vy) { JTP.btn = { x: clamp(+vx || 0, -1, 1), y: clamp(+vy || 0, -1, 1) }; }
+// (a throw in one frame is logged and the next frame still comes: phase 2's review)
 function jtFrame(now) {
   if (!JTP.on) return;
-  const dt = Math.min(.05, Math.max(0, (now - JTP.last) / 1000)); JTP.last = now;
-  const md = document.getElementById('modal'), boxed = !!md && !md.hidden;
-  jtKeysV();
-  if (!JTP.paused && !boxed) for (let i = 0; i < JTP.speed && !JTP.paused; i++) jtTick(dt);
-  jtRender(JTP.paused ? 0 : dt);
-  JTP.raf = requestAnimationFrame(jtFrame);
+  try {
+    const dt = Math.min(.05, Math.max(0, (now - JTP.last) / 1000)); JTP.last = now;
+    const md = document.getElementById('modal'), boxed = !!md && !md.hidden;
+    jtKeysV();
+    if (!JTP.paused && !boxed) for (let i = 0; i < JTP.speed && !JTP.paused; i++) jtTick(dt);
+    jtRender(JTP.paused ? 0 : dt);
+  } catch (e) { console.warn('The Lists: a frame threw', e); }
+  finally { if (JTP.on) JTP.raf = requestAnimationFrame(jtFrame); }
 }
 function jtShow() { JTP.host.hidden = false; if (JTP.on) return; JTP.on = true; JTP.last = performance.now(); JTP.raf = requestAnimationFrame(jtFrame); }
-function jtHide() { JTP.ptr = null; JTP.keys = {}; if (GP) jtNudge(0, 0); JTP.host.hidden = true; JTP.on = false; cancelAnimationFrame(JTP.raf); }
+function jtHide() { JTP.ptr = null; JTP.keys = {}; JTP.btn = null; if (GP) jtNudge(0, 0); JTP.host.hidden = true; JTP.on = false; cancelAnimationFrame(JTP.raf); }
 
 /* ---------- the keys ---------- */
 const JT_KEYS = { 1: ['aim', 'shield'], 2: ['aim', 'body'], 3: ['aim', 'helm'], q: ['guard', 'angled'], w: ['guard', 'square'], e: ['pace', 'canter'], r: ['pace', 'gallop'] };
@@ -48036,7 +48161,7 @@ function jtKeyUp(e) {
 }
 window.addEventListener('keydown', jtKeyDown, true);
 window.addEventListener('keyup', jtKeyUp, true);
-window.addEventListener('blur', () => { JTP.keys = {}; if (GP) jtNudge(0, 0); });
+window.addEventListener('blur', () => { JTP.keys = {}; JTP.btn = null; if (GP) jtNudge(0, 0); });
 
 /* ---------- the pointer: tap to spur, hold to couch, drag to aim and to lean ---------- */
 function jtPtrAt(e) { const r = JTP.cv.getBoundingClientRect(); return { sx: (e.clientX - r.left) * 960 / r.width, sy: (e.clientY - r.top) * 600 / r.height }; }
@@ -48095,7 +48220,10 @@ for (const ev of ['pointerup', 'pointercancel', 'lostpointercapture']) JTP.cv.ad
    nerveK(p, nerve); jobs (the squires' three jobs), cornerPlan(s, skill) (a corner's { jobs, why }), cornerDo(s, jobs)
    ('' or why not), squad (each side's squires, wind, arm, shake, girth, pressure, corner due and the last corner),
    mountFor(rs, courses) (the captain's mount for a rider: { m, why }); squadRules (the numbers). select({ jobs, job:
-   [squire, job], corner }) sets your squires' jobs on Play, before you ride. */
+   [squire, job], corner }) sets your squires' jobs on Play, before you ride.
+   Phase 2's review: hold(vx, vy) is a held button (the Lean buttons) as the arrows are; nudge is overwritten each frame
+   by the arrows and the held buttons. seat(st, d, lean, rnd, own) takes the rider's own strike (a tip that went high
+   and didn't break leaves them reaching). start(opts) also takes guardBy (lab only: a guard a side, or null). */
 return {
   rules: JSON.parse(JSON.stringify(JT_RULES)), at: JSON.parse(JSON.stringify(JT_AT)), get G() { return G; },
   newMatch: o => jtNewMatch(o), riders: () => jtRiders(), inTilt: () => jtInTilt(), left: () => jtLeft(),
@@ -48107,7 +48235,8 @@ return {
   stats: JT_STATS.slice(), skills: JSON.parse(JSON.stringify(JT_SKILL)), model: { sway: JT_SWAY, brk: JT_BREAK, rock: JT_ROCK, seat: JT_SEAT },
   rate: k => jtRate(k), rs: k => jtRs(k), zoneAt: (x, y, g) => jtZoneAt(x, y, g), edge: (z, x, y, g) => jtEdge(z, x, y, g),
   sway: o => jtSway(o), rideSpeed: o => jtSpeed(o), charge: (o, rnd) => jtCharge(o, rnd || Math.random), strike: (a, d, rnd) => jtStrike(a, d, rnd || Math.random),
-  seat: (st, d, lean, rnd) => jtSeat(st, d, lean, rnd || Math.random), impact: (rides, leans, rnd) => jtImpact(rides, leans || [.5, .5], rnd || Math.random),
+  seat: (st, d, lean, rnd, own) => jtSeat(st, d, lean, rnd || Math.random, own), impact: (rides, leans, rnd) => jtImpact(rides, leans || [.5, .5], rnd || Math.random),
+  planMix: s => G && G.teams && !G.over ? JT_PLANS.map((p, i) => Object.assign({ share: jtMixNow(s)[i] }, p)) : null, habit: s => G && G.teams && !G.over ? jtHabitOf(s) : null,
   start: o => { jtStart(o); jtPlayStart(o); return G; }, turn: () => GP && ['charge', 'seat'].includes(GP.ph) ? null : jtTurn(), rideCourse: (p, r, l) => G && G.teams ? jtRideCourse(p, r, l) : null, plan: s => G && G.teams && !G.over ? jtPlan(s) : null,
   summary: () => jtSummary(), simMatch: o => jtSimMatch(o),
   courseOpen: (p, r, l, w) => G && G.teams ? jtCourseOpen(p, r, l, w) : null, courseClose: (P, l) => G && G.teams ? jtCourseClose(P, l) : null,
@@ -48115,7 +48244,7 @@ return {
   modes: JT_MODES.slice(), playRules: JSON.parse(JSON.stringify(JT_PLAY)), get phase() { return GP ? GP.ph : null; }, get msg() { return GP ? GP.msg : ''; }, get call() { return GP ? GP.call : ''; },
   get view() { return G && G.teams ? jtView() : null; }, get mode() { return GP ? GP.mode : null; }, get last() { return GP && GP.last ? JSON.parse(JSON.stringify(GP.last)) : null; },
   setMode: m => jtSetMode(m), tick: dt => jtTick(dt), select: o => jtSelect(o), press: () => jtPress(), spur: () => jtSpur(), couch: on => jtCouch(on !== false),
-  aim: (x, y) => jtAim(x, y), nudge: (vx, vy) => jtNudge(vx, vy), lean: v => jtLeanTo(v), aimScr: (x, y) => jtAimScr(x, y), aimUn: (sx, sy) => jtAimUn(sx, sy), eight: (t, amp, pace) => jtEight(t, amp, pace),
+  aim: (x, y) => jtAim(x, y), nudge: (vx, vy) => jtNudge(vx, vy), hold: (vx, vy) => jtHold(vx, vy), lean: v => jtLeanTo(v), aimScr: (x, y) => jtAimScr(x, y), aimUn: (sx, sy) => jtAimUn(sx, sy), eight: (t, amp, pace) => jtEight(t, amp, pace),
   set onPhase(f) { JT_HOOK.onPhase = f; }, set onPick(f) { JT_HOOK.onPick = f; }, set onOver(f) { JT_HOOK.onOver = f; }, get onPhase() { return JT_HOOK.onPhase; }, get onPick() { return JT_HOOK.onPick; }, get onOver() { return JT_HOOK.onOver; },
   show: () => jtShow(), hide: () => jtHide(), get on() { return JTP.on; }, render: dt => jtRender(dt || 0),
   pause: on => { JTP.paused = !!on; }, get paused() { return JTP.paused; }, get speed() { return JTP.speed; }, set speed(n) { JTP.speed = clamp(Math.round(n) || 1, 1, 8); },
@@ -67922,7 +68051,7 @@ $('v-lists').insertAdjacentHTML('beforebegin', `<div id="wListsBar" class="wdbar
   <b id="wListsTitle">A tourney at the Tilting Lists</b><span id="wListsNote" class="hint wsnote"></span>
   <span id="wListsModes" class="wgmodes" role="group" aria-label="Who rides">${Object.entries(W_LISTS_MODES).map(([k, m]) => `<button class="ghost" data-jmode="${k}" title="${esc(m.title)}">${esc(m.n)}</button>`).join('')}</span>
   <label class="hint" title="How many courses a heat is. Also on the Settings panel.">Courses <select id="wListsCourses">${wJT.rules.coursesAt.map(m => `<option value="${m}">${m}</option>`).join('')}</select></label>
-  <label class="hint" title="How well the other side rides: a Squire picks a plan at random; a Knight plays the odds and reads the score and the heat; an Archmage also knows how your side rides, saves its mount's wind for when it pays, and has surer hands.">Their riders <select id="wListsSkill">${wJT.skills.map((S, i) => `<option value="${i}">${S.n}</option>`).join('')}</select></label>
+  <label class="hint" title="How well the other side rides: a Squire picks a plan at random; a Knight mixes its plans by the odds, so no plan always ridden beats it, and reads the score and the heat; an Archmage reads how your riders have ridden this match, saves its mount's wind for when it pays, and has surer hands.">Their riders <select id="wListsSkill">${wJT.skills.map((S, i) => `<option value="${i}">${S.n}</option>`).join('')}</select></label>
   <label class="hint" id="wListsSpeedL" title="How fast the match runs while you watch. In You ride it is always 1.">Speed <select id="wListsSpeed"><option value="1">1×</option><option value="2">2×</option><option value="4">4×</option></select></label>
   <button class="ghost" id="wListsAgain">Another match</button>
   <button class="ghost" id="wListsBack">Back to the world</button></div>`);
@@ -67945,7 +68074,7 @@ $('v-lists').insertAdjacentHTML('beforeend', `<div id="wListsRows" class="wccall
   <div class="wccrow"><span class="wccl">Aim</span><span id="wListsAim"></span></div>
   <div class="wccrow"><span class="wccl">Guard</span><span id="wListsGuard"></span></div>
   <div class="wccrow"><span class="wccl">Pace</span><span id="wListsPace"></span></div>
-  <div class="wccrow"><span class="wccl">Ride</span><span id="wListsGo"></span></div></div>
+  <div class="wccrow" id="wListsRowGo"><span class="wccl">Ride</span><span id="wListsGo"></span></div></div>
   <div id="wListsChargeRow" class="wccalls" hidden><div class="wccrow"><span class="wccl">Charge</span><span><button class="ghost" id="wListsSpur">Spur</button> <button class="ghost" id="wListsCouch">Hold to couch</button> <small class="hint">Or on the lists: tap with the hoofbeats, then hold and drag to aim.</small></span></div></div>
   <div id="wListsSeatRow" class="wccalls" hidden><div class="wccrow"><span class="wccl">Lean</span><span><button class="ghost" id="wListsLeanL">◀ Lean</button> <button class="ghost" id="wListsLeanR">Lean ▶</button> <small class="hint">Hold against the wobble (or the arrows, or drag).</small></span></div></div>
   <h4 class="wsh">The tourney board</h4><div id="wListsBoard" class="wcbox"></div>
@@ -67964,7 +68093,7 @@ $('wListsRows').addEventListener('click', e => {
 });
 $('wListsSpur').addEventListener('pointerdown', e => { if (WJT) { wJT.spur(); e.preventDefault(); } });
 for (const [ev, on] of [['pointerdown', true], ['pointerup', false], ['pointerleave', false], ['pointercancel', false]]) $('wListsCouch').addEventListener(ev, e => { if (WJT) { wJT.couch(on); e.preventDefault(); } });
-for (const [id, v] of [['wListsLeanL', -1], ['wListsLeanR', 1]]) for (const [ev, on] of [['pointerdown', true], ['pointerup', false], ['pointerleave', false], ['pointercancel', false]]) $(id).addEventListener(ev, e => { if (WJT) { wJT.nudge(on ? v : 0, 0); e.preventDefault(); } });
+for (const [id, v] of [['wListsLeanL', -1], ['wListsLeanR', 1]]) for (const [ev, on] of [['pointerdown', true], ['pointerup', false], ['pointerleave', false], ['pointercancel', false]]) $(id).addEventListener(ev, e => { if (WJT) { wJT.hold(on ? v : 0, 0); e.preventDefault(); } });
 // the rows: your plan before a course, the charge's buttons while you ride, Lean in the balance moment
 function wListsRows() {
   const V = WJT && !WJT.over && wJT.G && wJT.G.teams ? wJT.view : null, mine = V && V.mode === 'play';
@@ -67974,7 +68103,7 @@ function wListsRows() {
   box.hidden = !plan; if (!plan) return;
   const S = V.sel, on = (a, b) => a === b ? ' on' : '';
   for (const [f, id] of [['aim', 'wListsAim'], ['guard', 'wListsGuard'], ['pace', 'wListsPace']]) $(id).innerHTML = W_LISTS_ROWS[f].map(([k, n, t]) => `<button class="ghost${on(k, S[f])}" data-jf="${f}" data-jv="${k}" title="${esc(t)}">${n}</button>`).join(' ');
-  $('wListsGo').innerHTML = `<button class="ghost on" data-jgo="1" title="Space">Ride</button> <button class="ghost" data-jsuggest="1" title="G: your squire's plan for this course">Squire's plan</button> <small class="hint">${esc(S.why ? 'Your squire: ' + S.why + '.' : '')}</small>`;
+  $('wListsGo').innerHTML = `<button class="ghost on" id="wListsRideBtn" data-jgo="1" title="Space">Ride</button> <button class="ghost" data-jsuggest="1" title="G: your squire's plan for this course">Squire's plan</button> <small class="hint">${esc(S.why ? 'Your squire: ' + S.why + '.' : '')}</small>`;
 }
 // the two clubs; taken: names already in the match, so nobody shares one
 function wListsTeams(taken) {
@@ -68082,7 +68211,7 @@ function wListsHowHTML() {
   <p class="hint"><b>Your plan</b>, before each course: the <b>aim</b> (the shield, the body or the helm: 1, 2, 3; the helm is worth two but is a small mark, bigger when their shield is angled, and a lance that misses it leaves you reaching, so their lance rocks you more), the <b>guard</b> (angled turns strikes on your shield aside but leaves your helm open; square takes the hit and helps you stay on: Q, W) and the <b>pace</b> (a canter aims steadier and saves the mount's wind; a gallop hits harder but the tip sways more: E, R). Your squire suggests a plan, with the reason (G).</p>
   <p class="hint"><b>The charge.</b> Space (or Ride) sets off. <b>Spur:</b> tap Space with the hoofbeats (or tap the lists): taps on the beat build speed, taps off it don't. <b>Couch:</b> after the spur, hold Space (or hold a finger down) to lower the lance. The right moment is marked on the bar: too early and your arm tires and the tip droops (low strikes are fouls), too late and the tip never settles; let go and the lance comes up, a miss. <b>Aim:</b> the tip rides the horse's stride in a figure-eight; hold it on your mark with the arrows, or drag. A good lance rating sways less.</p>
   <p class="hint"><b>Keep your seat.</b> When their lance breaks on you, your rider rocks: lean against the wobble (the left and right arrows, drag, or the Lean buttons) to stay on. A harder hit (the helm, a gallop) wobbles more; a square guard helps. A glance never unhorses.</p>
-  <p class="hint"><b>Their riders</b> (on the bar): a <b>Squire</b> picks a plan at random; a <b>Knight</b> plays the odds and reads the score and the heat (behind with too few courses left, it rides for the points; well ahead, it weighs the points against it double); an <b>Archmage</b> also knows how a rider of your side's skill rides, saves its mount's wind for when a gallop pays, and has surer hands. <b>Watch</b> hands both sides to the CPU, and Speed on the bar runs it faster.</p>`;
+  <p class="hint"><b>Their riders</b> (on the bar): a <b>Squire</b> picks a plan at random; a <b>Knight</b> mixes its plans by the odds, so riding the same plan every course won't beat it, and reads the score and the heat (behind with too few courses left, it goes for the helm; well ahead, it weighs the points against it double); an <b>Archmage</b> reads how your riders have ridden this match and rides against it, saves its mount's wind for when a gallop pays, and has surer hands. Your squire's plan is the best by the odds against how their riders ride. <b>Watch</b> hands both sides to the CPU, and Speed on the bar runs it faster.</p>`;
 }
 const wW147RenderHelp = renderHelp;
 renderHelp = function () {

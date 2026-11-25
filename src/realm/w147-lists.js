@@ -34,7 +34,7 @@ $('v-lists').insertAdjacentHTML('beforebegin', `<div id="wListsBar" class="wdbar
   <b id="wListsTitle">A tourney at the Tilting Lists</b><span id="wListsNote" class="hint wsnote"></span>
   <span id="wListsModes" class="wgmodes" role="group" aria-label="Who rides">${Object.entries(W_LISTS_MODES).map(([k, m]) => `<button class="ghost" data-jmode="${k}" title="${esc(m.title)}">${esc(m.n)}</button>`).join('')}</span>
   <label class="hint" title="How many courses a heat is. Also on the Settings panel.">Courses <select id="wListsCourses">${wJT.rules.coursesAt.map(m => `<option value="${m}">${m}</option>`).join('')}</select></label>
-  <label class="hint" title="How well the other side rides: a Squire picks a plan at random; a Knight plays the odds and reads the score and the heat; an Archmage also knows how your side rides, saves its mount's wind for when it pays, and has surer hands.">Their riders <select id="wListsSkill">${wJT.skills.map((S, i) => `<option value="${i}">${S.n}</option>`).join('')}</select></label>
+  <label class="hint" title="How well the other side rides: a Squire picks a plan at random; a Knight mixes its plans by the odds, so no plan always ridden beats it, and reads the score and the heat; an Archmage reads how your riders have ridden this match, saves its mount's wind for when it pays, and has surer hands.">Their riders <select id="wListsSkill">${wJT.skills.map((S, i) => `<option value="${i}">${S.n}</option>`).join('')}</select></label>
   <label class="hint" id="wListsSpeedL" title="How fast the match runs while you watch. In You ride it is always 1.">Speed <select id="wListsSpeed"><option value="1">1×</option><option value="2">2×</option><option value="4">4×</option></select></label>
   <button class="ghost" id="wListsAgain">Another match</button>
   <button class="ghost" id="wListsBack">Back to the world</button></div>`);
@@ -57,7 +57,7 @@ $('v-lists').insertAdjacentHTML('beforeend', `<div id="wListsRows" class="wccall
   <div class="wccrow"><span class="wccl">Aim</span><span id="wListsAim"></span></div>
   <div class="wccrow"><span class="wccl">Guard</span><span id="wListsGuard"></span></div>
   <div class="wccrow"><span class="wccl">Pace</span><span id="wListsPace"></span></div>
-  <div class="wccrow"><span class="wccl">Ride</span><span id="wListsGo"></span></div></div>
+  <div class="wccrow" id="wListsRowGo"><span class="wccl">Ride</span><span id="wListsGo"></span></div></div>
   <div id="wListsChargeRow" class="wccalls" hidden><div class="wccrow"><span class="wccl">Charge</span><span><button class="ghost" id="wListsSpur">Spur</button> <button class="ghost" id="wListsCouch">Hold to couch</button> <small class="hint">Or on the lists: tap with the hoofbeats, then hold and drag to aim.</small></span></div></div>
   <div id="wListsSeatRow" class="wccalls" hidden><div class="wccrow"><span class="wccl">Lean</span><span><button class="ghost" id="wListsLeanL">◀ Lean</button> <button class="ghost" id="wListsLeanR">Lean ▶</button> <small class="hint">Hold against the wobble (or the arrows, or drag).</small></span></div></div>
   <h4 class="wsh">The tourney board</h4><div id="wListsBoard" class="wcbox"></div>
@@ -76,7 +76,7 @@ $('wListsRows').addEventListener('click', e => {
 });
 $('wListsSpur').addEventListener('pointerdown', e => { if (WJT) { wJT.spur(); e.preventDefault(); } });
 for (const [ev, on] of [['pointerdown', true], ['pointerup', false], ['pointerleave', false], ['pointercancel', false]]) $('wListsCouch').addEventListener(ev, e => { if (WJT) { wJT.couch(on); e.preventDefault(); } });
-for (const [id, v] of [['wListsLeanL', -1], ['wListsLeanR', 1]]) for (const [ev, on] of [['pointerdown', true], ['pointerup', false], ['pointerleave', false], ['pointercancel', false]]) $(id).addEventListener(ev, e => { if (WJT) { wJT.nudge(on ? v : 0, 0); e.preventDefault(); } });
+for (const [id, v] of [['wListsLeanL', -1], ['wListsLeanR', 1]]) for (const [ev, on] of [['pointerdown', true], ['pointerup', false], ['pointerleave', false], ['pointercancel', false]]) $(id).addEventListener(ev, e => { if (WJT) { wJT.hold(on ? v : 0, 0); e.preventDefault(); } });
 // the rows: your plan before a course, the charge's buttons while you ride, Lean in the balance moment
 function wListsRows() {
   const V = WJT && !WJT.over && wJT.G && wJT.G.teams ? wJT.view : null, mine = V && V.mode === 'play';
@@ -86,7 +86,7 @@ function wListsRows() {
   box.hidden = !plan; if (!plan) return;
   const S = V.sel, on = (a, b) => a === b ? ' on' : '';
   for (const [f, id] of [['aim', 'wListsAim'], ['guard', 'wListsGuard'], ['pace', 'wListsPace']]) $(id).innerHTML = W_LISTS_ROWS[f].map(([k, n, t]) => `<button class="ghost${on(k, S[f])}" data-jf="${f}" data-jv="${k}" title="${esc(t)}">${n}</button>`).join(' ');
-  $('wListsGo').innerHTML = `<button class="ghost on" data-jgo="1" title="Space">Ride</button> <button class="ghost" data-jsuggest="1" title="G: your squire's plan for this course">Squire's plan</button> <small class="hint">${esc(S.why ? 'Your squire: ' + S.why + '.' : '')}</small>`;
+  $('wListsGo').innerHTML = `<button class="ghost on" id="wListsRideBtn" data-jgo="1" title="Space">Ride</button> <button class="ghost" data-jsuggest="1" title="G: your squire's plan for this course">Squire's plan</button> <small class="hint">${esc(S.why ? 'Your squire: ' + S.why + '.' : '')}</small>`;
 }
 // the two clubs; taken: names already in the match, so nobody shares one
 function wListsTeams(taken) {
@@ -194,7 +194,7 @@ function wListsHowHTML() {
   <p class="hint"><b>Your plan</b>, before each course: the <b>aim</b> (the shield, the body or the helm: 1, 2, 3; the helm is worth two but is a small mark, bigger when their shield is angled, and a lance that misses it leaves you reaching, so their lance rocks you more), the <b>guard</b> (angled turns strikes on your shield aside but leaves your helm open; square takes the hit and helps you stay on: Q, W) and the <b>pace</b> (a canter aims steadier and saves the mount's wind; a gallop hits harder but the tip sways more: E, R). Your squire suggests a plan, with the reason (G).</p>
   <p class="hint"><b>The charge.</b> Space (or Ride) sets off. <b>Spur:</b> tap Space with the hoofbeats (or tap the lists): taps on the beat build speed, taps off it don't. <b>Couch:</b> after the spur, hold Space (or hold a finger down) to lower the lance. The right moment is marked on the bar: too early and your arm tires and the tip droops (low strikes are fouls), too late and the tip never settles; let go and the lance comes up, a miss. <b>Aim:</b> the tip rides the horse's stride in a figure-eight; hold it on your mark with the arrows, or drag. A good lance rating sways less.</p>
   <p class="hint"><b>Keep your seat.</b> When their lance breaks on you, your rider rocks: lean against the wobble (the left and right arrows, drag, or the Lean buttons) to stay on. A harder hit (the helm, a gallop) wobbles more; a square guard helps. A glance never unhorses.</p>
-  <p class="hint"><b>Their riders</b> (on the bar): a <b>Squire</b> picks a plan at random; a <b>Knight</b> plays the odds and reads the score and the heat (behind with too few courses left, it rides for the points; well ahead, it weighs the points against it double); an <b>Archmage</b> also knows how a rider of your side's skill rides, saves its mount's wind for when a gallop pays, and has surer hands. <b>Watch</b> hands both sides to the CPU, and Speed on the bar runs it faster.</p>`;
+  <p class="hint"><b>Their riders</b> (on the bar): a <b>Squire</b> picks a plan at random; a <b>Knight</b> mixes its plans by the odds, so riding the same plan every course won't beat it, and reads the score and the heat (behind with too few courses left, it goes for the helm; well ahead, it weighs the points against it double); an <b>Archmage</b> reads how your riders have ridden this match and rides against it, saves its mount's wind for when a gallop pays, and has surer hands. Your squire's plan is the best by the odds against how their riders ride. <b>Watch</b> hands both sides to the CPU, and Speed on the bar runs it faster.</p>`;
 }
 const wW147RenderHelp = renderHelp;
 renderHelp = function () {

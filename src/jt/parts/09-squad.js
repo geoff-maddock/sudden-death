@@ -20,9 +20,9 @@
    corner is chosen by the side: on Play by you, your corner suggesting; the CPU by its skill (jtCornerPlan):
    - a Squire's corner picks two jobs at random;
    - a Knight's works out each way of sharing two jobs between its two squires on the model (jtCornerM: the next
-     course ridden from the state the jobs leave, against the plan a Knight would ride, and what lasts, the wind and
-     the arm, for one more course), and takes the best;
-   - an Archmage's does the same against the plan the other side will really ride (its own skill's).
+     course ridden from the state the jobs leave, its rider riding its own plans against a Knight's mix, and what
+     lasts, the wind and the arm, for one more course), and takes the best;
+   - an Archmage's does the same against the plans the other side will really ride (its own skill's).
    Every corner is logged with its reason (G.corners).
    Pressure (jtPressure, 0 or 1): the last course of a heat when the side is behind in the match, and every course of
    the tilt for the crown. Nerve takes it off (jtNerveK): the tip sways more and the couch's timing scatters, less for
@@ -139,33 +139,42 @@ function jtAfterJobs(s, jobs) {
   return X;
 }
 /* what one course is worth to side s (its points less the other side's, on average) with its rider in state X, riding
-   the plan it would ride then, against the other rider on plan op: played out JT_CORNER.n times on a stream of its own
-   (the same numbers for every state, so the states are compared fairly; the match's random numbers are never touched) */
-function jtCornerM(s, X, op) {
-  const keep = ['wind', 'arm', 'shaken', 'girth'].map(k => G[k][s]), o = 1 - s, lab = G.lab || {};
-  let mine;
+   the plans it would ride (mine: [{ plan, w }], drawn by their shares) against the other rider's (op, the same):
+   played out JT_CORNER.n times on a stream of its own (the same numbers for every state, so the states are compared
+   fairly; the match's random numbers are never touched) */
+function jtCornerM(s, X, op, mine) {
+  const keep = ['wind', 'arm', 'shaken', 'girth'].map(k => G[k][s]), o = 1 - s;
+  let rides;
   try {
     G.wind[s] = X.wind; G.arm[s] = X.arm; G.shaken[s] = X.shaken; G.girth[s] = X.girth;
-    const psk = lab.planBy && lab.planBy[s] != null ? lab.planBy[s] : G.skill[s];
-    mine = jtRideOpts(s, psk <= 0 && !(lab.fix && lab.fix[s]) ? JT_CORNER.plain : jtPlan(s));
+    rides = mine.map(d => jtRideOpts(s, d.plan));
   } finally { ['wind', 'arm', 'shaken', 'girth'].forEach((k, i) => { G[k][s] = keep[i]; }); }
-  const theirs = jtRideOpts(o, op), rnd = engRng(JT_CORNER.seed), ln = [0, 1].map(x => JT_SKILL[jtHandsK(x)].lean);
+  const theirs = op.map(d => jtRideOpts(o, d.plan)), rnd = engRng(JT_CORNER.seed), ln = [0, 1].map(x => JT_SKILL[jtHandsK(x)].lean);
+  const draw = D => { let r = rnd(); for (let i = 0; i < D.length; i++) { r -= D[i].w; if (r <= 0) return i; } return D.length - 1; };
   const pts = (I, x) => I.res[x].unhorse ? JT_RULES.unhorse : JT_RULES.pts[I.res[x].at] || 0;
   let m = 0;
   for (let i = 0; i < JT_CORNER.n; i++) {
-    const a = jtCharge(mine, rnd), b = jtCharge(theirs, rnd), I = jtImpact(s ? [b, a] : [a, b], ln, rnd);
+    const a = jtCharge(rides[draw(mine)], rnd), b = jtCharge(theirs[draw(op)], rnd), I = jtImpact(s ? [b, a] : [a, b], ln, rnd);
     m += pts(I, s) - pts(I, o) - (I.res[o].unhorse ? JT_CORNER.heat * jtAfterNext() : 0) + (I.res[s].unhorse ? JT_CORNER.heat * jtAfterNext() : 0);
   }
   return m / JT_CORNER.n;
 }
-// the plan the other side's rider is reckoned to ride next: a Knight's corner reckons a Knight's plan; an Archmage's
-// reads the other side's own (a Squire's anything: its plain plan)
-function jtCornerOpp(s, sk) {
-  const o = 1 - s, keep = G.skill[o];
-  if (sk >= 2 && keep <= 0) return JT_CORNER.plain;
-  if (sk < 2) G.skill[o] = 1;
-  try { return jtPlan(o); } finally { G.skill[o] = keep; }
+// a Knight's mix as plans and shares (the shares under JT_READ.min left out)
+function jtMixDist(s) {
+  const x = jtMixNow(s); if (!x) return [{ plan: JT_CORNER.plain, w: 1 }];
+  const D = JT_PLANS.map((p, i) => ({ plan: p, w: x[i] })).filter(d => d.w >= JT_READ.min), t = D.reduce((a, d) => a + d.w, 0);
+  return D.map(d => ({ plan: d.plan, w: d.w / t }));
 }
+// the plans side s (or the other side, as side s's corner reckons them: sk) is reckoned to ride next: a Squire's anything
+// (its plain plan), a Knight's mix, an Archmage's plan; a Knight's corner reckons the other side rides a Knight's mix
+function jtPlansOf(s) {
+  const lab = G.lab || {}, sk = lab.planBy && lab.planBy[s] != null ? lab.planBy[s] : G.skill[s];
+  if (lab.fix && lab.fix[s]) return [{ plan: lab.fix[s], w: 1 }];
+  if (sk === 0) return [{ plan: JT_CORNER.plain, w: 1 }];
+  if (sk === 1) return jtMixDist(s);
+  return [{ plan: jtPlanOwn(s, { det: true }), w: 1 }];
+}
+function jtCornerOpp(s, sk) { return sk >= 2 ? jtPlansOf(1 - s) : jtMixDist(1 - s); }
 /* side s's corner, by a skill: { jobs: [squire 0's job, squire 1's], why } */
 function jtCornerPlan(s, sk, allow) {
   if (sk == null) { const lab = (G.lab || {}).cornerBy; sk = lab && typeof lab[s] === 'number' ? lab[s] : G.skill[s]; }
@@ -176,11 +185,11 @@ function jtCornerPlan(s, sk, allow) {
   }
   // each way to share two of the jobs between the two squires: the next course in the state it leaves, and what lasts
   // (the wind and the arm) for one more course when the heat has one (counting every course left did worse: measured)
-  const op = jtCornerOpp(s, sk), after = Math.min(1, jtAfterNext()), base = jtCornerM(s, Object.assign(jtAfterJobs(s, []), { shaken: 0 }), op);
+  const op = jtCornerOpp(s, sk), mine = jtPlansOf(s), after = Math.min(1, jtAfterNext()), base = jtCornerM(s, Object.assign(jtAfterJobs(s, []), { shaken: 0 }), op, mine);
   let best = null;
   for (const a of jobs) for (const b of jobs) {
     if (a === b) continue;
-    const X = jtAfterJobs(s, [a, b]), v = jtCornerM(s, X, op) + (after ? after * JT_CORNER.last * (jtCornerM(s, { wind: X.wind, arm: X.arm, shaken: 0, girth: 0 }, op) - base) : 0);
+    const X = jtAfterJobs(s, [a, b]), v = jtCornerM(s, X, op, mine) + (after ? after * JT_CORNER.last * (jtCornerM(s, { wind: X.wind, arm: X.arm, shaken: 0, girth: 0 }, op, mine) - base) : 0);
     if (!best || v > best.v + 1e-9) best = { jobs: [a, b], v };
   }
   return { jobs: best.jobs, why: jtCornerWhy(s, best.jobs) };

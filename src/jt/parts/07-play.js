@@ -14,12 +14,13 @@
      before the impact and the lance comes up: a miss.
    - the aim: once couched, the tip rides the stride's figure-eight, sway()'s spread times JT_PLAY.aim.eight wide;
      your hand (the arrows, or drag) holds it on your mark. At impact the tip is the mark, plus the eight, plus your
-     hand, plus a little of your rider's own miss (JT_PLAY.aim.noise of the spread), less the droop.
+     hand, plus your rider's own miss (JT_PLAY.aim.noise of the spread: a perfect hand rides about as true as an
+     Archmage's, a little truer at the helm; phase 2's review), less the droop.
    - the impact, then the seat: if their lance broke on you, a short balance moment follows: the rider wobbles and you
      lean against it (the arrows, drag, or the Lean buttons). How well you held it is your lean (0 to 1) for seat().
    Watch: the CPU rides both. You ride: your side's courses are yours (side 0). */
 const JT_PLAY = { charge: 3.6, spur: { until: .42, win: .09, min: .86, beat: { canter: .46, gallop: .34 } }, couch: { ideal: .66, span: .3, high: 40 },
-  aim: { eight: 2.6, noise: .3, reach: 18, key: 40 }, seat: { time: 1.4, amp: 1, key: 2.6 }, pace: { herald: 1.2, after: 2.4, heat: 3.2, over: 3.4 } };
+  aim: { eight: 2.6, noise: .9, reach: 18, key: 40 }, seat: { time: 1.4, amp: 1, key: 2.6 }, pace: { herald: 1.2, after: 2.4, heat: 3.2, over: 3.4 } };
 const JT_HOOK = { onPhase: null, onPick: null, onOver: null };
 const JT_MODES = ['watch', 'play'];
 let GP = null;
@@ -39,10 +40,10 @@ const jtSide = s => G.teams[s].name;
 function jtPicked() { if (JT_HOOK.onPick) try { JT_HOOK.onPick(); } catch (e) { console.error(e); } }
 
 /* ---------- your plan ---------- */
-// your squire's word: the plan a Knight would ride here, with the reason
+// your squire's word: the best plan by the odds against how the other side rides (an Archmage's read, a Knight's
+// hands), with the reason (phase 2's review)
 function jtSuggest(s) {
-  const keep = G.skill[s]; G.skill[s] = 1; let P;
-  try { P = jtPlan(s); } finally { G.skill[s] = keep; }
+  const P = jtPlanOwn(s, { sk: 'word', hk: 1 });
   return { aim: P.aim, guard: P.guard, pace: P.pace, why: P.why };
 }
 /* change your plan: { aim, guard, pace, suggest }. Returns '' or why not */
@@ -100,7 +101,8 @@ function jtCharge0() {
   // (phase 3: your squires do the jobs you gave them before you set off)
   if (jtYours(GP.you) && GP.jobs && G.cornerDue && G.cornerDue[GP.you]) jtCornerDo(GP.you, GP.jobs, 'your call');
   GP.jobs = null;
-  const plans = [0, 1].map(s => jtYours(s) ? Object.assign({}, GP.sel) : GP.plans[s]);
+  // (a plan always exists for the course: yours, your squire's word when there is none, or the CPU's)
+  const plans = [0, 1].map(s => jtYours(s) ? Object.assign({}, GP.sel || jtSuggest(s)) : (GP.plans && GP.plans[s]) || jtPlan(s));
   // the CPU's rides are drawn as it sets off (the page draws its lance from them); yours is built as you ride
   const cpuRides = [0, 1].map(s => jtYours(s) ? null : jtCharge(jtRideOpts(s, plans[s]), R));
   const mine = jtYours(0) || jtYours(1), s = GP.you;
@@ -247,9 +249,21 @@ function jtPlayNext() {
 }
 function jtSetMode(m) {
   if (!GP || !JT_MODES.includes(m)) return;
-  GP.mode = m;
-  // a plan you were making goes back to the CPU in Watch; a charge in progress finishes as it began
+  const was = GP.mode; GP.mode = m;
+  if (m === was) return;
+  // a plan you were making goes back to the CPU in Watch; your course while the herald names the riders (You ride
+  // picked then) is yours, on a plan made for it; a charge of yours handed to Watch is ridden on by the CPU's hands for
+  // your side, and so is the balance moment (phase 2's review)
   if (m !== 'play' && GP.ph === 'plan') jtGo('next');
+  else if (m === 'play' && GP.ph === 'herald') jtGo('next');
+  else if (m !== 'play' && GP.ph === 'charge' && GP.ch && GP.ch.mine) jtHandOver();
+  else if (m !== 'play' && GP.ph === 'seat' && GP.P) { GP.P.lean[GP.you] = jtLean(GP.you); jtFinish(); }
+}
+// your charge handed to the CPU mid-way: its ride for your side, drawn now on your plan (your spur and hands are dropped)
+function jtHandOver() {
+  const C = GP.ch, s = GP.you;
+  GP.cpuRides[s] = jtCharge(jtRideOpts(s, GP.plans[s]), R);
+  C.mine = false; C.down = false; C.downAt = null; C.tipNow = null; GP.keyV = { x: 0, y: 0 };
 }
 // what the page needs, as a copy
 function jtView() {

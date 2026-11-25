@@ -23,21 +23,26 @@ function jtRender(dt) {
   if (d !== JTP.dpr || JTP.cv.width !== Math.round(960 * d)) { JTP.dpr = d; JTP.cv.width = Math.round(960 * d); JTP.cv.height = Math.round(600 * d); }
   const c = JTP.c; c.save(); c.setTransform(d, 0, 0, d, 0, 0); jtDraw(c, dt || 0); c.restore();
 }
+// the arrows and a held button (the Lean buttons: jtHold) move your hand or your lean
 function jtKeysV() {
-  const K = JTP.keys, x = (K.arrowright ? 1 : 0) - (K.arrowleft ? 1 : 0), y = (K.arrowup ? 1 : 0) - (K.arrowdown ? 1 : 0);
+  const K = JTP.keys, B = JTP.btn || { x: 0, y: 0 }, x = (K.arrowright ? 1 : 0) - (K.arrowleft ? 1 : 0) + B.x, y = (K.arrowup ? 1 : 0) - (K.arrowdown ? 1 : 0) + B.y;
   if (!JTP.ptr) jtNudge(x, y);
 }
+function jtHold(vx, vy) { JTP.btn = { x: clamp(+vx || 0, -1, 1), y: clamp(+vy || 0, -1, 1) }; }
+// (a throw in one frame is logged and the next frame still comes: phase 2's review)
 function jtFrame(now) {
   if (!JTP.on) return;
-  const dt = Math.min(.05, Math.max(0, (now - JTP.last) / 1000)); JTP.last = now;
-  const md = document.getElementById('modal'), boxed = !!md && !md.hidden;
-  jtKeysV();
-  if (!JTP.paused && !boxed) for (let i = 0; i < JTP.speed && !JTP.paused; i++) jtTick(dt);
-  jtRender(JTP.paused ? 0 : dt);
-  JTP.raf = requestAnimationFrame(jtFrame);
+  try {
+    const dt = Math.min(.05, Math.max(0, (now - JTP.last) / 1000)); JTP.last = now;
+    const md = document.getElementById('modal'), boxed = !!md && !md.hidden;
+    jtKeysV();
+    if (!JTP.paused && !boxed) for (let i = 0; i < JTP.speed && !JTP.paused; i++) jtTick(dt);
+    jtRender(JTP.paused ? 0 : dt);
+  } catch (e) { console.warn('The Lists: a frame threw', e); }
+  finally { if (JTP.on) JTP.raf = requestAnimationFrame(jtFrame); }
 }
 function jtShow() { JTP.host.hidden = false; if (JTP.on) return; JTP.on = true; JTP.last = performance.now(); JTP.raf = requestAnimationFrame(jtFrame); }
-function jtHide() { JTP.ptr = null; JTP.keys = {}; if (GP) jtNudge(0, 0); JTP.host.hidden = true; JTP.on = false; cancelAnimationFrame(JTP.raf); }
+function jtHide() { JTP.ptr = null; JTP.keys = {}; JTP.btn = null; if (GP) jtNudge(0, 0); JTP.host.hidden = true; JTP.on = false; cancelAnimationFrame(JTP.raf); }
 
 /* ---------- the keys ---------- */
 const JT_KEYS = { 1: ['aim', 'shield'], 2: ['aim', 'body'], 3: ['aim', 'helm'], q: ['guard', 'angled'], w: ['guard', 'square'], e: ['pace', 'canter'], r: ['pace', 'gallop'] };
@@ -68,7 +73,7 @@ function jtKeyUp(e) {
 }
 window.addEventListener('keydown', jtKeyDown, true);
 window.addEventListener('keyup', jtKeyUp, true);
-window.addEventListener('blur', () => { JTP.keys = {}; if (GP) jtNudge(0, 0); });
+window.addEventListener('blur', () => { JTP.keys = {}; JTP.btn = null; if (GP) jtNudge(0, 0); });
 
 /* ---------- the pointer: tap to spur, hold to couch, drag to aim and to lean ---------- */
 function jtPtrAt(e) { const r = JTP.cv.getBoundingClientRect(); return { sx: (e.clientX - r.left) * 960 / r.width, sy: (e.clientY - r.top) * 600 / r.height }; }

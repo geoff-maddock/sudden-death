@@ -32,7 +32,7 @@ function jtStart(opts) {
   // (lab only: a side planned by another skill's logic, ridden with another skill's hands, or held to one plan)
   const labSide = (L, ok) => Array.isArray(L) ? [0, 1].map(s => ok(L[s]) ? L[s] : null) : null, sk3 = v => v === 0 || v === 1 || v === 2;
   const fixOk = p => !!p && typeof p === 'object' && jtOwn(JT_PLAN.aim, p.aim) && jtOwn(JT_PLAN.guard, p.guard) && jtOwn(JT_PLAN.pace, p.pace);
-  const lab = { planBy: labSide(o.planBy, sk3), handsBy: labSide(o.handsBy, sk3), fix: labSide(o.fix, fixOk) };
+  const lab = { planBy: labSide(o.planBy, v => sk3(v) || v === 'word'), handsBy: labSide(o.handsBy, sk3), fix: labSide(o.fix, fixOk), guard: labSide(o.guardBy, g => g === 'angled' || g === 'square') };
   if (lab.fix) lab.fix = lab.fix.map(p => p && { aim: p.aim, guard: p.guard, pace: p.pace });
   Object.assign(G, { teams, skill: [0, 1].map(s => clamp(((o.skill || [])[s] ?? 1) | 0, 0, 2)), mounts, wind: [1, 1], n: 0, lab,
     st: [jtBox(), jtBox()], pst: teams.map(T => T.roster.map(() => ({ courses: 0, breaks: 0, helms: 0, unhorse: 0, unhorsed: 0, rocked: 0, kept: 0, fouls: 0, jobs: 0 }))), plans: [[], []], last: null });
