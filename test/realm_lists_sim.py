@@ -5,8 +5,11 @@
 # strike misses more, a gallop hits harder but the tip strays more, and an early couch droops the tip. A broken lance
 # rocks the rider, and a good seat, a square guard and a good lean keep them on; a glance never unhorses. The mounts:
 # a Charger hits hardest and sways most, a Destrier sways least, a Courser gets its wind back quickest. The CPU's plan:
-# a Knight behind with too few courses left goes for the helm at a gallop, ahead it rides safe, and in the tilt it
-# rides for a sure break; an Archmage saves its gallop for the heat's last course; a Squire picks anything.
+# a Knight behind with too few courses left goes for the helm at a gallop, ahead it weighs the points against it
+# double, and in the tilt it rides the best expected margin; an Archmage saves its gallop for the heat's last course;
+# a Squire picks anything. The plan is a real choice: at a Knight's hands no aim is best everywhere and each is best
+# somewhere; always going for the helm doesn't win; a Knight's plan beats a random one and an Archmage's a Knight's at
+# equal hands; every reason is true to the plan.
 # A match, CPU against CPU (calibrated): a Knight breaks a lance in about half its courses, helm breaks are rare,
 # about one match in three has an unhorsing, every match has a winner, and each skill beats the one below. The tilt
 # is capped, and the marshal's count settles it. simMatch leaves the match on the lists and its seeded stream alone,
@@ -51,7 +54,7 @@ async def main():
         z = await pg.evaluate("""(() => { const A = wJT.planRules.aim, at = (p, g) => wJT.zoneAt(p.x, p.y, g);
           return { aims: [at(A.shield, 'square'), at(A.body, 'square'), at(A.helm, 'square'), at(A.shield, 'angled'), at(A.body, 'angled')],
             low: wJT.zoneAt(0, -15, 'square'), mount: wJT.zoneAt(0, -30, 'square'), barrier: wJT.zoneAt(-20, -10, 'square'), miss: [wJT.zoneAt(20, 0, 'square'), wJT.zoneAt(0, 40, 'square')],
-            angledHelm: [wJT.zoneAt(0, 25, 'square'), wJT.zoneAt(0, 25, 'angled')], angledBody: [wJT.zoneAt(1.5, 2, 'square'), wJT.zoneAt(1.5, 2, 'angled')] }; })()""")
+            angledHelm: [wJT.zoneAt(0, 24, 'square'), wJT.zoneAt(0, 24, 'angled')], angledBody: [wJT.zoneAt(1.5, 2, 'square'), wJT.zoneAt(1.5, 2, 'angled')] }; })()""")
         check(z['aims'] == ['shield', 'body', 'helm', 'shield', 'body'], 'each aim point lands on its mark, square or angled', z['aims'])
         check(z['low'] == 'low' and z['mount'] == 'mount' and z['barrier'] == 'barrier' and z['miss'] == ['miss', 'miss'], 'below the belt, the mount and the barrier are fouls; wide or high is a miss', z)
         check(z['angledHelm'] == ['miss', 'helm'] and z['angledBody'] == ['shield', 'body'], 'an angled shield leaves the helm a bigger mark and more of the body open', z)
@@ -98,9 +101,9 @@ async def main():
           wJT.start({ seed: 6, skill: [0, 0] }); const seen = new Set(); for (let i = 0; i < 60; i++) { const p = wJT.plan(0); seen.add(p.aim + '/' + p.guard + '/' + p.pace); } out.squire = seen.size;
           return out; })()""")
         check(cp['behind']['aim'] == 'helm' and cp['behind']['pace'] == 'gallop' and 'helm' in cp['behind']['why'], 'a Knight four behind with three courses left goes for the helm at a gallop, and says why', cp['behind'])
-        check([cp['ahead'][k] for k in ('aim', 'guard', 'pace')] == ['shield', 'square', 'canter'], 'a Knight well ahead rides safe: the shield, square, at a canter', cp['ahead'])
+        check(cp['ahead']['why'].startswith('ahead by 4: weighing the points against it double'), 'a Knight well ahead weighs the points against it double, and says so', cp['ahead'])
         check(cp['arch'] == ['canter', 'gallop', 'square'], 'an Archmage canters level early and saves its gallop for the heat\'s last course', cp['arch'])
-        check([cp['tilt'][k] for k in ('aim', 'guard', 'pace')] == ['body', 'square', 'gallop'], 'in the tilt for the crown a Knight rides for a sure break and its seat', cp['tilt'])
+        check(cp['tilt']['why'].startswith('the tilt for the crown') and 'expected margin' in cp['tilt']['why'] and 'sure' not in cp['tilt']['why'], 'in the tilt for the crown a Knight rides the best expected margin over their lance, and says so (no "sure break")', cp['tilt'])
         check(cp['squire'] >= 8, 'a Squire picks its plan at random', cp['squire'])
 
         # ---------- a match, CPU against CPU (calibrated) ----------
@@ -115,6 +118,46 @@ async def main():
         check(.22 <= kk['unh'] <= .45, 'about one match in three has an unhorsing', kk['unh'])
         check(.4 <= kk['w'][0] / kk['n'] <= .6, 'two Knights: even', kk['w'])
         check(g['ak']['w'][0] > g['ak']['w'][1] * 1.1 and g['ks']['w'][0] > g['ks']['w'][1] * 1.3, 'an Archmage beats a Knight, and a Knight beats a Squire', [g['ak']['w'], g['ks']['w']])
+
+        # ---------- the plan is a real choice (phase 1's review) ----------
+        # what each aim is worth at a Knight's hands, fresh and tired, at each pace against each guard: the points it
+        # scores less the points scored on it, against a Knight cantering at the shield or the body
+        mx = await pg.evaluate("""(() => { const rs = __rs(), N = 6000, H = { aim: 1, couch: .3 }, out = {};
+          for (const wind of [1, .6]) for (const g of ['square', 'angled']) for (const pace of ['canter', 'gallop']) { const row = {};
+            for (const aim of ['shield', 'body', 'helm']) { const rnd = __rng(11); let net = 0;
+              for (let i = 0; i < N; i++) { const a = wJT.charge({ plan: { aim, guard: 'square', pace }, rs, mount: 'destrier', wind, hands: H }, rnd);
+                const d = wJT.charge({ plan: { aim: rnd() < .5 ? 'shield' : 'body', guard: g, pace: 'canter' }, rs, mount: 'destrier', wind: 1, hands: H }, rnd);
+                const I = wJT.impact([a, d], [.5, .5], rnd), p = s => I.res[s].unhorse ? 3 : (wJT.rules.pts[I.res[s].at] || 0); net += p(0) - p(1); }
+              row[aim] = +(net / N).toFixed(3); }
+            out[(wind === 1 ? 'fresh' : 'tired') + ' ' + g + ' ' + pace] = { row, best: Object.keys(row).sort((x, y) => row[y] - row[x])[0] }; }
+          return out; })()""")
+        for k2, v2 in mx.items(): print(f"   ({k2}: {v2['row']} best {v2['best']})")
+        bests = [v2['best'] for v2 in mx.values()]
+        for wd in ('fresh', 'tired'):
+            check(len({v2['best'] for k2, v2 in mx.items() if k2.startswith(wd)}) >= 2, f'{wd}, no aim is best against both guards at both paces', {k2: v2['best'] for k2, v2 in mx.items() if k2.startswith(wd)})
+        check(all(a2 in bests for a2 in ('shield', 'body', 'helm')), 'each aim is the best somewhere: the shield, the body and the helm', bests)
+        check(all(mx[f'{wd} square canter']['best'] == 'shield' for wd in ('fresh', 'tired')), 'the shield at a canter is the safe point against a square guard', mx)
+        check(all(mx[f'{wd} angled {pc}']['row']['shield'] < mx[f'{wd} angled {pc}']['row']['body'] for wd in ('fresh', 'tired') for pc in ('canter', 'gallop')), 'an angled guard turns the shield aside: the body is the better aim against it', mx)
+        pol = await pg.evaluate("""(() => { const run = (o, n, s0) => { const w = [0, 0]; for (let i = 0; i < n; i++) w[wJT.simMatch(Object.assign({ seed: s0 + i }, o)).win]++; return w; };
+          const H = g => ({ skill: [1, 1], fix: [{ aim: 'helm', guard: g, pace: 'canter' }, null] });
+          return { helmSq: run(H('square'), 300, 9000), helmAng: run(H('angled'), 300, 9000), helmA: run({ skill: [1, 2], fix: [{ aim: 'helm', guard: 'square', pace: 'canter' }, null] }, 300, 9000),
+            kVr: run({ skill: [1, 1], planBy: [null, 0] }, 400, 9000), aVk: run({ skill: [2, 1], handsBy: [1, null] }, 400, 9000) }; })()""")
+        print('   (always the helm at a canter v a Knight, square:', pol['helmSq'], 'angled:', pol['helmAng'], '; v an Archmage:', pol['helmA'], ')')
+        print('   (a Knight\'s plan v a random plan, both with a Knight\'s hands:', pol['kVr'], '; an Archmage\'s plan v a Knight\'s, Knight\'s hands:', pol['aVk'], ')')
+        check(pol['helmSq'][0] / 300 <= .55 and pol['helmAng'][0] / 300 <= .55 and pol['helmA'][0] / 300 <= .55, 'always going for the helm doesn\'t beat a Knight (or an Archmage) by more than the noise', pol)
+        check(pol['kVr'][0] / 400 >= .55, 'a Knight\'s plan beats a random plan at equal hands', pol['kVr'])
+        check(pol['aVk'][0] / 400 >= .53, 'an Archmage\'s plan beats a Knight\'s at equal hands', pol['aVk'])
+        # every reason is true to the plan: a gallop "with no more courses in the heat" only in a heat's last course, the
+        # wind "saved" only on a canter, and nothing claims a sure break
+        wy = await pg.evaluate("""(() => { const bad = []; let n = 0;
+          for (let i = 0; i < 60; i++) { wJT.start({ seed: 6000 + i, skill: [2, i % 3], courses: i % 2 ? 5 : 3 }); let k = 0; while (!wJT.G.over && k++ < 100) wJT.turn();
+            for (const p of wJT.G.plans[0]) { n++; const last = p.heat < 2 && p.course === wJT.G.courses - 1;
+              if (/no more courses in the heat/.test(p.why) && !(last && p.pace === 'gallop')) bad.push(p);
+              if (/saving the mount/.test(p.why) && p.pace !== 'canter') bad.push(p);
+              if (/sure break|saved for it/.test(p.why)) bad.push(p);
+              if (!p.why.includes(wJT.planRules.aim[p.aim].n) || !p.why.includes(wJT.planRules.pace[p.pace].n) || !p.why.includes(p.guard)) bad.push(p); } }
+          return { n, bad: bad.slice(0, 4) }; })()""")
+        check(wy['n'] > 300 and not wy['bad'], 'every reason says what the plan does (its aim, pace and guard) and claims nothing it didn\'t do', wy)
 
         # ---------- the tilt's cap and the marshal's count ----------
         m = await pg.evaluate("""(() => { const st = a => ({ at: a, unhorse: false }), out = {};

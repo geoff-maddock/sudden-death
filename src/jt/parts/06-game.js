@@ -1,6 +1,7 @@
 /* The Tilting Lists: one match, CPU against CPU (issue #117, phase 1).
    jtStart(opts) puts a match on the lists: { courses, teams: [2 × { name, short, color, roster: [{ n, kind, rs? }] }],
-   riders, best, skill: [2 skills, 0 to 2], mounts: [2 × [the two riders' mounts]], seed }. jtTurn() rides the next
+   riders, best, skill: [2 skills, 0 to 2], mounts: [2 × [the two riders' mounts]], seed; lab only: planBy, handsBy
+   (a skill a side, or null) and fix (a plan a side, or null), 05-cpu.js }. jtTurn() rides the next
    course (both plans, both rides, the impact and the seats, the rules) and says what happened; jtRideCourse(plans,
    rides, leans) is the same course with any side's ride or lean given (Play's, phase 2) and the rest drawn.
    jtSimMatch(opts) rides a whole match headless and leaves the match on the lists (and the random stream) as it was;
@@ -22,7 +23,12 @@ function jtStart(opts) {
     return Object.assign({}, T, { roster }); });
   jtNewMatch({ courses: o.courses, riders: o.riders || teams.map(T => T.riders), roster: teams.map(T => T.roster.length), best: o.best });
   const mounts = [0, 1].map(s => [0, 1].map(i => { const m = ((o.mounts || [])[s] || [])[i]; return jtOwn(JT_MOUNT, m) ? m : JT_MOUNT_DEF; }));
-  Object.assign(G, { teams, skill: [0, 1].map(s => clamp(((o.skill || [])[s] ?? 1) | 0, 0, 2)), mounts, wind: [1, 1], n: 0,
+  // (lab only: a side planned by another skill's logic, ridden with another skill's hands, or held to one plan)
+  const labSide = (L, ok) => Array.isArray(L) ? [0, 1].map(s => ok(L[s]) ? L[s] : null) : null, sk3 = v => v === 0 || v === 1 || v === 2;
+  const fixOk = p => !!p && typeof p === 'object' && jtOwn(JT_PLAN.aim, p.aim) && jtOwn(JT_PLAN.guard, p.guard) && jtOwn(JT_PLAN.pace, p.pace);
+  const lab = { planBy: labSide(o.planBy, sk3), handsBy: labSide(o.handsBy, sk3), fix: labSide(o.fix, fixOk) };
+  if (lab.fix) lab.fix = lab.fix.map(p => p && { aim: p.aim, guard: p.guard, pace: p.pace });
+  Object.assign(G, { teams, skill: [0, 1].map(s => clamp(((o.skill || [])[s] ?? 1) | 0, 0, 2)), mounts, wind: [1, 1], n: 0, lab,
     st: [jtBox(), jtBox()], pst: teams.map(T => T.roster.map(() => ({ courses: 0, breaks: 0, helms: 0, unhorse: 0 }))), plans: [[], []], last: null });
   GB = null;
   return G;
@@ -51,7 +57,7 @@ function jtCourseOpen(plans, given, leans, wait) {
 function jtCourseClose(P, leans) {
   if (!P || P.n !== G.n || G.over) return null;
   const { heat, course, tilt, riders, plans, rides, st } = P, lean = [0, 1].map(s => leans && leans[s] != null ? clamp(+leans[s] || 0, 0, 1) : P.lean[s] != null ? P.lean[s] : .5);
-  const seat = [jtSeat(st[1], rides[0], lean[0], R), jtSeat(st[0], rides[1], lean[1], R)];
+  const seat = [jtSeat(st[1], rides[0], lean[0], R, st[0]), jtSeat(st[0], rides[1], lean[1], R, st[1])];
   const imp = { res: [0, 1].map(s => ({ at: st[s].at, unhorse: seat[1 - s].unhorse })), st, seat };
   const lead = [0, 1].map(s => jtTotal(s) - jtTotal(1 - s)), rule = jtCourse(imp.res);
   // the mounts: the course's wind spent, a little back before the next; fresh mounts for a new heat
@@ -65,7 +71,7 @@ function jtCourseClose(P, leans) {
     else if (sk.at === 'glance') B.glances++; else if (sk.at === 'miss') B.misses++; else B.fouls++;
     if (imp.res[s].unhorse) { B.unhorse++; Pp.unhorse++; G.st[1 - s].unhorsed++; }
     if (se.rocked) { B.rocked++; if (!se.unhorse) B.kept++; }
-    G.plans[s].push({ aim: plans[s].aim, guard: plans[s].guard, pace: plans[s].pace, at: sk.at, lead: lead[s] });
+    G.plans[s].push({ aim: plans[s].aim, guard: plans[s].guard, pace: plans[s].pace, why: plans[s].why || '', heat, course, at: sk.at, lead: lead[s] });
   });
   G.n++;
   const ev = { heat, course, tilt, riders, plans, rides, lean, imp, rule };

@@ -9,7 +9,7 @@
    - square: the shield faces the lance and covers more of the torso (a strike on it is likely to break, but the rider
      takes it and stays on);
    - angled: the shield is turned edge-on to deflect (a strike on it mostly glances), it covers less of the torso,
-     and the head is out from behind it (the helm is a bigger mark).
+     and the head is out from behind it (the helm is a bigger mark: 4.6 inches round against 3.2 behind a square one).
    Below the torso is below the belt (a foul, 'low'); lower again, the mount's neck (a foul, 'mount'); low and across
    to the left, the barrier (a foul, 'barrier'); anywhere else, a miss.
    The plan (JT_PLAN): an aim (shield, body or helm, each with its aim point), a guard (angled or square) and a pace
@@ -51,7 +51,7 @@ const jtPace = p => JT_PLAN.pace[jtPick('pace', p, 'canter')];
 const JT_ZONE = {
   torso: { x0: -8, x1: 10, y0: -10, y1: 14 },
   shield: { square: { x0: -11, x1: 3, y0: -6, y1: 14 }, angled: { x0: -11, x1: -.5, y0: -4, y1: 12 } },
-  helm: { x: 0, y: 20, square: 4.2, angled: 5.6 },
+  helm: { x: 0, y: 20, square: 3.2, angled: 4.6 },
   low: -22, barrier: { x: -15, y: -6 }, mount: 15
 };
 const jtIn = (b, x, y) => x >= b.x0 && x <= b.x1 && y >= b.y0 && y <= b.y1;

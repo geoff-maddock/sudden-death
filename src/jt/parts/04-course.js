@@ -12,17 +12,19 @@
    their skill's hands, with jtSway's spread.
    The impact (jtStrike): the tip lands in a zone of the other rider (jtZoneAt, by their guard). A foul or a miss is
    that. On the shield, the body or the helm the lance breaks (JT_BREAK, by zone and guard: an angled shield turns most
-   strikes on it into glances; the helm is the hardest mark and breaks surest) with a chance that grows with the
+   strikes on it into glances; the helm is the smallest mark, and its curve turns a lance more often than the body
+   does) with a chance that grows with the
    force (speed and mount, a clean couch) and falls toward the zone's edge and with the defender's shield rating; it
    doesn't break, it glances. A strike's rock is how hard it hits the other rider (JT_ROCK).
    The seat (jtSeat): a rider rocked by a broken lance leans against it. Their hold (JT_SEAT: the seat rating, a
    square guard taking the hit, a steady mount, the lean) against the rock, shaken a little: short of it, they are
-   unhorsed. On Play the lean is your balance moment (0 to 1); the CPU's comes from its skill (05-cpu.js). Only a
+   unhorsed. A rider who went for the helm and didn't break it has reached past the head, and sits the other lance
+   worse (JT_SEAT.reach off the hold): a helm aim scores big but its misses cost. On Play the lean is your balance moment (0 to 1); the CPU's comes from its skill (05-cpu.js). Only a
    broken lance can unhorse: a glance rocks, no more. */
 const JT_SWAY = { base: 3.6, lance: .55, wind: .5, late: .9, early: .35, droop: 7 };
-const JT_BREAK = { shield: { square: .9, angled: .45 }, body: { square: .88, angled: .88 }, helm: { square: .92, angled: .95 }, edge: .25, shieldR: .2, force: .3 };
-const JT_ROCK = { shield: { square: .8, angled: .6 }, body: 1, helm: 1.3, glance: .3 };
-const JT_SEAT = { base: .59, seat: .45, square: .1, lean: .3, shake: .22, rocked: .7 };
+const JT_BREAK = { shield: { square: .9, angled: .45 }, body: { square: .95, angled: .95 }, helm: { square: .7, angled: .8 }, edge: .25, shieldR: .2, force: .3 };
+const JT_ROCK = { shield: { square: .8, angled: .6 }, body: 1, helm: 1.15, glance: .3 };
+const JT_SEAT = { reach: .3, base: .68, seat: .45, square: .1, lean: .3, shake: .22, rocked: .7 };
 const jtGauss = rnd => { let u = 0, v = 0; while (!u) u = rnd(); while (!v) v = rnd(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); };
 
 // the tip's spread at impact (inches, one sigma) and its droop (inches down), from the pace, the mount and its wind,
@@ -63,17 +65,19 @@ function jtStrike(a, d, rnd) {
   const rock = force * (broke ? (zone === 'shield' ? JT_ROCK.shield[g] : JT_ROCK[zone]) : JT_ROCK.glance);
   return { zone, at: broke ? zone : 'glance', broke, force, rock, pb };
 }
-/* rider d's seat against a strike st: lean is their balance (0 to 1). { unhorse, rocked, hold, margin } */
-function jtSeat(st, d, lean, rnd) {
-  const r = d.rs || {}, M = jtMount(d.mount);
-  const hold = JT_SEAT.base + JT_SEAT.seat * (r.seat ?? .5) + (d.guard === 'angled' ? 0 : JT_SEAT.square) + M.steady + JT_SEAT.lean * clamp(lean ?? .5, 0, 1);
+/* rider d's seat against a strike st: lean is their balance (0 to 1); own is d's own strike this course (a rider who
+   went for the helm and didn't break has reached past the head and sits the hit worse: JT_SEAT.reach off the hold).
+   { unhorse, rocked, hold, margin, reach } */
+function jtSeat(st, d, lean, rnd, own) {
+  const r = d.rs || {}, M = jtMount(d.mount), reach = d.aim === 'helm' && !!own && !own.broke;
+  const hold = JT_SEAT.base + JT_SEAT.seat * (r.seat ?? .5) + (d.guard === 'angled' ? 0 : JT_SEAT.square) + M.steady + JT_SEAT.lean * clamp(lean ?? .5, 0, 1) - (reach ? JT_SEAT.reach : 0);
   const hit = st.rock * (1 + JT_SEAT.shake * jtGauss(rnd)), margin = hold - hit;
-  return { unhorse: !!st.broke && margin < 0, rocked: !!st.broke && st.rock >= JT_SEAT.rocked, hold, margin };
+  return { unhorse: !!st.broke && margin < 0, rocked: !!st.broke && st.rock >= JT_SEAT.rocked, hold, margin, reach };
 }
 /* a course on the model: rides [a0, a1] and leans [l0, l1] (each side's balance if rocked). Returns { res (for the
    rules: [{ at, unhorse }, ...]), st: [the strikes], seat: [each side's seat, against the other's strike] } */
 function jtImpact(rides, leans, rnd) {
   const st = [jtStrike(rides[0], rides[1], rnd), jtStrike(rides[1], rides[0], rnd)];
-  const seat = [jtSeat(st[1], rides[0], leans[0], rnd), jtSeat(st[0], rides[1], leans[1], rnd)];
+  const seat = [jtSeat(st[1], rides[0], leans[0], rnd, st[0]), jtSeat(st[0], rides[1], leans[1], rnd, st[1])];
   return { res: [0, 1].map(s => ({ at: st[s].at, unhorse: seat[1 - s].unhorse })), st, seat };
 }
