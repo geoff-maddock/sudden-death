@@ -138,7 +138,10 @@ async def main():
           return out; })()""".replace('__CASES', '[["elf", 3], ["dwarf", 5], ["harpy", 5]]'))
         for k2, v2 in mt.items(): print(f'   ({k2}: {v2})')
         best = {k2: max(v2, key=v2.get) for k2, v2 in mt.items()}
-        check(best == {'elf3': 'charger', 'dwarf5': 'destrier', 'harpy5': 'courser'}, 'each mount has a case where it is the better pick: a Charger under an elf\'s lance in a short heat, a Destrier under a dwarf in a long one, a Courser under a harpy', best)
+        # (a Charger's and a Courser's cases hold on every seed base tried; a Destrier's doesn't: under a dwarf in a long heat
+        # the three come within the noise, the Destrier best on some seed bases and the Courser on others, phase 12's review)
+        close = max(mt['dwarf5'].values()) - min(mt['dwarf5'].values())
+        check(best['elf3'] == 'charger' and best['harpy5'] == 'courser' and close <= 32, 'a Charger is the better pick under an elf\'s lance in a short heat, a Courser under a harpy in a long one, and under a dwarf in a long heat no mount is far ahead', [best, close])
         mf = await pg.evaluate("[['elf', 3], ['dwarf', 5], ['harpy', 5]].map(([k, c]) => wJT.mountFor(wJT.rs(k), c).m)")
         check(mf == ['charger', 'destrier', 'courser'], 'the captain picks those mounts for them', mf)
 

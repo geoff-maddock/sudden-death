@@ -52,7 +52,10 @@ for (const id of Object.keys(wJT.potions)) {
   DB.items[id] = { name: P.n, desc: P.desc, use: 'In a jousting match, before one of your courses: the Bag row under the lists. One potion a course.', price: W_LISTS_KIT.potions[id] };
 }
 // Sir Ruddock's rack at the Lists, and the Mossgate grocer's
-DB.shops.lists = Object.assign({}, W_LISTS_KIT.potions, { draught: (DB.shops.hq || {}).draught || 30 });
+// (the rack is a store like any other: it carries what every store carries, the Stamina Draught and the other sports'
+// everyday potions, at the same prices, and a part loaded later that stocks every store stocks it too)
+const wListsCommon = (() => { const S = Object.values(DB.shops), H = DB.shops.hq || {}; return Object.fromEntries(Object.keys(H).filter(id => S.every(x => x[id])).map(id => [id, H[id]])); })();
+DB.shops.lists = Object.assign({}, wListsCommon, W_LISTS_KIT.potions, { draught: (DB.shops.hq || {}).draught || 30 });
 for (const id of W_LISTS_KIT.store) DB.shops.lists[id] = W_LISTS_GEAR[id].price;
 if (DB.shops.moss) { for (const id of Object.keys(W_LISTS_KIT.potions)) DB.shops.moss[id] = W_LISTS_KIT.potions[id]; for (const id of W_LISTS_KIT.store) DB.shops.moss[id] = W_LISTS_GEAR[id].price; }
 (() => {

@@ -121,9 +121,9 @@ musicWanted = function () {
 
 /* ---------- tips ---------- */
 Object.assign(TIPS, {
-  w_lists: ['Jousting', 'Your team is big enough for jousting. Open the Team screen (C), then the Lists tab: pick your two riders, your two squires and a mount for each rider, then Joust a match against the local side or a rival club. Sir Ruddock at the Tilting Lists books matches too: ask for a MATCH.'],
+  w_lists: ['Jousting', 'Your team is big enough for jousting. On the Team screen (C), the Lists tab picks your two riders, two squires and their mounts, and Joust a match plays a club. Sir Ruddock at the Tilting Lists books a MATCH too.'],
   w_lance: ['The Gilded Lance', 'Jousting has its own cup, every week. Ask Sir Ruddock at the Tilting Lists about the CUP, or use the Gilded Lance button on the Lists tab.'],
-  w_listsride: ['Riding a course', 'Press Space to ride your squire\'s plan. Then tap Space with the hoofbeats, hold it down at the green couch mark, and steer the white dot onto your mark with the arrows. If a hit rocks you, lean against the needle. Quick start, beside How to play under the lists, shows each step.'],
+  w_listsride: ['Riding a course', 'Press Space to ride your squire\'s plan, then tap Space with the hoofbeats, hold it at the green couch mark, and steer the white dot onto your mark with the arrows. Rocked? Lean against the needle. Quick start shows each step.'],
 });
 function wListsTips() {
   if (LAB || !SET.tips || !WG || !RUN || UI.screen !== 'run') return;

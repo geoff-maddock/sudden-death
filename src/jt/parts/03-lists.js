@@ -46,7 +46,7 @@ const JT_PLAN = {
   pace: { canter: { n: 'a canter', speed: .68, sway: 1, wind: .12 }, gallop: { n: 'a gallop', speed: 1, sway: 1.35, wind: .3 } }
 };
 // (phase 12's lab: as first set, a Charger (hit 1.08, steady 0) and a Courser (steady 0) left their riders unhorsed in 85
-// to 96% of matches against 37% on Destriers. A Charger and a Courser now steady the seat nearly as a Destrier does, and the
+// to 96% of matches against 37% on Destriers. A Charger and a Courser now steady the seat a little, and the
 // Charger hits a little softer (1.02) and sways a little less (1.2). Each is still the best pick somewhere.
 // Phase 12's follow-up: a four with a steady lance on a Charger (an elf: seat 5) still saw an unhorsing in 72% of its
 // matches, where fours without one saw 11 to 42%: a Charger's broken lance at a gallop threw its rider 29% of the time

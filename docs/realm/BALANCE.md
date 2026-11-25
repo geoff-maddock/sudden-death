@@ -1674,8 +1674,11 @@ before: 34% at `realm_lists_sim`'s seeds):
 
 **After** (the same rows): this four 41.8% (400); the mirror fours 18, 35, 30 and 23% (they converge on a third:
 the high seats come off a little more, the light ones less); round the rival clubs at tiers 1, 2 and 3, 57, 43 and 40%
-(300; tier 1's Squires lean worst and fall most). The engine's checks all pass: plain Knights 34% (unchanged), real
-kinds 26% (32% before; band 22 to 45%), each mount still the best somewhere (above), and an Archmage still saves its
+(a first run of 300; the tiers table below, at 400, reads 55, 35.3 and 41.8%, and is the one to go by; tier 1's
+Squires lean worst and fall most). The engine's checks all pass: plain Knights 34% (unchanged), real
+kinds 26% (32% before; band 22 to 45%), a Charger and a Courser each still the better pick somewhere (above; the Destrier's case, a dwarf in a long heat, holds
+only at the check's seeds: on other seed bases the three mounts come within the noise there and the Courser leads, as it
+did before the follow-up too, so the check now asks only that no mount is far ahead in that case), and an Archmage still saves its
 gallop. The cost: a Charger now sits a hit better than a Destrier, so the Destrier's "sits a hit on" is gone from its
 words (How to play, the Lists tab, the captain's reason).
 
