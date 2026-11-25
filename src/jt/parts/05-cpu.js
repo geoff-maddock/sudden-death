@@ -213,6 +213,7 @@ function jtWhy(s, sk, Q, P, need, safe, them, H) {
 }
 // side s's hands, by skill (a lab may ride a side with another skill's hands)
 const jtHandsK = s => { const lab = G.lab || {}; return clamp((lab.handsBy && lab.handsBy[s] != null ? lab.handsBy[s] : G.skill[s]) | 0, 0, JT_SKILL.length - 1); };
-const jtHands = s => JT_SKILL[jtHandsK(s)];
+// (phase 11: a Lich's side, G.lich, rides with its own row, JT_LICH in 15-umbral.js: sharper hands than an Archmage's, and a surer lean)
+const jtHands = s => { const lab = G.lab || {}; return G.lich && G.lich[s] && !(lab.handsBy && lab.handsBy[s] != null) ? JT_LICH : JT_SKILL[jtHandsK(s)]; };
 // side s's lean into a hit (0 to 1), by skill
 const jtLean = s => clamp(jtHands(s).lean + .2 * gauss(), 0, 1);

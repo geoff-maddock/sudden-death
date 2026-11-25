@@ -47173,7 +47173,8 @@ function jtWhy(s, sk, Q, P, need, safe, them, H) {
 }
 // side s's hands, by skill (a lab may ride a side with another skill's hands)
 const jtHandsK = s => { const lab = G.lab || {}; return clamp((lab.handsBy && lab.handsBy[s] != null ? lab.handsBy[s] : G.skill[s]) | 0, 0, JT_SKILL.length - 1); };
-const jtHands = s => JT_SKILL[jtHandsK(s)];
+// (phase 11: a Lich's side, G.lich, rides with its own row, JT_LICH in 15-umbral.js: sharper hands than an Archmage's, and a surer lean)
+const jtHands = s => { const lab = G.lab || {}; return G.lich && G.lich[s] && !(lab.handsBy && lab.handsBy[s] != null) ? JT_LICH : JT_SKILL[jtHandsK(s)]; };
 // side s's lean into a hit (0 to 1), by skill
 const jtLean = s => clamp(jtHands(s).lean + .2 * gauss(), 0, 1);
 /* The Tilting Lists: one match, CPU against CPU (issue #117, phase 1).
@@ -47740,7 +47741,7 @@ function jtHorse(c, x, y, k, dir, mount, col, phase, moving) {
 const JT_POSE = { legL: { a: -1.25, lift: .1 }, legR: { a: -1.05, lift: .1 }, armL: { x: -12, y: -46 }, armR: { x: 26, y: -50 }, lean: .08 };
 function jtRider(c, s, x, y, k, dir, o) {
   const T = G.teams[s], m = T.roster[o.ri] || {}, kind = m.kind && KIND[m.kind] ? m.kind : 'goblin', hpx = 1.55 * k, sc = hpx * (KIND[kind].h) / 100;
-  const sy = y - 1.42 * k - o.bob, fy = sy + 34 * sc, team = { color: T.color || '#888', light: '#f2e6c4', short: T.short };
+  const sy = y - 1.42 * k - o.bob, fy = sy + 34 * sc, team = { color: T.color || '#888', light: '#f2e6c4', short: T.short, shade: !!T.shade };
   c.save();
   if (o.fall) { c.translate(x, sy); c.rotate(-dir * o.fall * 1.4); c.translate(-x, -sy + -o.fall * .2 * k); c.translate(-dir * o.fall * .8 * k, o.fall * 1.2 * k); }
   // their shield shows on the far rider (its face to us), a sliver on yours
@@ -49216,6 +49217,157 @@ function jtGroundDraw(c) {
   c.restore();
 }
 jtDraw = function (c, dt) { JT_W13.draw(c, dt); if (jtGndOn()) jtGroundDraw(c); };
+/* The Tilting Lists in the Umbral (issue #117, phase 11), as curling's 15-umbral.js: the Lich, the hexes, and a
+   jouster's own ultimate. Nothing here runs unless a match asks for it: with no hexes, no Lich and no rider's own
+   ultimate, the engine plays exactly as before (same seed, same match).
+   The Lich (opts.skill 3 for a side). Its side's G.skill stays 2, an Archmage's, so every table read by skill keeps its
+   three rows (the corner, the casts, the potions, the line and the wind, and the exhibition's three skills);
+   G.lich[s] = 1 marks it (plain JSON, kept with the match). Its rider rides with its own row of hands (JT_LICH, through
+   05-cpu.js's jtHands): a steadier tip, a truer couch and a surer lean than an Archmage's. Deciding better alone was
+   worth nothing measurable on the lists (docs/realm/BALANCE.md: the course is a game near its equilibrium), so the
+   hands are most of its edge, about 9 points. It also decides as no other skill does:
+   - its odds are the course against the rider it meets as they are: their ratings, their mount, their mount's wind and
+     their hands (jtLichOdds), where every other skill reckons with a plain Knight on a destrier;
+   - its read leans on what your side has really ridden sooner (JT_LICH.prior: one course's worth of the mix your rider
+     would ride, where an Archmage takes two).
+   The herald's card names it a Lich, and its reasons say what it reckons with.
+   Hexes (opts.hexes: ids in JT_HEX; G.hex = { ids, on }, plain JSON, so a kept match keeps them). Each works against one
+   side, G.hex.on (opts.hexOn, 0 by default: yours), through the ride's effects (jtRideFx: the powers' vocabulary), so
+   Play, Manage, the CPU and Simulate all ride with them. No plan knows them:
+     mist     Grave Mist: that side's tip sways JT_HEX.mist.sway times as much
+     nag      Hollow Mounts: that side's mounts charge JT_HEX.nag.speed as fast (a softer hit), and each course costs
+              them JT_HEX.nag.wind times the wind
+     cold     The Cold Saddle: that side's riders sit a hit worse (JT_HEX.cold.hold off the hold)
+     shroud   Shrouded Shields: the other side drinks that side's lance (a lance on them breaks JT_HEX.shroud.turn as
+              often: the other side's turn)
+   The hexes are named before the first course (the status line: jtGo) and on the lists all match, top right (jtHexDraw).
+   A rider's own ultimate (a roster member sent with { ult: id }, an id in JT_ULT_OWN): cast in place of their kind's
+   when they ride (jtUltOf). The Hollow Lists' champion brings one; so does the champion redeemed after the Seal. */
+const JT_LICH = { n: 'Lich', aim: .75, couch: .16, lean: .8, prior: 1, why: '; a Lich, it reckons with the rider it meets as they are, their mount and their wind' };
+const JT_HEX = {
+  mist: { n: 'Grave Mist', d: 'A mist off the graves hangs on the tilt: your tip sways a seventh more.', sway: 1.14 },
+  nag: { n: 'Hollow Mounts', d: 'Your mounts are half shadow: they charge slower, and each course costs them half again the wind.', speed: .92, wind: 1.5 },
+  cold: { n: 'The Cold Saddle', d: 'Frost on your saddles: your riders sit a hit worse.', hold: -.08 },
+  shroud: { n: 'Shrouded Shields', d: 'Their shields drink the light, and your lance with it: a lance on them breaks a tenth less often.', turn: .9 },
+};
+const JT_ULT_OWN = {
+  palecharge: jtU('palecharge', 'The Pale Charge', 'Death on a pale horse: your lance breaks on any fair touch, and their tip sways a quarter more, this course.', { splinter: 1 }, { sway: 1.25 }),
+};
+const JT_W15 = { start: jtStart, rideFx: jtRideFx, ultOf: jtUltOf, planOwn: jtPlanOwn, odds: jtOdds, card: jtCard, summary: jtSummary, view: jtView, draw: jtDraw, go: jtGo };
+// while a Lich plans: its own rider's ratings (me) and the rider it meets
+const JT_LV = { vs: null };
+
+/* ---------- a match's Lich and hexes ---------- */
+jtStart = function (opts) {
+  const o = opts || {}, g = JT_W15.start(opts);
+  if (!G || G.yard) return g;
+  const lich = [0, 1].map(s => +((o.skill || [])[s]) === 3 ? 1 : 0);
+  if (lich[0] || lich[1]) G.lich = lich;
+  const hx = (Array.isArray(o.hexes) ? o.hexes : []).filter((k, i, a) => jtOwn(JT_HEX, k) && a.indexOf(k) === i);
+  if (hx.length) G.hex = { ids: hx, on: o.hexOn === 1 ? 1 : 0 };
+  return g;
+};
+const jtHexHas = id => !!(G && G.hex && G.hex.ids.includes(id));
+const jtLichOn = s => !!(G && G.lich && G.lich[s]);
+// the hexes on a side's ride (after its powers, gear and potions): null stays null when no hex touches it
+jtRideFx = function (s) {
+  const f0 = JT_W15.rideFx(s); if (!G || !G.hex) return f0;
+  const mine = G.hex.on === s, H = JT_HEX, f = f0 || Object.assign({}, JT_FX0);
+  let any = false;
+  if (mine && jtHexHas('mist')) { f.sway *= H.mist.sway; any = true; }
+  if (mine && jtHexHas('nag')) { f.speed *= H.nag.speed; f.wind *= H.nag.wind; any = true; }
+  if (mine && jtHexHas('cold')) { f.hold += H.cold.hold; any = true; }
+  if (!mine && jtHexHas('shroud')) { f.turn *= H.shroud.turn; any = true; }
+  return any ? f : f0;
+};
+const jtHexNames = () => G && G.hex ? G.hex.ids.map(k => JT_HEX[k].n).join(', ') : '';
+const jtHexLine = () => G && G.hex && G.teams ? `Hexes on ${G.teams[G.hex.on].short || G.teams[G.hex.on].name}: ${jtHexNames()}` : '';
+
+/* ---------- a rider's own ultimate ---------- */
+jtUltOf = function (s, ri) { const m = G && G.teams ? jtRiderOf(s, ri) : null; return m && typeof m.ult === 'string' && jtOwn(JT_ULT_OWN, m.ult) ? JT_ULT_OWN[m.ult] : JT_W15.ultOf(s, ri); };
+
+/* ---------- the Lich ---------- */
+/* the odds as a Lich reckons them: jtOdds's table, but against the rider it meets (V: their rs, mount, wind and hands,
+   hk), not a plain Knight on a destrier; the same streams, so its cells compare as every other table's */
+function jtLichOdds(rs, mount, hk, wind, X0, V) {
+  const w = jtWindB(wind), vw = jtWindB(V.wind), X = jtXB(X0), key = JSON.stringify(['lich', rs, mount, hk, w, X, V.rs, V.mount, V.hk, vw]);
+  let O = JT_ODDS_CACHE.get(key); if (O) return O;
+  const H = Object.assign({}, JT_SKILL[hk], { lean: JT_LICH.lean }), VH = JT_SKILL[V.hk] || JT_SKILL[1], hands = { aim: H.aim, couch: H.couch }, N = JT_ODDS.n, own = r => r ? { broke: false, high: true } : { broke: true };
+  O = { A: {}, B: {} };
+  for (const aim of JT_AIMS) for (const pace of JT_PACES) for (const g of JT_GUARDS) for (const reach of [false, true]) {
+    const a = { pts: 0, brk: 0, helm: 0, unh: 0 }, b = { pts: 0, brk: 0, helm: 0, unh: 0 };
+    let rnd = engRng(JT_ODDS.seed);
+    for (let i = 0; i < N; i++) {
+      const x = jtCharge({ plan: { aim, guard: 'square', pace }, rs, mount, wind: w, hands, arm: X.arm, shaken: X.shaken, press: X.press }, rnd), d = { guard: g, rs: V.rs, mount: V.mount };
+      const st = jtStrike(x, d, rnd), se = jtSeat(st, d, VH.lean, rnd, own(reach));
+      a.pts += se.unhorse ? JT_RULES.unhorse : JT_RULES.pts[st.at] || 0; if (st.broke) a.brk++; if (st.broke && st.zone === 'helm') a.helm++; if (se.unhorse) a.unh++;
+    }
+    rnd = engRng(JT_ODDS.seed + 1);
+    for (let i = 0; i < N; i++) {
+      const y = jtCharge({ plan: { aim, guard: 'square', pace }, rs: V.rs, mount: V.mount, wind: vw, hands: { aim: VH.aim, couch: VH.couch } }, rnd), me = { guard: g, rs, mount, girth: X.girth, shaken: X.shaken };
+      const st = jtStrike(y, me, rnd), se = jtSeat(st, me, H.lean, rnd, own(reach));
+      b.pts += se.unhorse ? JT_RULES.unhorse : JT_RULES.pts[st.at] || 0; if (st.broke) b.brk++; if (st.broke && st.zone === 'helm') b.helm++; if (se.unhorse) b.unh++;
+    }
+    for (const k in a) { a[k] /= N; b[k] /= N; }
+    O.A[jtCell(aim, pace, g, reach)] = a; O.B[jtCell(aim, pace, g, reach)] = b;
+  }
+  JT_ODDS_CACHE.set(key, O);
+  return O;
+}
+// (only the Lich's own rider's odds, while it plans: the read of the other side's mix is the plain table, as ever)
+jtOdds = function (rs, mount, hk, wind, X0) { const V = JT_LV.vs; return V && rs === V.me ? jtLichOdds(rs, mount, hk, wind, X0, V) : JT_W15.odds.apply(this, arguments); };
+// a Lich's plan: the Archmage's logic, on its own odds and its quicker read (a lab's plan, logic or held plan for the
+// side, or a plan asked of another skill's logic, is as ever)
+jtPlanOwn = function (s, o) {
+  o = o || {};
+  const lab = (G && G.lab) || {}, R0 = G && G.teams ? jtRiders() : null;
+  if (!jtLichOn(s) || o.sk != null || (lab.planBy && lab.planBy[s] != null) || (lab.fix && lab.fix[s]) || !R0) return JT_W15.planOwn(s, o);
+  const t = 1 - s, p0 = JT_READ.prior;
+  JT_LV.vs = { me: jtRsOf(s, R0[s]), rs: jtRsOf(t, R0[t]), mount: jtMountOf(t), wind: G.wind[t], hk: jtHandsK(t) };
+  JT_READ.prior = JT_LICH.prior;
+  try { const P = JT_W15.planOwn(s, o); if (P && typeof P.why === 'string') P.why += JT_LICH.why; return P; } finally { JT_LV.vs = null; JT_READ.prior = p0; }
+};
+
+/* ---------- the card, the summary, the view ---------- */
+jtCard = function (s) {
+  const K = JT_W15.card(s); if (!K) return K;
+  if (jtLichOn(1 - (s ? 1 : 0))) K.skill = JT_LICH.n;
+  if (G.hex) K.hex = { ids: G.hex.ids.slice(), on: G.hex.on, line: jtHexLine() };
+  return K;
+};
+jtSummary = function () {
+  const S = JT_W15.summary(); if (!S || !G) return S;
+  if (G.lich) S.lich = G.lich.slice();
+  if (G.hex) S.hex = JSON.parse(JSON.stringify(G.hex));
+  return S;
+};
+jtView = function () {
+  const V = JT_W15.view(); if (!V) return V;
+  if (G.hex) V.hex = { ids: G.hex.ids.slice(), on: G.hex.on, line: jtHexLine() };
+  if (G.lich) V.lich = G.lich.slice();
+  return V;
+};
+// named before the first course: the status line, whatever the beat says
+jtGo = function (ph, wait, msg) {
+  const r = JT_W15.go.apply(this, arguments);
+  if (GP && G && G.hex && G.teams && !G.over && G.n === 0 && !String(GP.msg || '').includes('Hexes on')) GP.msg = `${GP.msg ? GP.msg + ' ' : ''}${jtHexLine()}.`;
+  return r;
+};
+
+/* ---------- drawing: the hexes, top right (under the ground's panel when it is up) ---------- */
+function jtHexDraw(c) {
+  if (!G || !G.hex || G.yard || !G.teams) return;
+  const font = '700 12px "Alegreya Sans", sans-serif', w = 240, x0 = JT_VIEW.w - w - 10, y0 = jtGndOn() ? 72 : 10;
+  c.save(); c.font = font;
+  const lines = [], words = jtHexLine().split(' ');
+  let cur = '';
+  for (const wd of words) { const t = cur ? cur + ' ' + wd : wd; if (c.measureText(t).width > w - 20 && cur) { lines.push(cur); cur = wd; } else cur = t; }
+  if (cur) lines.push(cur);
+  c.fillStyle = 'rgba(24,10,40,.78)'; rr(c, x0, y0, w, 8 + lines.length * 16, 8); c.fill();
+  lines.forEach((l, i) => txt(c, (i ? '' : '☾ ') + l, x0 + 10, y0 + 19 + i * 16, font, '#d4b8ff'));
+  c.restore();
+}
+jtDraw = function (c, dt) { JT_W15.draw(c, dt); jtHexDraw(c); };
 /* The Tilting Lists' superstars (issue #117, phase 9), inside the wJT scope: each superstar's jousting ratings and
    powers, added to the engine's own tables after its parts load, as curling's are (shed/s0-stars.js). Plain
    assignments, nothing declared. Ratings are [lance, couch, seat, shield, ride, nerve, care] (JT_STATS); each has a
@@ -49673,7 +49825,12 @@ for (const ev of ['pointerup', 'pointercancel', 'lostpointercapture']) JTP.cv.ad
    ground (the tally and the log).
    Phase 9 is the superstars (j0-stars.js, in the tables: their kinds, powers, curses and ultimates) and their figures
    (src/realm/stars/s1-figures.js, in this scope): figKinds() (the kinds the figures know; a rider of a kind they don't
-   is drawn as a goblin). */
+   is drawn as a goblin).
+   Phase 11 is the Umbral's lists (15-umbral.js): start(opts) and simMatch(opts) take skill 3 for a side (the Lich: G.skill
+   stays 2, G.lich marks it), hexes (ids in hexes) and hexOn (the side they work against, 0 by default); a roster member
+   sent with ult (an id in ultOwn) casts it in place of their kind's; lich, hexes and ultOwn are the tables; hex() (the
+   match's: { ids, on }, or null), hexLine() (in words) and hexFx(s) (side s's ride's effects with them); card(s), view
+   and summary() add hex and lich. */
 return {
   rules: JSON.parse(JSON.stringify(JT_RULES)), at: JSON.parse(JSON.stringify(JT_AT)), get G() { return G; },
   newMatch: o => jtNewMatch(o), riders: () => jtRiders(), inTilt: () => jtInTilt(), left: () => jtLeft(),
@@ -49723,6 +49880,9 @@ return {
   gndPush: (s, pace) => jtGndPush(s, pace), gustK: pace => jtGustK(pace), lineK: (s, l) => jtLineK(s, l), lineFor: (s, plan, sk) => G && G.teams && !G.over ? jtLineFor(s, plan || jtPlanOwn(s), sk) : null, windWords: w => jtWindWords(w || { k: 0, dir: 1 }),
   // the superstars (phase 9)
   figKinds: () => Object.keys(KIND),
+  // the Umbral's lists (phase 11)
+  lich: JSON.parse(JSON.stringify(JT_LICH)), hexes: JSON.parse(JSON.stringify(JT_HEX)), ultOwn: JSON.parse(JSON.stringify(JT_ULT_OWN)),
+  hex: () => G && G.teams && G.hex ? JSON.parse(JSON.stringify(G.hex)) : null, hexLine: () => jtHexLine(), hexFx: s => G && G.teams ? jtRideFx(s) : null,
   mountFor: (rs, n) => jtMountFor(rs, n), squadRules: JSON.parse(JSON.stringify({ role: JT_ROLE, arm: JT_ARM, shake: JT_SHAKE, nerve: JT_NERVE, corner: JT_CORNER }))
 };
 
@@ -72419,7 +72579,8 @@ W_QUICK.push({ id: 'pets', n: 'Pets', where: 'your camp', more: 'wHelpPets',
    carry the wWU0 prefix).
 
    The state, WG.umbral (plain JSON), from the unlock on: { at (dayAbs), year, crossed (times through the portal),
-   pieces [ids], beaten {champion: dayAbs}, tries {champion: n}, finale (the round reached, 0 before it), sealed (0/1) }.
+   pieces [ids], beaten {champion: dayAbs}, tries {champion: n}, finale (the round reached, 0 before it), sealed (0/1),
+   need [the piece ids the Seal asks for: every piece at the unlock; issue #117, phase 11, u3's wUmbNeed] }.
    Unlocked the first time the Crown is won on a journey (the 'champion' flag), or on loading a journey that won it
    before the Umbral existed. Phase 1 turns the unlock into its scene; here it is a line in the log.
    The dark maps: MAPS['u:' + id], built with the light ones, from them, by a fixed transform (nothing about the maps
@@ -72462,7 +72623,8 @@ const wUmbDark = m => !!(m || (typeof WG !== 'undefined' && WG && MAPS[WG.map]) 
 
 function wUmbralUnlock() {
   if (typeof WG === 'undefined' || !WG || WG.umbral) return false;
-  WG.umbral = { at: WG.dayAbs || 0, year: WG.year || 1, crossed: 0, pieces: [], beaten: {}, tries: {}, finale: 0, sealed: 0 };
+  // (need: the pieces this Umbral's Seal asks for, every one there is as it opens: u3's wUmbNeed)
+  WG.umbral = { at: WG.dayAbs || 0, year: WG.year || 1, crossed: 0, pieces: [], beaten: {}, tries: {}, finale: 0, sealed: 0, need: Object.keys(W_UMB_PIECES) };
   // the Road to Nowhere is on the map from now on, found or not
   wSetFlag('clue_den');
   wInvalidate('umbralden'); wInvalidate('world');
@@ -72690,7 +72852,7 @@ const W_UMB1 = {
   speech: [
     'Champions. You won it fair, and that is the trouble.',
     'The Crown was half of a seal. The other half kept a door shut, at the end of a road nobody made.',
-    'When you lifted it, the Seal broke into nine pieces, one for every way there is to play. Nine champions on the other side took one each. They call themselves the Nadir.',
+    'When you lifted it, the Seal broke into ten pieces, one for every way there is to play. Ten champions on the other side took one each. They call themselves the Nadir.',
     'Go north, to the Road to Nowhere. The door is open now. Win the pieces back, bring them to the portal, forge the Seal, and close it.',
     'The one at the Gate, just through the door, is the gentlest. Start there. I will be here, by the statue, if you need telling twice.',
   ],
@@ -72705,11 +72867,11 @@ DB.chars.uherald = { name: 'The Pale Herald', kind: 'lich', look: { coat: '#d8d4
   topics: {
     job: { t: 'I announce. Not games. Endings. Ask me about the SEAL.' },
     portal: { t: 'At the end of the Road to Nowhere, north of the Roost. It goes both ways: rest on this side, play on that one. Time runs on both.' },
-    seal: { t: 'The Seal of the Crown. Nine pieces now, one for each way to play. Win all nine, bring them to the portal, and it can be forged whole again. Then the door shuts.' },
+    seal: { t: 'The Seal of the Crown. Ten pieces now, one for each way to play. Win them all, bring them to the portal, and it can be forged whole again. Then the door shuts.' },
     nadir: { t: 'The other league. The same as ours, wrong. Their champions hold the pieces, and their captain is someone you have heard of, who never left the last game she lost.' },
-    gate: { t: 'Just through the portal, where the road comes out. The card game, played straight. The gentlest of the nine. Start there.' },
+    gate: { t: 'Just through the portal, where the road comes out. The card game, played straight. The gentlest of the ten. Start there.' },
     road: { t: 'The Road to Nowhere. Nobody made it. It is on your map now, north of the Roost. Walk to its end.' },
-    pieces: { t: 'Nine. The baseball, the basketball, the golf, the card game, the bowling, the curling, the football, the boxing and the hockey. Each one held by a Nadir champion, each in their own region.' },
+    pieces: { t: 'Ten. The baseball, the basketball, the golf, the card game, the bowling, the curling, the football, the boxing, the hockey and the jousting. Each one held by a Nadir champion, each in their own region.' },
   } };
 // (the flag topics wait on, set by the unlock: the audit counts it as set)
 DB.engineFlags.push('umbral_open');
@@ -72765,7 +72927,7 @@ function wUmbScene(replay) {
     <div id="wUmbLines" class="wumblines" aria-live="polite"></div>
     <div class="row" id="wUmbEnd" hidden><button class="btn" id="wUmbGo">North, then</button></div>`, () => {
       cancelAnimationFrame(WUS.raf); WUS.raf = 0;
-      if (!replay) wLog('The crown cracked, the Coliseum went dark at noon, and a pale herald said the Seal of the Crown is broken into nine pieces, held by the Nadir on the other side of a portal at the end of the Road to Nowhere. Win them back and forge the Seal. The herald waits by the Coliseum\'s statue.', 'b');
+      if (!replay) wLog(`The crown cracked, the Coliseum went dark at noon, and a pale herald said the Seal of the Crown is broken into ${wUmbNum(wUmbNeed().length)} pieces, held by the Nadir on the other side of a portal at the end of the Road to Nowhere. Win them back and forge the Seal. The herald waits by the Coliseum's statue.`, 'b');
       WUI.hudKey = ''; wDrain();
     });
   const cv = $('wUmbCv'), c = cv.getContext('2d'), lines = $('wUmbLines'), t0 = performance.now();
@@ -72882,10 +73044,11 @@ wLookText = function (x, y) {
 /* ---------- the Journal's chapter ---------- */
 function wUmbJournal() {
   const U = wUmb(); if (!U) return [0, ''];
-  const got = U.pieces.length;
-  if (U.sealed) return ['sealed', `<div class="wumbj"><p>The Seal of the Crown is forged, in year ${U.sealedYear || WG.year}. You won back all nine pieces and beat Hollow Aurelia's Nadir Athletic in the Hollow Coliseum; the portal at the end of the Road to Nowhere is shut, and the eclipses are over.</p><button class="ghost" data-umbscene="1">See the first night again</button></div>`];
-  return [`${got}/9`, `<div class="wumbj"><p>The Crown cracked in your hands, and the Coliseum went dark at noon. The Pale Herald says the Seal of the Crown is broken into nine pieces, one for every way to play, and the Nadir hold them on the far side of a portal at the end of the Road to Nowhere, north of the Roost. Win them back, bring them to the portal, forge the Seal, and close the door. The herald waits by the statue in the Coliseum.</p>
-    <p class="hint">Pieces won: ${got} of 9.${U.crossed ? ` You have crossed ${U.crossed} time${U.crossed === 1 ? '' : 's'}.` : ' You have not crossed yet.'}</p>
+  // (the pieces this journey's Seal asks for: u3's wUmbNeed)
+  const got = wUmbGot(), need = wUmbNeed().length, nw = wUmbNum(need);
+  if (U.sealed) return ['sealed', `<div class="wumbj"><p>The Seal of the Crown is forged, in year ${U.sealedYear || WG.year}. You won back all ${nw} pieces and beat Hollow Aurelia's Nadir Athletic in the Hollow Coliseum; the portal at the end of the Road to Nowhere is shut, and the eclipses are over.</p><button class="ghost" data-umbscene="1">See the first night again</button></div>`];
+  return [`${got}/${need}`, `<div class="wumbj"><p>The Crown cracked in your hands, and the Coliseum went dark at noon. The Pale Herald says the Seal of the Crown is broken into ${nw} pieces, one for every way to play, and the Nadir hold them on the far side of a portal at the end of the Road to Nowhere, north of the Roost. Win them back, bring them to the portal, forge the Seal, and close the door. The herald waits by the statue in the Coliseum.</p>
+    <p class="hint">Pieces won: ${got} of ${need}.${U.crossed ? ` You have crossed ${U.crossed} time${U.crossed === 1 ? '' : 's'}.` : ' You have not crossed yet.'}</p>
     <button class="ghost" data-umbscene="1">See it again</button></div>`];
 }
 const wWU1OpenJournal = wOpenJournal;
@@ -73240,15 +73403,20 @@ wAudit = function () {
    (W_UMB3.card): the other side has more HP and Strength, and you draw as at the Hall of Fame (B.drawMod, one card
    fewer). Its players are their umbral forms: drawn in shadow (e.shade: drained colours, pale glowing eyes, in the
    fight and on the map) and each with its kind's dark trait (W_UMB3.traits, named on the match's log).
-   The Nadir champions hold the Seal's nine pieces (W_UMB_PIECES). Each waits somewhere on the dark side (W_NADIR) and
+   The Nadir champions hold the Seal's ten pieces (W_UMB_PIECES). Each waits somewhere on the dark side (W_NADIR) and
    plays when asked (PLAY): a match that draws hexes (W_UMB3.hexes: one or two, announced on the match card and in the
    log), a piece to the winner. Lose, and the next try costs a toll. The first is the Gatekeeper, at the Gate on the
-   dark road just through the portal: the card game, played straight, the gentlest of the nine. The others come with
+   dark road just through the portal: the card game, played straight, the gentlest of them. The others come with
    their sports (phase 4).
+   The pieces the Seal asks for (wUmbNeed): every piece, for an Umbral opened since jousting's champion joined (issue
+   #117, phase 11: WG.umbral.need, set at the unlock). An Umbral opened before then asks for the nine it opened with
+   (W_UMB_NINE, set on loading such a journey, u4j): its jousting piece can still be won, and sings like any other, but
+   the Seal never waits for it. wUmbGot() counts the pieces held that the Seal asks for; wUmbNum(n) says a count in
+   words.
    A new curse: the Umbral Shade (u_shade), unplayable, 1 HP lost if it is in your hand at the end of your turn, and it
    fades at the end of the match like any match-only card.
 
-   W_UMB3, W_UMB_PIECES, W_NADIR, wNadirMatch, wUmbHexes
+   W_UMB3, W_UMB_PIECES, W_UMB_NINE, W_NADIR, wNadirMatch, wUmbHexes, wUmbNeed, wUmbGot, wUmbNum
    Wraps: wBuildEncounter (wWU3BuildEncounter: an Umbral match is tier 3 and carries its hexes), wPreGame (wWU3PreGame:
    the match card names tier U and the hexes), wRunAct (wWU3RunAct: PLAY), buildAllMaps (wWU3BuildAllMaps: the
    champions on their maps), wDrawActor (wWU3DrawActor: the dark side's people in shadow), wAudit (wWU3Audit: the
@@ -73291,12 +73459,19 @@ function wUmbHp(e, k) { e.max = Math.round(e.max * k); e.hp = Math.round(e.hp * 
 function wUmbSlip(id, n) { for (let i = 0; i < n; i++) B.draw.splice(ri(0, B.draw.length), 0, mkCard(id)); }
 K('u_shade', 'Umbral Shade', 'none', 'curse', -1, 'x', 'self', [], { endHurt: 1, fl: 'Unplayable. While in hand at the end of your turn, lose 1 HP. It fades when the match is over.' });
 
-// the nine pieces of the Seal of the Crown, one for every way to play
+// the ten pieces of the Seal of the Crown, one for every way to play (jousting's last: issue #117, phase 11)
 const W_UMB_PIECES = {
   card: { n: 'The Cracked Card', sport: 'the card game' }, baseball: { n: 'The Iron Stitch', sport: 'baseball' }, basketball: { n: 'The Black Net', sport: 'basketball' },
   golf: { n: 'The Hollow Flag', sport: 'golf' }, bowling: { n: 'The Drowned Pin', sport: 'bowling' }, curling: { n: 'The Sunken Stone', sport: 'curling' },
   football: { n: 'The Ash Ball', sport: 'football' }, boxing: { n: 'The Broken Bell', sport: 'boxing' }, hockey: { n: 'The Dead Puck', sport: 'hockey' },
+  jousting: { n: 'The Splintered Lance', sport: 'jousting' },
 };
+// the nine an Umbral opened before jousting's champion asks for
+const W_UMB_NINE = ['card', 'baseball', 'basketball', 'golf', 'bowling', 'curling', 'football', 'boxing', 'hockey'];
+// the pieces this journey's Seal asks for, in the pieces' own order
+function wUmbNeed() { const U = wUmb(), all = Object.keys(W_UMB_PIECES); return U && Array.isArray(U.need) ? all.filter(p => U.need.includes(p)) : all; }
+const wUmbGot = () => { const U = wUmb(); return U ? wUmbNeed().filter(p => U.pieces.includes(p)).length : 0; };
+const wUmbNum = n => ['none', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten', 'eleven', 'twelve'][n] || String(n);
 // the Nadir champions: where each waits, who they field, what they hold. Phase 4 adds the sports' champions.
 const W_NADIR = {
   gate: { piece: 'card', char: 'nadir_gate', map: 'u:umbralden', at: [9, 4], region: 'rime', ids: ['u_gatekeeper', 'boneline'], type: 'elite', hexes: 2, toll: 20, gold: 80 },
@@ -73311,7 +73486,7 @@ DB.chars.nadir_gate = { name: 'Morrow Vane, the Gatekeeper', kind: 'lich', look:
   greet: 'You came through. They always do, the first time. I hold the CARD. Say PLAY when you want to lose it to me again. Ask about the RULES first, if you like.',
   topics: {
     job: { t: 'I keep the Gate. Nobody comes further in without playing me first. Nobody has to, but they all do.' },
-    card: { t: 'The Cracked Card. One ninth of your Seal. Win a hand of ours and it is yours. Lose, and the next hand costs you a TOLL.' },
+    card: { t: 'The Cracked Card. One piece of your Seal. Win a hand of ours and it is yours. Lose, and the next hand costs you a TOLL.' },
     rules: { t: 'Our cards, our rules. Everything here is harder: my side has more in it, you hold one card fewer, and before we start I draw the HEXES. Two, for you.' },
     hexes: { t: 'A little something extra on the table. Shades in your deck, a grudge, cold hands. You will see which before we start.' },
     toll: { t: 'Twenty gold a hand, after the first. The first is free. Nothing else here is.' },
@@ -73384,7 +73559,9 @@ W_ON_END.nadir = function (r, ref) {
   if (r === 'win') {
     if (!U.pieces.includes(C.piece)) U.pieces.push(C.piece);
     U.beaten[ref.id] = WG.dayAbs; RUN.gold += C.gold;
-    wLog(`You beat ${DB.chars[C.char].name}, and ${W_UMB_PIECES[C.piece].n} is yours: ${U.pieces.length} of 9 pieces of the Seal. ${C.gold} gold.`, 'g');
+    // (a piece this journey's Seal doesn't ask for, the jousting piece of an Umbral opened before it: it only sings)
+    const need = wUmbNeed(), of = need.includes(C.piece) ? `${wUmbGot()} of ${need.length} pieces of the Seal` : `your Seal was cast without it, so it only sings for you (${wUmbGot()} of ${need.length} pieces)`;
+    wLog(`You beat ${DB.chars[C.char].name}, and ${W_UMB_PIECES[C.piece].n} is yours: ${of}. ${C.gold} gold.`, 'g');
     wGainCard({ pick: 3, rarity: 'r' }, DB.chars[C.char].name);
   } else U.tries[ref.id] = (U.tries[ref.id] || 0) + 1;
   wSave();
@@ -73420,10 +73597,11 @@ wAudit = function () {
   return P;
 };
 /* u4: the dark grounds (issue #99, phase 4's frame). Loads after u3-monsters.js; changes earlier parts only by
-   reassignment (saved originals carry the wWU4 prefix). The sports' own parts (u4a to u4h) load after it.
+   reassignment (saved originals carry the wWU4 prefix). The sports' own parts (u4a to u4h, and u4j) load after it.
 
    Every sport with an engine has its ground on the dark world too (W_UMB4.grounds): the light ground through u0's
-   transform, under its dark name. A Nadir champion waits at the far end of each, and the approach is guarded:
+   transform, under its dark name. (The Tilting Lists joined as the Hollow Lists with jousting's champion, issue #117,
+   phase 11: u4j-jousting.js.) A Nadir champion waits at the far end of each, and the approach is guarded:
      the cold     every W_UMB4.cold.steps steps on a dark ground costs your team 1 HP (never below 1)
      the guards   two of the Nadir, by the champion; each plays you an Umbral card match (an elite, tier U) and once
                   beaten stands aside for the rest of the journey (WG.umbral.guards)
@@ -73446,8 +73624,8 @@ wAudit = function () {
    ground has its guards, and its gate is a real item). */
 
 const W_UMB4 = {
-  grounds: { g_ballpark: 'baseball', g_court: 'basketball', g_links: 'golf', g_lanes: 'bowling', g_shed: 'curling', g_bowl: 'football', g_ring: 'boxing', g_rink: 'hockey' },
-  names: { g_ballpark: 'The Bone Diamond', g_court: 'The Black Court', g_links: 'The Hollow Links', g_lanes: 'The Drowned Lanes', g_shed: 'The Sunken Shed', g_bowl: 'The Cinder Pit', g_ring: 'The Broken Ring', g_rink: 'The Dead Pond' },
+  grounds: { g_ballpark: 'baseball', g_court: 'basketball', g_links: 'golf', g_lanes: 'bowling', g_shed: 'curling', g_bowl: 'football', g_ring: 'boxing', g_rink: 'hockey', g_lists: 'jousting' },
+  names: { g_ballpark: 'The Bone Diamond', g_court: 'The Black Court', g_links: 'The Hollow Links', g_lanes: 'The Drowned Lanes', g_shed: 'The Sunken Shed', g_bowl: 'The Cinder Pit', g_ring: 'The Broken Ring', g_rink: 'The Dead Pond', g_lists: 'The Hollow Lists' },
   cold: { steps: 2, hp: 1 },
   gate: { plains: 'grain', bloom: 'mossberry', tide: 'brinekelp', ember: 'emberpepper', rime: 'frostmint' },
   guardNames: ['The Left Hand of the Nadir', 'The Right Hand of the Nadir'],
@@ -73649,7 +73827,7 @@ DB.chars.nadir_diamond = { name: 'Vesper Quill, the Stitcher', kind: 'witch', lo
   greet: 'Another nine through the door. I keep the STITCH, and I pitch for the Bone Nine. Say PLAY when you want to try to hit me. Ask about the RULES first. Everybody should.',
   topics: {
     job: { t: 'I pitch. I have pitched every game ever played on this diamond, and I have never once been taken out of one.' },
-    stitch: { t: 'The Iron Stitch. One ninth of your Seal, sewn into the oldest ball on this side of the door. Beat my nine and it is yours. Lose, and the next game costs a TOLL.' },
+    stitch: { t: 'The Iron Stitch. One piece of your Seal, sewn into the oldest ball on this side of the door. Beat my nine and it is yours. Lose, and the next game costs a TOLL.' },
     rules: { t: 'Three innings, our ground, our rules. My nine play at your level, a little better at everything, and they think faster than any coach you have met. Before the first pitch I draw the HEXES: two, for you.' },
     hexes: { t: 'A pitch that goes through the bat. Bases that will not stay put. A font that never runs dry. A chill in the hands. You will see which before we start, and they stay up on the scoreboard.' },
     dead: { t: 'The Dead Ball. It leaves my hand and it is not there, and then it is, and it is late. Nobody else throws it.' },
@@ -73826,7 +74004,7 @@ DB.chars.nadir_gridiron = { name: 'Ossian Pyre, the Ash Marshal', kind: 'lich', 
   greet: 'Another one who walked through the cold for a game. I captain the Nadir here, and I hold the BALL. Say PLAY when you are ready to lose it. Ask about the RULES first; nobody ever does.',
   topics: {
     job: { t: 'I call the plays in the Pit. I called them before the Ash Bowl had grass, and I will call them after it is ash.' },
-    ball: { t: 'The Ash Ball. One ninth of your Seal, and still warm. Beat my seven at football and it is yours. Lose, and the next game costs a TOLL.' },
+    ball: { t: 'The Ash Ball. One piece of your Seal, and still warm. Beat my seven at football and it is yours. Lose, and the next game costs a TOLL.' },
     rules: { t: 'Real football, seven a side, two halves, our field. My side plays harder than anything you have met, a Lich calls our plays, and our sideline carries a full bag. I keep an ECLIPSE for when it matters. Before kickoff I draw the HEXES.' },
     hexes: { t: 'The Pit has its moods. The end zone at your end creeps out, the ball rolls our way, the cold gets into your legs, the wind turns your kicks. You will hear which before kickoff.' },
     toll: { t: 'Twenty gold a game, after the first. Paid at kickoff. Walking away from the card costs nothing.' },
@@ -73962,7 +74140,7 @@ DB.chars.nadir_ring = { name: 'Brakka Knell, the Broken Bell', kind: 'minotaur',
   greet: 'Every bell on this side rang once for somebody, and then it cracked. I hold the BELL. Say PLAY when you want to hear it ring for you. Ask about the RULES first, if you like.',
   topics: {
     job: { t: 'I box. I have boxed every fool who walked down this ring since the bell broke. None of them heard the end of the third round.' },
-    bell: { t: 'The Broken Bell. One ninth of your Seal. Win the card and it is yours. Lose, and the next card costs you a TOLL.' },
+    bell: { t: 'The Broken Bell. One piece of your Seal. Win the card and it is yours. Lose, and the next card costs you a TOLL.' },
     rules: { t: 'Three bouts, as in your Anvil Ring: two of my Nadir, then me. Everything here is harder. My boxers are stronger than yours, my corner is cleverer than any you have met, and before the bell I draw the HEXES. One or two, for you.' },
     hexes: { t: 'A ring that closes in. Bad water in your bucket. Heavy gloves. A quick count. You will hear which before the bell.' },
     toll: { t: 'Twenty gold a card, after the first. The first is free. The bell does not ring for nothing twice.' },
@@ -74112,7 +74290,7 @@ DB.chars.nadir_court = { name: 'Vesper Gloam, the Night Warden', kind: 'vampire'
   greet: 'You walked all the way through the cold for a game of basketball. I captain the Nadir on the Black Court, and I keep the NET. Say PLAY when you want to lose it. Ask about the RULES first, if you like; nobody listens.',
   topics: {
     job: { t: 'I run the point on the Black Court. I was running it when the torches on that wall were lit, and I will be running it when the last one goes out.' },
-    net: { t: 'The Black Net. One ninth of your Seal, and it has never once let a ball through cleanly. Beat my five at basketball and it is yours. Lose, and the next game costs a TOLL.' },
+    net: { t: 'The Black Net. One piece of your Seal, and it has never once let a ball through cleanly. Beat my five at basketball and it is yours. Lose, and the next game costs a TOLL.' },
     rules: { t: 'Real basketball, five on five, four quarters, our boards. My side plays harder than anything you have met, a Lich calls our sets, and our bench carries a full bag. I keep the LIGHTS for when it matters. Before the tip I draw the HEXES.' },
     hexes: { t: 'The Black Court has its moods. Your rim drifts on its bracket, a shadow comes out to guard you, a crooked whistle calls every touch against you, the cold gets into your fingers at the line. You will hear which before the tip.' },
     toll: { t: 'Twenty gold a game, after the first. Paid at the tip. Walking away from the card costs nothing.' },
@@ -74258,7 +74436,7 @@ DB.chars.nadir_rink = { name: 'Hollis Grael, the Drowned Captain', kind: 'wraith
   greet: 'You crossed the cold for a game. I captain the Nadir on this pond, and I hold the PUCK. Say PLAY when you want to try to take it off me. Ask about the RULES first. The ice here has opinions.',
   topics: {
     job: { t: 'I went through the ice on this pond one winter, and I came up captain. I have not lost a game on it since.' },
-    puck: { t: 'The Dead Puck. One ninth of your Seal, frozen through. Beat my six at hockey and it is yours. Lose, and the next game costs a TOLL.' },
+    puck: { t: 'The Dead Puck. One piece of your Seal, frozen through. Beat my six at hockey and it is yours. Lose, and the next game costs a TOLL.' },
     rules: { t: 'Real hockey, five skaters and a goalie, three periods, our pond. My six skate harder than anything you have met, a Lich calls our lines, and our bench carries a full bag. I keep a NIGHT of my own for when it matters. Before the puck drops I draw the HEXES.' },
     hexes: { t: 'The pond has moods. It opens under the puck and gives it back at centre ice. The net wanders off its line. The cold gets into your legs. The whistle forgets whose side it is on. You will hear which before the puck drops, and they stay up on the board.' },
     toll: { t: 'Twenty gold a game, after the first. Paid when the puck drops. Walking away from the card costs nothing.' },
@@ -74402,7 +74580,7 @@ DB.chars.nadir_links = { name: 'Sexton Vale, the Last Caddie', kind: 'wraith', l
   greet: 'Nobody finishes a round here. They just stop playing. I keep the FLAG on the last green. Say PLAY when you want to try for it, and ask about the RULES first. They change.',
   topics: {
     job: { t: 'I caddied on these links when they were green. I still do. Every round on this side ends on my last hole.' },
-    flag: { t: 'The Hollow Flag. One ninth of your Seal, and it flies on a green nobody has ever reached in regulation. Beat my four at golf and it is yours. Lose, and the next round costs a TOLL.' },
+    flag: { t: 'The Hollow Flag. One piece of your Seal, and it flies on a green nobody has ever reached in regulation. Beat my four at golf and it is yours. Lose, and the next round costs a TOLL.' },
     rules: { t: 'Match play, captain\'s choice, your four against my four, one ball a side. My side plays at your level and better at everything, a Lich carries our bag and reads every green for us, and we bring a full bag of potions. Before the first tee I draw the HEXES.' },
     hexes: { t: 'A green that will not lie still. A cup that wanders off. Fog over the flag. A wind that turns while you swing. One of them, for you. You will hear which before the first tee.' },
     hollow: { t: 'Once a round I let the flag go hollow. Your reads come up short, and your hands shake on the putts. Mind it.' },
@@ -74547,7 +74725,7 @@ DB.chars.nadir_lanes = { name: 'Ossery Brine, the Drowned Pinsetter', kind: 'zom
   greet: 'The sea came in under these lanes a long time ago, and we kept bowling. I set the pins down here, and I keep the PIN. Say PLAY when you want to bowl for it. Ask about the RULES first; the water changes them.',
   topics: {
     job: { t: 'I set the pins on the Drowned Lanes. I set them when the lamps were lit and the floor was dry, and I set them now. Every one of them comes up wet.' },
-    pin: { t: 'The Drowned Pin. One ninth of your Seal, and it has never once gone down clean. Beat my five at bowling and it is yours. Lose, and the next game costs a TOLL.' },
+    pin: { t: 'The Drowned Pin. One piece of your Seal, and it has never once gone down clean. Beat my five at bowling and it is yours. Lose, and the next game costs a TOLL.' },
     rules: { t: 'One team game, ten frames, the Baker format, your five against mine. My side bowls at your level and better at everything, a Lich reads the oil for us and weighs every ball before it leaves the hand, and we bring a full bag. Nobody goes home level: a roll-off. Before the first frame I draw the HEXES.' },
     hexes: { t: 'The water has its moods. Oil that turns to ichor under your ball, a pin too heavy to fall, gutters that pull, a black tide under your lane. You will hear which before the first frame.' },
     bell: { t: 'Once a game I ring the bell under the floor. The oil goes heavy for your five, and your ball carries less. Mind it.' },
@@ -74703,7 +74881,7 @@ DB.chars.nadir_shed = { name: 'Grisel Mourne, the Sunken Skip', kind: 'lich', lo
   greet: 'The tide came in over this sheet a long time ago, and nobody told the stones. I skip the Nadir here, and I keep the STONE at the bottom of the house. Say PLAY when you want to curl for it. Ask about the RULES first. The ice here has its own.',
   topics: {
     job: { t: 'I skipped at the Shed when the pebble was water and the windows had glass. I still call every stone. The sea never asked me to stop.' },
-    stone: { t: 'The Sunken Stone. One ninth of your Seal, and it has sat on the button so long the button has forgotten it is there. Beat my four at curling and it is yours. Lose, and the next match costs a TOLL.' },
+    stone: { t: 'The Sunken Stone. One piece of your Seal, and it has sat on the button so long the button has forgotten it is there. Beat my four at curling and it is yours. Lose, and the next match costs a TOLL.' },
     rules: { t: 'Real curling, your four against my four, six ends, nobody goes home level. My side curls at your level and a little better at everything, a Lich calls our stones and reads every pebble as it is, our sweepers know where a stone is going before it does, and we bring a full bag. Before the first stone I draw the HEXES.' },
     hexes: { t: 'Rime on your pebble, so your stones curl past where your skip reads them. Brooms that weigh like lead. A house that slides away from you. Frost that sets my stones in the four-foot like rock. One of them, for you. You will hear which before the first stone.' },
     sunken: { t: 'Once a match I let the house go under. Your stones drag in the cold water, and they hardly curl. Mind the end I choose.' },
@@ -74816,10 +74994,202 @@ wShedBoard = function () {
 // after a Hardcore journey ends on the finale's lost round, the curling result card stays off the end screen
 const wWU4HShedResultCard = wShedResultCard;
 wShedResultCard = function () { if ((RUN && RUN.over) || UI.screen === 'end') return; return wWU4HShedResultCard.apply(this, arguments); };
+/* u4j: jousting in the Umbral (issue #117, phase 11), as u4h is curling's. Loads after u4h-curling.js; changes earlier
+   parts only by reassignment (saved originals carry the wWU4J prefix). The engine's side is src/jt/parts/15-umbral.js:
+   the Lich (CPU skill 3), the hexes (opts.hexes) and a rider's own ultimate. The dark ground itself, the Hollow Lists
+   (u:g_lists, on the dark Mossgate's side of the Rotwold), is u4's: W_UMB4.grounds lists it, so u0's transform builds
+   it, u4 sets its two guards and its gate (the Rotwold's mossberry) and places its champion, and u8d walls it.
+
+   Tier U at the Lists is tier 4 in jousting's tables: W_JTG.oppBonus[4] rating points on each of their four (an umbral
+   form changes only their ratings, never yours), the Lich riding for them (W_BALL.diff[4] = 3, the skill every engine
+   reads by tier, named in W_BALL_SKILL: the engine's sharper hands, a surer lean, and odds reckoned against the rider it
+   meets) and a full bag (W_LISTS_KIT.opp[4]). Tiers 1 to 3 are as they were.
+   The champion of the Hollow Lists: Isolde Grave, the Pale Rider, holds the Splintered Lance. Past the two guards and the
+   gate (u4), PLAY opens the game card (wUmbJtCard): tier U, the Nadir four (W_UMB4J.four, at your team's level: a
+   wraith rides the first heat, the champion the second and the tilt for the crown, with an ultimate of her own, The
+   Pale Charge; a spider and a witch squire), the hexes for this try, and Play, Manage or Simulate. The match is the
+   Realm's own jousting match (wStartLists: save and leave, resume after a reload, Concede, the result) against club
+   'nadir:lists' (or 'nadir:lists:finale', Nadir Athletic, for a round of the Seal) at tier 4 with kind 'unadirjt': its
+   end goes to wUmbNadirEnd (a joust never ends level: the tilt for the crown). Always two heats of three courses,
+   whatever Settings says (the standard match), and the Lists' own ways are off (ground: false: the Hollow Lists'
+   sand is never raked and no pennant flies; the Umbral's other grounds turn their layers off too). Your four ride as a
+   Knight in Manage and Simulate, against the Lich, with the same hexes, so Simulate is no way round them. The toll, on
+   a retry, is paid as the match starts (wUmbTollAtKickoff); backing away from the card costs nothing.
+   Hexes: jousting's own (wJT.hexes, the engine's table), W_NADIR.lists.hexes of them (a finale round its own count),
+   drawn for each try by wUmbJtHexes (fixed for the try: a reload doesn't redraw them), named on the card, in the log,
+   before the first course, on the lists all match, on the bar and in the board's caption.
+   In LAB mode PLAY skips the card and plays W_UMB4J.labHow (Simulate) at once. A match left half-played
+   (W_UMB4.live.lists) is picked up by PLAY where it was, with no card and no toll.
+   The finale (u5) drives the same adapter with id 'finale' (no piece, no toll).
+   The Seal's count: a journey whose Umbral opened before this part (WG.umbral without need) asks for the nine pieces
+   it opened with (u3's W_UMB_NINE): set on loading it (wStart), so a save mid-Umbral, or mid-Seal, finishes as it
+   would have. Its jousting champion still plays, and the piece still sings (u8j), but the Seal never waits for it.
+
+   W_UMB4J, wUmbJtClub, wUmbJtFour, wUmbJtHexes, wUmbJtCard, wUmbJtKick, wUmbJtHelp (u6's How to play); W_NADIR.lists, DB.chars.nadir_lists,
+   W_UMB4.start.lists, W_UMB4.live.lists, W_ON_END.unadirjt
+   Wraps: wBallRegion (wWU4JBallRegion), wBallTeam (wWU4JBallTeam), wListsOpp (wWU4JListsOpp): the Nadir's clubs are the
+   Rotwold's and the Nadir four; wListsOpts (wWU4JListsOpts: tier U jousts with the ground off); wJT.start and
+   wJT.simMatch (wWU4JStart, wWU4JSimMatch: the hexes go in); wListsBarNote (wWU4JListsBarNote: the hexes on the bar,
+   and no "from the next match" length note), wListsBoard (wWU4JListsBoard: and in the board's caption),
+   wListsResultCard (wWU4JListsResultCard: never over the end screen of a journey the finale ended), wStart (wWU4JStart2: an older Umbral's count of pieces). */
+
+const W_UMB4J = {
+  id: 'lists', club: 'nadir:lists', finaleClub: 'nadir:lists:finale', kind: 'unadirjt', tier: 4, labHow: 'sim',
+  team: { name: 'Hollow Lists Nadir', short: 'NDR', color: '#2e2438', light: '#d8c8ff', shade: 1 },
+  finaleTeam: { name: 'Nadir Athletic', short: 'NDR', color: '#2a1e34', light: '#e4defa', shade: 1 },
+  // the four: the first heat's rider, the second's (the champion, and the tilt for the crown), then the two squires
+  four: [{ n: 'Sir Hollowmere', kind: 'wraith' }, { n: 'Isolde Grave', kind: 'vampire', champ: true }, { n: 'Weft', kind: 'spider' }, { n: 'Hemlock', kind: 'witch' }],
+  champ: { more: 0, ult: 'palecharge' },
+};
+// tier U in jousting's tables (W_BALL.diff and W_BALL_SKILL are shared with the other sports' tier U: set once)
+W_JTG.oppBonus[4] = 1;
+W_LISTS_KIT.opp[4] = { draught: 2, jtliniment: 1, jttonic: 1, jtoil: 2 };
+if (W_BALL.diff[4] == null) W_BALL.diff[4] = 3;
+if (!W_BALL_SKILL[3]) W_BALL_SKILL[3] = 'Lich';
+
+W_NADIR.lists = { piece: 'jousting', char: 'nadir_lists', ground: 'g_lists', map: 'u:g_lists', region: 'bloom', engine: 'lists', hexes: 1, toll: 20, gold: 100 };
+DB.chars.nadir_lists = { name: 'Isolde Grave, the Pale Rider', kind: 'vampire', look: { coat: '#2e2438', acc: 'helmet' },
+  greet: 'Nobody rakes this sand any more. Nobody needs to. I ride for the Nadir here, and I keep the LANCE. Say PLAY when you want to ride for it. Ask about the RULES first. Our tilt has its own.',
+  topics: {
+    job: { t: 'I rode the Tilting Lists when the pennants still had colours. I unhorsed everyone who came, and then there was nobody left to come, and I kept riding.' },
+    lance: { t: 'The Splintered Lance. One piece of your Seal, and it broke on a shield so long ago that the shield is dust. Beat my four at jousting and it is yours. Lose, and the next match costs a TOLL.' },
+    rules: { t: 'Real jousting, your four against my four: two heats of three courses, and the tilt for the crown if we are level. My side rides at your level and a little better at everything, a Lich calls our courses and steadies our hands, and our squires bring a full bag. No wind here, and the sand never ruts. Before the first course I draw the HEXES.' },
+    hexes: { t: 'A grave mist on the tilt, so your tip wanders. Mounts that are half shadow, and blow too soon. Frost on your saddles. Shields on my side that drink your lance. One of them, for you. You will hear which before the first course.' },
+    charge: { t: 'Once a match I ride the Pale Charge. My lance breaks on anything it touches, and your rider\'s tip goes looking for something to hold on to. Mind the course I choose.' },
+    toll: { t: 'Twenty gold a match, after the first. Paid as the match starts. Walking away from the card costs nothing.' },
+    play: { t: 'Then pick your four.', act: 'unadir:lists' },
+  } };
+
+/* ---------- the Nadir four ---------- */
+// which of the Nadir's clubs this is: 'champ', 'finale', or ''
+const wUmbJtClub = club => club === W_UMB4J.club ? 'champ' : club === W_UMB4J.finaleClub ? 'finale' : '';
+// at your team's level (level parity), tier U's points on each (spread as wListsOpp spreads a tier's), the champion
+// riding the second heat with W_UMB4J.champ.more points more and her own ultimate; each rider on the mount that suits
+// them, the champion the best for the tilt
+function wUmbJtFour(lvl, finale) {
+  const L = lvl != null ? lvl : Math.max(1, Math.min(W_PARTY.maxLvl, wNineTier())), k = W_JTG.oppBonus[W_UMB4J.tier] || 0, X = W_UMB4J.champ, st = wJT.stats;
+  const roster = W_UMB4J.four.map((f, j) => {
+    const p = wListsPlayer(wMakePlayer({ kind: f.kind, lvl: L, n: f.n }, 'opp')), n = k + (f.champ ? X.more : 0);
+    p.n = f.n; p.pw = wJT.pwByName(f.n);
+    for (let i = 0; i < n; i++) { const s = st[(i * 3 + j) % st.length]; p.r[s] = Math.min(wJT.cap, p.r[s] + 1); }
+    if (f.champ) p.ult = X.ult;
+    delete p.gear;
+    return p;
+  });
+  const T = finale ? W_UMB4J.finaleTeam : W_UMB4J.team, riders = [0, 1], n = wListsCourses();
+  return { name: T.name, short: T.short, color: T.color, shade: 1, roster, riders, squires: [2, 3],
+    mounts: riders.map(i => wJT.mountFor(wJtRsOfR(roster[i].r), n).m), best: W_UMB4J.four.findIndex(f => f.champ) === 1 ? 1 : 0 };
+}
+const wWU4JBallRegion = wBallRegion;
+wBallRegion = function (club) { return wUmbJtClub(club) ? W_NADIR.lists.region : wWU4JBallRegion.apply(this, arguments); };
+const wWU4JBallTeam = wBallTeam;
+wBallTeam = function (club) {
+  const f = wUmbJtClub(club); if (!f) return wWU4JBallTeam.apply(this, arguments);
+  const T = f === 'finale' ? W_UMB4J.finaleTeam : W_UMB4J.team;
+  return { name: T.name, short: T.short, color: T.color, dark: tint(T.color, -.6), light: T.light, motto: '' };
+};
+const wWU4JListsOpp = wListsOpp;
+wListsOpp = function (club, tier) { const f = wUmbJtClub(club); return f ? wUmbJtFour(null, f === 'finale') : wWU4JListsOpp.apply(this, arguments); };
+// tier U jousts with the Lists' ways off (as the Umbral's other grounds turn their layers off): w155 respects a match
+// whose options already say
+const wWU4JListsOpts = wListsOpts;
+wListsOpts = function (mine, opp, tier) { const o = wWU4JListsOpts.apply(this, arguments); return tier === W_UMB4J.tier ? Object.assign(o, { ground: false }) : o; };
+
+/* ---------- the hexes ---------- */
+const WU4J = { next: null };
+const wWU4JStart = wJT.start, wWU4JSimMatch = wJT.simMatch;
+wJT.start = o => wWU4JStart(WU4J.next ? Object.assign({}, o, { hexes: wUmbTakeHex(WU4J), hexOn: 0 }) : o);
+wJT.simMatch = o => wWU4JSimMatch(WU4J.next ? Object.assign({}, o, { hexes: wUmbTakeHex(WU4J), hexOn: 0 }) : o);
+// n of jousting's hexes for this try of the champion (or this round of the finale): fixed for the try (the same draw
+// after a reload)
+function wUmbJtHexes(id, n) {
+  const U = wUmb(), ks = Object.keys(wJT.hexes);
+  const r = mulberry(wUmbHash('jt:' + id) + 977 * ((U && U.tries[id]) || 0) + ((WG && WG.year) || 1) + (id === 'finale' && U ? 1013 * (U.finale || 0) : 0));
+  const out = []; while (out.length < Math.min(Math.max(0, n), ks.length)) { const k = ks[Math.floor(r() * ks.length)]; if (!out.includes(k)) out.push(k); }
+  return out;
+}
+const wUmbJtHexWords = hx => hx.map(h => wJT.hexes[h]).filter(Boolean);
+
+/* ---------- PLAY: the card, then the first course ---------- */
+function wUmbJtCard(C, id, hx) {
+  const ch = DB.chars[C.char], U = wUmb(), tries = (U && U.tries[id]) || 0, lvl = Math.max(1, Math.min(W_PARTY.maxLvl, wNineTier()));
+  const fin = id === 'finale' || !C.piece, T = fin ? W_UMB4J.finaleTeam : W_UMB4J.team, H = wUmbJtHexWords(hx), uo = wJT.ultOwn[W_UMB4J.champ.ult], champ = W_UMB4J.four.find(f => f.champ).n;
+  const k = W_JTG.oppBonus[W_UMB4J.tier] || 0;
+  // (a round of the Seal holds no piece and costs no toll)
+  const toll = !C.toll ? '' : tries > 0 ? ` This match costs the toll, ${C.toll} gold, as it starts.` : ` The first match is free; after a loss, each costs a toll of ${C.toll} gold.`;
+  const prize = fin ? `Win, and ${esc(W_UMB_PIECES[C.piece].n)} is yours.` : `Win, and ${esc(W_UMB_PIECES[C.piece].n)} is yours, with ${C.gold} gold.${toll}`;
+  const close = modal(`<header><h3>${esc(ch.name)}</h3></header><div class="wmsg">
+    <p><b>${fin ? 'The Seal: jousting' : 'The Hollow Lists'}: tier U.</b> Jousting against ${esc(T.name)}: level ${lvl}, in umbral form${k ? ` (${k} rating point${k === 1 ? '' : 's'} on each of their four)` : ''}, their courses called by a ${esc(W_BALL_SKILL[wListsSkillOf(W_UMB4J.tier)[1]])}, who reads the rider in front of it as they are and rides with surer hands than any Archmage, and a full bag of potions. ${esc(champ)} rides the second heat and the tilt for the crown, and once a match rides ${esc(uo.n)}: ${esc(uo.desc)} No wind on the Hollow Lists, and the sand never ruts.</p>
+    <p class="hint wumbpg"><b>Hexes:</b> ${H.length ? H.map(h => `${esc(h.n)} (${esc(h.d)})`).join(' ') : 'none'}</p>
+    <p class="hint">${prize} Always two heats of ${wJT.rules.courses} courses, and the tilt for the crown if level. <b>Play</b>: you ride every course of yours. <b>Manage</b>: your riders ride on their ratings; the plan and your squires' jobs are your calls. <b>Simulate</b>: the result now.</p></div>
+    <div class="row"><button class="btn" data-ujt="play">Play</button><button class="ghost" data-ujt="manage">Manage</button><button class="ghost" data-ujt="sim">Simulate</button><button class="ghost" id="wUjtNo">Not now</button></div>`, () => wDrain());
+  $('modalBox').querySelectorAll('[data-ujt]').forEach(b => b.onclick = () => { close(); const why = wUmbJtKick(C, id, hx, b.dataset.ujt); if (why) wLog(why, 'b'); });
+  $('wUjtNo').onclick = () => close();
+  const f = $('modalBox').querySelector('[data-ujt="play"]'); if (f) f.focus();
+}
+// why your team can't joust the champion now, or ''
+function wUmbJtWhy() { const probs = wListsProblems(); if (probs.length) return probs.join(' '); return wListsLive() ? 'Finish the jousting match you started first.' : ''; }
+// the first course: the toll (on a retry), the hexes in the log, and the Realm's jousting match at tier U ('' when it started)
+function wUmbJtKick(C, id, hx, how) {
+  const why = wUmbJtWhy(); if (why) return why;
+  wUmbTollAtKickoff(id);
+  const H = wUmbJtHexWords(hx);
+  if (H.length) wLog(`${DB.chars[C.char].name.split(',')[0]} draws the hexes: ${H.map(h => `${h.n} (${h.d})`).join(' ')}`, 'b');
+  WU4J.next = hx.slice();
+  // (the champion's match is the standard length, whatever Settings says: as the rules say and the lab measured)
+  const c0 = SET.listsCourses; SET.listsCourses = wJT.rules.courses;
+  try { return wStartLists({ club: id === 'finale' ? W_UMB4J.finaleClub : W_UMB4J.club, how, tier: W_UMB4J.tier, kind: W_UMB4J.kind, ref: { id }, cup: true }); }
+  finally { WU4J.next = null; if (c0 === undefined) delete SET.listsCourses; else SET.listsCourses = c0; }
+}
+W_UMB4.live.lists = () => wListsLive();
+W_UMB4.start.lists = function (C, id) {
+  // (a match left half-played picks up where it was, here as anywhere, and nothing else opens)
+  if (wListsLive()) { wResumeLists(); return ''; }
+  const why = wUmbJtWhy(); if (why) return why;
+  // (a round of the Seal draws exactly its own count)
+  const hx = wUmbJtHexes(id, C.hexes != null ? C.hexes : 1);
+  if (LAB) return wUmbJtKick(C, id, hx, W_UMB4J.labHow);
+  wUmbJtCard(C, id, hx);
+  return '';
+};
+// the end: the piece (or the finale's round), or a try counted (the finale's entry is rebuilt by u5 after a reload, so
+// no check on W_NADIR here)
+W_ON_END[W_UMB4J.kind] = function (r, ref) { if (ref && ref.id) wUmbNadirEnd(ref.id, r === 'win' ? 'win' : 'lose'); };
+
+/* ---------- on screen ---------- */
+// the hexes on the bar and in the board's caption, while a Nadir match is on
+// (the match is the live one from the moment it is put on the lists: the board is first drawn before WJT.world is set)
+const wUmbJtLiveHex = () => { const L = WG && WG.jtg && WG.jtg.live; return L && L.world.kind === W_UMB4J.kind && WJT && !WJT.over ? wJT.hex() : null; };
+const wWU4JListsBarNote = wListsBarNote;
+wListsBarNote = function () {
+  const r = wWU4JListsBarNote.apply(this, arguments), hx = wUmbJtLiveHex(), el = $('wListsNote');
+  if (hx && el) el.textContent = el.textContent.replace(/\s*\(Courses: \d+ a heat from the next match; this one is \d+\.\)/, '') + ` The Umbral, tier U. Hexes: ${hx.ids.map(h => wJT.hexes[h].n).join(', ')}.`;
+  return r;
+};
+const wWU4JListsBoard = wListsBoard;
+wListsBoard = function () {
+  const r = wWU4JListsBoard.apply(this, arguments), hx = wUmbJtLiveHex(), cap = hx && document.querySelector('#wListsBoard caption');
+  if (cap) cap.insertAdjacentHTML('beforeend', ` <small class="wumbpg">${esc(wJT.hexLine())}</small>`);
+  return r;
+};
+// after a Hardcore journey ends on the finale's lost round, the jousting result card stays off the end screen
+const wWU4JListsResultCard = wListsResultCard;
+wListsResultCard = function () { if ((RUN && RUN.over) || UI.screen === 'end') return; return wWU4JListsResultCard.apply(this, arguments); };
+
+/* ---------- How to play: a line in the Umbral's section (u6 writes the section, after this part: it calls this) ---------- */
+const wUmbJtHelp = () => `<p class="hint" id="wHelpUmbLists"><b>The Hollow Lists.</b> The Tilting Lists' dark mirror, by Mossgrave: Isolde Grave, the Pale Rider, holds the Splintered Lance. Her side jousts at your level with a point more on every rider, a full bag, and a Lich calling their courses, with surer hands than an Archmage and odds reckoned against the rider in front of it. Always two heats of ${wJT.rules.courses} courses; no wind, and the sand never ruts. She rides the second heat and the tilt for the crown, and once a match the Pale Charge. Her hexes: ${Object.values(wJT.hexes).map(x => `<b>${esc(x.n)}</b> (${esc(x.d)})`).join(' ')} An Umbral opened before she came asks only for the nine pieces it opened with: her lance can still be won, and sings like the rest.</p>`;
+
+/* ---------- an Umbral opened before jousting's champion: the nine it opened with ---------- */
+const wWU4JStart2 = wStart;
+wStart = function (save) {
+  const r = wWU4JStart2.apply(this, arguments), U = WG && WG.umbral;
+  if (U && !Array.isArray(U.need)) { U.need = W_UMB_NINE.slice(); wSave(); }
+  return r;
+};
 /* u4i: the champions' conditions (issue #99, "some champions also want a condition"). Loads after the sports'
    parts (u4a..u4h); changes earlier parts only by reassignment (saved originals carry the wWU4I prefix).
 
-   Four of the eight sports' champions want more than a win (W_UMB4I.conds, kept on each one's W_NADIR entry as C.cond):
+   Four of the sports' champions (not jousting's) want more than a win (W_UMB4I.conds, kept on each one's W_NADIR entry as C.cond):
      night   Vesper Gloam (basketball) and Sexton Vale (golf) play only after dark: by day, the game is turned away
              once everything else is in order (the guards beaten, the gate's item handed over, the toll affordable),
              so their other asks come first; a game left half-played resumes whatever the hour.
@@ -74905,9 +75275,11 @@ wRinkSettle = wUmbCondSettle(wWU4IRinkSettle);
 /* u5: the finale (issue #99, phase 5). Loads after the sports' parts (u4a..u4h); changes earlier parts only by
    reassignment (saved originals carry the wWU5 prefix).
 
-   Forging the Seal. Hollow Aurelia waits in the Hollow Coliseum (DB.chars.nadir_aurelia). With all nine pieces, PLAY
+   Forging the Seal. Hollow Aurelia waits in the Hollow Coliseum (DB.chars.nadir_aurelia). With all the pieces the Seal
+   asks for (u3's wUmbNeed: all ten, or the nine an Umbral opened before jousting's champion asks for), PLAY
    is the finale against Nadir Athletic: three rounds, each in a different way to play, the three where your Umbral
-   record is weakest (the champions that took you the most tries; chosen once, WG.umbral.finaleSports). Each round is
+   record is weakest among the pieces it asks for (the champions that took you the most tries; chosen once,
+   WG.umbral.finaleSports). Each round is
    that sport's game at tier U (its adapter, as its champion's was) or, for the card game, an Umbral card match; it
    draws W_UMB5.hexes hexes, one fewer where you won that sport's piece at the first try (the piece's edge: win them
    well). Win a round and the next waits (WG.umbral.finale: rounds won); lose and you try that round again. In a
@@ -74924,7 +75296,7 @@ wRinkSettle = wUmbCondSettle(wWU4IRinkSettle);
 const W_UMB5 = {
   rounds: 3, hexes: 2,
   // a piece's way to play: an engine (W_ENGINES key), or the card game (null)
-  engine: { card: null, baseball: 'diamond', basketball: 'court', golf: 'links', bowling: 'lanes', curling: 'shed', football: 'gridiron', boxing: 'ring', hockey: 'rink' },
+  engine: { card: null, baseball: 'diamond', basketball: 'court', golf: 'links', bowling: 'lanes', curling: 'shed', football: 'gridiron', boxing: 'ring', hockey: 'rink', jousting: 'lists' },
   card: { ids: ['u_aurelia', 'u_gatekeeper'], type: 'boss' },
 };
 EN('u_aurelia', 'Hollow Aurelia', 'wraith', [210, 220], {
@@ -74934,10 +75306,10 @@ EN('u_aurelia', 'Hollow Aurelia', 'wraith', [210, 220], {
   lose: { n: 'The Losing Throw', ops: [['a', 6, 4]] },
 }, { seq: ['hold', 'crown', 'echo', 'lose'] }, { team: { name: 'Nadir Athletic', short: 'NDR', color: '#2a1e34', light: '#e4defa' }, aura: 'wisps', crown: 1, flav: 'Captain of Apex Athletic, once. She never left the last game she lost, and she has been playing it ever since.' });
 DB.chars.nadir_aurelia = { name: 'Hollow Aurelia', kind: 'wraith', look: { coat: '#2a1e34', acc: 'scarf', tall: 1 },
-  greet: 'You have been busy. Bring me all nine PIECES and we will play for the SEAL. Three games. My choice.',
+  greet: 'You have been busy. Bring me all the PIECES and we will play for the SEAL. Three games. My choice.',
   topics: {
     job: { t: 'I captain Nadir Athletic. I lost a game once. I am still playing it.' },
-    pieces: { t: 'Nine. One for every way to play. Without all of them there is nothing to forge, and nothing to play for.' },
+    pieces: { t: 'One for every way to play. Without all of them there is nothing to forge, and nothing to play for.' },
     seal: { t: 'Win three games against my side and the pieces lock together. The door shuts, and you go home. Lose, and you come back and try that game again. I will be here. I am always here.' },
     games: { t: 'I choose them. The three you are worst at, by your record on this side. A piece you won cleanly, at the first try, makes its game a little kinder.' },
     play: { t: 'Then let us begin.', act: 'ufinale' },
@@ -74952,7 +75324,7 @@ const wUmbChampOf = piece => Object.keys(W_NADIR).find(k => W_NADIR[k].piece ===
 function wUmbFinaleSports() {
   const U = wUmb(); if (!U) return [];
   if (U.finaleSports && U.finaleSports.length === W_UMB5.rounds) return U.finaleSports;
-  const ps = Object.keys(W_UMB_PIECES), tries = p => { const c = wUmbChampOf(p); return (c && U.tries[c]) || 0; };
+  const ps = wUmbNeed(), tries = p => { const c = wUmbChampOf(p); return (c && U.tries[c]) || 0; };
   U.finaleSports = ps.map((p, i) => [p, tries(p), i]).sort((a, b) => b[1] - a[1] || a[2] - b[2]).slice(0, W_UMB5.rounds).map(x => x[0]);
   return U.finaleSports;
 }
@@ -74974,8 +75346,8 @@ function wUmbFinaleEntry() {
 function wUmbFinale() {
   const U = wUmb(); if (!U) return 'Nobody here plays.';
   if (U.sealed) return 'The Seal is forged. Hollow Aurelia is gone, and the stands are empty.';
-  const missing = Object.keys(W_UMB_PIECES).filter(p => !U.pieces.includes(p));
-  if (missing.length) return `You hold ${U.pieces.length} of the nine pieces. Hollow Aurelia will not play for the Seal until you hold them all (still out: ${missing.map(p => W_UMB_PIECES[p].n).join(', ')}).`;
+  const need = wUmbNeed(), missing = need.filter(p => !U.pieces.includes(p));
+  if (missing.length) return `You hold ${wUmbGot()} of the ${wUmbNum(need.length)} pieces. Hollow Aurelia will not play for the Seal until you hold them all (still out: ${missing.map(p => W_UMB_PIECES[p].n).join(', ')}).`;
   const r = U.finale || 0, piece = wUmbFinaleSports()[r];
   wUmbFinaleEntry();
   wLog(`The Seal, round ${r + 1} of ${W_UMB5.rounds}: ${W_UMB_PIECES[piece].sport}.${wUmbClean(piece) ? ` (You won ${W_UMB_PIECES[piece].n} cleanly: one hex fewer.)` : ''}`, 'b');
@@ -75000,7 +75372,7 @@ W_ON_END.nadir = function (r, ref) {
 };
 function wUmbSeal() {
   const U = wUmb(); U.sealed = WG.dayAbs; U.sealedYear = WG.year; U.finale = W_UMB5.rounds;
-  wLog(`The Seal is forged. The nine pieces lock together in your captain's hands, the portal at the end of the Road to Nowhere closes, and the eclipse lifts. Year ${WG.year}.`, 'g');
+  wLog(`The Seal is forged. The ${wUmbNum(U.pieces.length)} pieces lock together in your captain's hands, the portal at the end of the Road to Nowhere closes, and the eclipse lifts. Year ${WG.year}.`, 'g');
   wUmbHeraldSync(); // (the herald has nothing more to say: he goes)
   const m = MAPS.coliseum; wEnterMap('coliseum', m.spawn[0], m.spawn[1]); WG.face = 'u';
   wInvalidate('umbralden'); wSave();
@@ -75008,9 +75380,10 @@ function wUmbSeal() {
   if (!LAB) U.sealScene = 1;
 }
 function wUmbSealScene() {
+  const U = wUmb(), n = wUmbNum(U ? U.pieces.length : wUmbNeed().length), N = n.charAt(0).toUpperCase() + n.slice(1);
   const close = modal(`<header><h3>The Seal of the Crown</h3></header>
     <div class="wumblines"><p class="wumbn">The last whistle goes, and the Hollow Coliseum goes very quiet.</p>
-    <p class="wumbn">Nine pieces, from nine games, lock together in your captain's hands: a seal, warm, and heavier than it looks.</p>
+    <p class="wumbn">${N} pieces, from ${n} games, lock together in your captain's hands: a seal, warm, and heavier than it looks.</p>
     <p class="wumbh">Hollow Aurelia looks at it for a long time. "That was a good game," she says, and she is gone.</p>
     <p class="wumbn">The stands empty like a breath going out. Far to the north, at the end of the Road to Nowhere, the portal folds shut.</p>
     <p class="wumbn">You walk out into the Crown Coliseum at noon. The sun is out. The block beside the statue is white again, and somebody has carved your team's name in it.</p></div>
@@ -75076,10 +75449,12 @@ TROPHY_FX.umbseal = { on: { fightStart: () => { gainBlock(W_UMB6.block, true); }
 Object.assign(RELICS.umbseal, TROPHY_FX.umbseal); // (core/hooks.js copied TROPHY_FX into RELICS at its load, before this part)
 ACH.push({ id: 'w_umbral', n: 'The Door Shut', d: 'Win back the pieces of the Seal of the Crown, and forge it', stat: 'realmUmbral', at: [1, 4, 10] });
 
-// the medal's stat: pieces won, and one more for the Seal (it only ever goes up)
+// the medal's stat: pieces won, and gold for the Seal (it only ever goes up). Gold is the Seal itself: the pieces
+// count up to one under gold (a tenth piece, jousting's, issue #117 phase 11, mustn't reach it unsealed), and the Seal
+// is gold however many pieces it took (the nine of an Umbral opened before jousting's champion)
 function wUmbAch() {
   const U = wUmb(); if (!U || LAB) return;
-  const v = U.pieces.length + (U.sealed ? 1 : 0), cur = ACHS.stats.realmUmbral || 0;
+  const gold = ACH.find(a => a.id === 'w_umbral').at[2], v = U.sealed ? gold : Math.min(U.pieces.length, gold - 1), cur = ACHS.stats.realmUmbral || 0;
   if (v > cur) achAdd('realmUmbral', v - cur);
 }
 const wWU6OnNadir = W_ON_END.nadir;
@@ -75132,17 +75507,18 @@ renderHelp = function () {
   const h = $('wHelp'); if (!h || $('wHelpUmbral')) return;
   if (!wUmbOn()) { h.insertAdjacentHTML('beforeend', '<p class="hint" id="wHelpUmbral"><b>After the Crown.</b> There is more to the Realm after you win the Crown. Nobody in the league will say what.</p>'); return; }
   h.insertAdjacentHTML('beforeend', `<div id="wHelpUmbral"><h3>The Umbral Realm</h3>
-    <p class="hint"><b>The door.</b> Winning the Crown broke the Seal of the Crown into nine pieces, one for every way to play, and opened a portal at the end of the Road to Nowhere, north of the Roost. Through it is the Umbral: the same Realm, wrong. Same roads, the towns mirrored and dark, the people their own doubles. Time runs on both sides, and the portal works both ways.</p>
+    <p class="hint"><b>The door.</b> Winning the Crown broke the Seal of the Crown into ten pieces, one for every way to play, and opened a portal at the end of the Road to Nowhere, north of the Roost. Through it is the Umbral: the same Realm, wrong. Same roads, the towns mirrored and dark, the people their own doubles. Time runs on both sides, and the portal works both ways.</p>
     <p class="hint"><b>Harder everywhere.</b> Every match on the dark side is tier U: tier 3 and more (the other side has a quarter more HP and a point more Strength, and you draw a card fewer), and every player has its kind's dark trait. There are no inns: rest by a lantern, one in each region, and a match that goes badly wakes you by the last one you rested at. The dark shops sell for fans or a player's XP, never gold.</p>
-    <p class="hint"><b>The pieces.</b> Nine Nadir champions hold them. The Gatekeeper, just through the portal, plays the card game. The others wait at the far end of their sport's dark ground, past the cold, two guards (each a card match) and a gate: bring them something from the light side of their region. Their games are at tier U, with one or two hexes (dark twists, named before you start). Some want more than a win: two play only after dark, and two want it won by two or more (a narrower win pays as a win, but they keep the piece). Lose, and the next try costs a toll.</p>
-    <p class="hint"><b>The Seal.</b> With all nine, Hollow Aurelia plays you for the Seal in the Hollow Coliseum: three games, in your three weakest ways to play on that side. A piece you won at the first try takes a hex off its game. Lose a game and you try that one again. Win all three and the door shuts.</p>
+    <p class="hint"><b>The pieces.</b> Ten Nadir champions hold them. The Gatekeeper, just through the portal, plays the card game. The others wait at the far end of their sport's dark ground, past the cold, two guards (each a card match) and a gate: bring them something from the light side of their region. Their games are at tier U, with one or two hexes (dark twists, named before you start). Some want more than a win: two play only after dark, and two want it won by two or more (a narrower win pays as a win, but they keep the piece). Lose, and the next try costs a toll.</p>
+    ${wUmbJtHelp()}
+    <p class="hint"><b>The Seal.</b> With all ten (an Umbral opened before the Hollow Lists had its champion asks only for the nine it opened with), Hollow Aurelia plays you for the Seal in the Hollow Coliseum: three games, in your three weakest ways to play on that side. A piece you won at the first try takes a hex off its game. Lose a game and you try that one again. Win all three and the door shuts.</p>
     <p class="hint"><b>When it shuts.</b> Forge the Seal and you keep it, a trophy: every card match starts with 6 Block and a card more in your first hand. The Nadir captain you beat most cleanly asks to join you. Your team's portrait in the Hall of Legends says you sealed it, for every later journey to see, and your profile's medal (The Door Shut) fills: bronze for the first piece, silver for four, gold for the Seal.</p>
     <p class="hint"><b>On the light side.</b> While the portal stands open, the sun goes out at midday once a week, and more often the longer it stays open. The Pale Herald, by the statue in the Coliseum, will tell you anything twice.</p></div>`);
 };
 
 /* ---------- Quick start: the hexes, sport by sport (only once the Umbral is open) ---------- */
 const W_UMB6_SPORTS = [['diamond', 'Baseball', 'The Bone Diamond'], ['gridiron', 'Football', 'The Cinder Pit'], ['ring', 'Boxing', 'The Broken Ring'], ['court', 'Basketball', 'The Black Court'],
-  ['rink', 'Hockey', 'The Dead Pond'], ['links', 'Golf', 'The Hollow Links'], ['lanes', 'Bowling', 'The Drowned Lanes'], ['shed', 'Curling', 'The Sunken Shed']];
+  ['rink', 'Hockey', 'The Dead Pond'], ['links', 'Golf', 'The Hollow Links'], ['lanes', 'Bowling', 'The Drowned Lanes'], ['shed', 'Curling', 'The Sunken Shed'], ['lists', 'Jousting', 'The Hollow Lists']];
 function wUmbQuick() {
   const steps = W_UMB6_SPORTS.map(([e, n, g]) => {
     const E = W_ENGINES[e], h = E && E.api.hexes, t = (typeof h === 'function' ? h() : h) || {};
@@ -75556,7 +75932,7 @@ renderHelp = function () {
      0  The Quiet       0-2 pieces   a few slow shadows; spikes on the approaches to the grounds
      1  The Stirring    3-5          the pits open; more shadows
      2  The Raging      6-7          the shadows hunt (two steps every third step) and see further
-     3  The Last Hour   8-9          more shadows still
+     3  The Last Hour   8 and up     more shadows still
    Each stage reached plays a short scene the next time the world is free (WG.umbral.dreadSeen: the highest whose scene
    has played; a save from before this part that is already past a stage sees only the highest one, once). The light
    side feels it too: the blight (u1's eclipses and hunters) is a step further on for each stage.
@@ -75599,7 +75975,7 @@ const W_UMB8C = {
   scenes: [null,
     { h: 'The Stirring', lines: ['Three pieces gone, and the Umbral notices.', 'The dead moon cracks across its face, and a thin light comes through the crack.', 'Out on the dark world the ground splits open in places. Something down there has woken up, and it is hungry.'] },
     { h: 'The Raging', lines: ['Six pieces. The Umbral is angry now.', 'The wind turns and carries ash the wrong way. The shadows on the dark world stop drifting.', 'They hunt now, and they hunt fast.'] },
-    { h: 'The Last Hour', lines: ['Eight pieces. One more, and then the Seal.', 'The sky over the dark world bleeds from the north. Every shadow on that side turns to face the portal.', 'It knows you are nearly done. It will not make the end easy.'] }],
+    { h: 'The Last Hour', lines: ['Eight pieces. Not many more, and then the Seal.', 'The sky over the dark world bleeds from the north. Every shadow on that side turns to face the portal.', 'It knows you are nearly done. It will not make the end easy.'] }],
 };
 DB.items.shadowsalt = { name: 'Shadow Salt', desc: `A pinch of grey salt. Scatter it on the dark side and the shadows can't see you for ${W_UMB8C.salt} steps.`, use: `Bag → Scatter, on the dark world: the shadows can't see you for ${W_UMB8C.salt} steps.`, price: 30 };
 // a dark-side ware: each dark shop keeps its own list (DB.shops['u_' + shop]), the light one's and the Umbral's wares
@@ -75932,7 +76308,7 @@ const wWU8CRenderHelp = renderHelp;
 renderHelp = function () {
   wWU8CRenderHelp.apply(this, arguments);
   const h = $('wHelpUmbral'); if (!h || !wUmbOn() || $('wHelpDread')) return;
-  h.insertAdjacentHTML('beforeend', `<p class="hint" id="wHelpDread"><b>The Dread.</b> The dark side wakes as you take its pieces: ${W_UMB8C.names.map((n, i) => `${n} (${W_UMB8C.stages[i]}${W_UMB8C.stages[i + 1] ? '-' + (W_UMB8C.stages[i + 1] - 1) : '-9'} pieces)`).join(', ')}.
+  h.insertAdjacentHTML('beforeend', `<p class="hint" id="wHelpDread"><b>The Dread.</b> The dark side wakes as you take its pieces: ${W_UMB8C.names.map((n, i) => `${n} (${W_UMB8C.stages[i]}${W_UMB8C.stages[i + 1] ? '-' + (W_UMB8C.stages[i + 1] - 1) : ' or more'} pieces)`).join(', ')}.
     Hungry shadows walk the dark world, more of them at each stage. One that sees you comes for you, and from the Raging they come two steps at a time; one that reaches you is a match.
     You only see one plainly when it is close: ${W_UMB8C.show[0]} steps in the Quiet and the Stirring, ${W_UMB8C.show[2]} from the Raging. Farther off it fades to a shimmer, so from the Raging they can see you before you see them. They keep out of a lantern's light, and Shadow Salt (from the dark shops) hides you from them.
     Spikes cost ${wUmbSpikeHp()} HP to walk on. From the Stirring, the cracked ground opens into pits: ${wUmbPitHp()} HP, and you climb out somewhere else. Wild matches come half as often on that side; the danger is one you can see.</p>`);
@@ -76468,7 +76844,7 @@ wUmbQuick = function () {
 
    W_UMB8H, wUmbHexCut, wUmbTradable, wUmbTrade
    Wraps: the hex draws wUmbHexes, wUmb4aHexes, wUmbGfHexes, wUmbRingHexes, wUmbBkHexes, wUmbHkHexes, wUmbGlHexes,
-   wUmbBlHexes and wUmbCrHexes (wWU8H<Name>: trimmed), wUmbTollAtKickoff (wWU8HTollAtKickoff: the ward bound to the game that
+   wUmbBlHexes, wUmbCrHexes and wUmbJtHexes (wWU8H<Name>: trimmed), wUmbTollAtKickoff (wWU8HTollAtKickoff: the ward bound to the game that
    kicks off), W_ON_END.nadir (wWU8HOnNadir: the ward used up), wUseItem
    (wWU8HUseItem: the wares from the Bag), wCampBag (wWU8HCampBag: their buttons), wUmbShop (wWU8HUmbShop: the trophy
    list), wAudit (wWU8HAudit: the wares come from the dark shops), renderHelp (wWU8HRenderHelp). */
@@ -76478,7 +76854,7 @@ const W_UMB8H = {
   str: 2,
   noTrade: ['umbseal', 'belt'],
   // each sport's Nadir game kind (a champion's and the Seal's round), to tell its saved game from another of that sport
-  kindOf: { diamond: 'unadir_ball', gridiron: W_UMB4B.kind, ring: 'unbox', court: W_UMB4D.kind, rink: W_UMB4E.kind, links: W_UMB4F.kind, lanes: W_UMB4G.kind, shed: W_UMB4H.kind },   // (the Bandolier's tonic slot is added outside its gain, and would stay)
+  kindOf: { diamond: 'unadir_ball', gridiron: W_UMB4B.kind, ring: 'unbox', court: W_UMB4D.kind, rink: W_UMB4E.kind, links: W_UMB4F.kind, lanes: W_UMB4G.kind, shed: W_UMB4H.kind, lists: W_UMB4J.kind },   // (the Bandolier's tonic slot is added outside its gain, and would stay)
 };
 DB.items.uward = { name: 'Hex Ward', desc: 'A knot of black thread. Ready it from the Bag: the next Nadir game you play draws one hex fewer.', use: 'Bag → Ready. Used up when that game ends.', price: 0 };
 DB.items.ulampoil = { name: 'Lantern Oil', desc: 'A flask of violet oil. On the dark side, rest where you stand, once, as by a lantern.', use: 'Bag → Rest, on the dark side.', price: 0 };
@@ -76537,6 +76913,7 @@ const wWU8HHkHexes = wUmbHkHexes; wUmbHkHexes = function (id) { return wUmbCutHe
 const wWU8HGlHexes = wUmbGlHexes; wUmbGlHexes = function (id) { return wUmbCutHexes(id, wWU8HGlHexes.apply(this, arguments)); };
 const wWU8HBlHexes = wUmbBlHexes; wUmbBlHexes = function (id) { return wUmbCutHexes(id, wWU8HBlHexes.apply(this, arguments)); };
 const wWU8HCrHexes = wUmbCrHexes; wUmbCrHexes = function (id) { return wUmbCutHexes(id, wWU8HCrHexes.apply(this, arguments)); };
+const wWU8HJtHexes = wUmbJtHexes; wUmbJtHexes = function (id) { return wUmbCutHexes(id, wWU8HJtHexes.apply(this, arguments)); };
 // the ward is used up by the game it was readied for, won or lost (a game backed away from never ends: it keeps)
 const wWU8HOnNadir = W_ON_END.nadir;
 W_ON_END.nadir = function () {
@@ -77124,7 +77501,7 @@ renderHelp = function () {
    (wWU8JOnNadir: a piece won well), wNadirMatch (wWU8JNadirMatch: the feat on the card, and the no-powers choice),
    wStartLinks, wStartLanes and wStartShed (wWU8J<Name>: the choice into the game's ref), wGL/wBL/wCR start and simGame
    (wWU8J<Name>: powers off for your side), wUmbFinaleEntry (wWU8JFinaleEntry: a well-won piece's hex), wUmbSpikeHp,
-   wUmbShadowSight, wUmbShadowStep, wUmbPitHp, wUmbTollAtKickoff (also the hour a game kicked off, for the night feat), wBlackout (wWU8J<Name>: the boons), W_JTAB_FN.umbral
+   wUmbShadowSight, wUmbShadowStep, wUmbPitHp, wUmbTollAtKickoff (also the hour a game kicked off, for the night feat), wBlackout, wTryMove (wWU8J<Name>: the boons), W_JTAB_FN.umbral
    (wWU8JJournal: the Seal panel), wStart (wWU8JStart: an old journey's pieces keep the first-try rule), renderHelp
    (wWU8JRenderHelp). */
 
@@ -77139,8 +77516,9 @@ const W_UMB8J = {
     links: { k: 'nopowers', n: 'win with your side\'s powers off' },
     lanes: { k: 'nopowers', n: 'win with your side\'s powers off' },
     shed: { k: 'nopowers', n: 'win with your side\'s powers off' },
+    lists: { k: 'margin', by: 3, n: 'win by three points or more' },
   },
-  kinds: ['unadir_ball', 'unadirgf', 'unbox', 'unadirbk', 'unadirhk', 'unadirgl', 'unadirbl', 'unadircr'],
+  kinds: ['unadir_ball', 'unadirgf', 'unbox', 'unadirbk', 'unadirhk', 'unadirgl', 'unadirbl', 'unadircr', 'unadirjt'],
   // each piece's boon on the dark side: [held, won well]
   boons: {
     card: { n: 'Every card match on this side starts with Block', v: [4, 8], u: 'Block' },
@@ -77152,6 +77530,8 @@ const W_UMB8J = {
     football: { n: 'A blackout on this side costs less of your gold', v: [50, 100], u: '%' },
     boxing: { n: 'A champion\'s toll is cheaper', v: [10, 20], u: 'gold' },
     hockey: { n: 'The shadows never hunt two steps at a time', v: [1, 1], u: '' },
+    // (issue #117, phase 11: the cold on a dark ground takes its HP every so many steps, not every W_UMB4.cold.steps)
+    jousting: { n: 'The cold on the dark grounds bites only every few steps', v: [3, 4], u: 'steps' },
   },
   edgeBlock: 10,
   pend: null, nopowNext: 0, winHp: null,
@@ -77305,6 +77685,13 @@ wBlackout = function () {
   if (lost > 0) { const back = Math.round(lost * k / 100); RUN.gold += back; if (back) { wLog(`The Ash Ball: ${back} of that gold is still in your pocket.`, 'g'); wSave(); } }
   return r;
 };
+// (the Splintered Lance: the cold on a dark ground, u4's, takes its HP every so many steps, for the step's own count)
+const wWU8JTryMove = wTryMove;
+wTryMove = function () {
+  const k = wUmbBoon('jousting'); if (!k) return wWU8JTryMove.apply(this, arguments);
+  const s0 = W_UMB4.cold.steps; W_UMB4.cold.steps = Math.max(s0, k);
+  try { return wWU8JTryMove.apply(this, arguments); } finally { W_UMB4.cold.steps = s0; }
+};
 
 /* ---------- the Seal's edges ---------- */
 const wWU8JFinaleEntry = wUmbFinaleEntry;
@@ -77352,7 +77739,7 @@ const wWU8JQuick = wUmbQuick;
 wUmbQuick = function () {
   const q = wWU8JQuick.apply(this, arguments), at = q.steps.findIndex(s => /Dark traits/.test(s.h)), i = at < 0 ? q.steps.length : at;
   q.steps.splice(i, 0,
-    { h: 'The Dread: the dark side wakes', t: W_UMB8C.names.map((n, k) => `<b>${esc(n)}</b> (${W_UMB8C.stages[k]}${W_UMB8C.stages[k + 1] ? '-' + (W_UMB8C.stages[k + 1] - 1) : '-9'} pieces): ${esc(wUmbDreadDoes(k))}`).join(' ') },
+    { h: 'The Dread: the dark side wakes', t: W_UMB8C.names.map((n, k) => `<b>${esc(n)}</b> (${W_UMB8C.stages[k]}${W_UMB8C.stages[k + 1] ? '-' + (W_UMB8C.stages[k + 1] - 1) : ' or more'} pieces): ${esc(wUmbDreadDoes(k))}`).join(' ') },
     { h: 'Feats: win the pieces well', t: Object.keys(W_UMB8J.feats).map(id => { const C = W_NADIR[id]; return C && C.piece ? `<b>${esc(W_UMB_PIECES[C.piece].n)}</b>: ${esc(W_UMB8J.feats[id].n)}.` : ''; }).join(' ') + ' Or win at the first try. A piece won well sings twice as strongly on the dark side, and its game in the Seal draws a hex fewer.' });
   q.lede = q.lede.replace(' Last, the dark traits', ' Then the Dread and the feats, and last, the dark traits');
   q.tip = 'A piece won well (by its feat, or at the first try) takes a hex off its game in the Seal\'s final.';
@@ -77380,6 +77767,7 @@ wUmbQuick = function () {
      golf       Sexton Vale: The Hollow Flag, hollowflag (wLinksPlayer's ult)
      bowling    Ossery Brine: The Drowning Bell, drownbell (wLanesPlayer's ult)
      curling    Grisel Mourne: The Sunken Stone, sunkenstone (wShedPlayer's ult)
+     jousting   Isolde Grave: The Pale Charge, palecharge (wListsPlayer's ult, cast when she rides: issue #117, phase 11)
    A redeemed captain signed before this part (a plain player with the champion's name and kind) is made a star when
    the journey is next loaded, and given their card; one still waiting (in the prompt queue or at camp) too.
 
@@ -77387,7 +77775,7 @@ wUmbQuick = function () {
    Wraps: wStar (wWU9Star: the redeemed by id), wMakePlayer (wWU9MakePlayer: they stay the redeemed), wUmbSeal (wWU9Seal: the recruit is the star), wAddPlayer (wWU9AddPlayer:
    their own card), wShowRecruit (wWU9ShowRecruit: their card on the recruit card; passed over, they wait at camp),
    wCampRow (wWU9CampRow: the Superstar tag), wCampStars (wWU9CampStars: a line on the Stars tab), wSevenPlayer,
-   wCourtPlayer, wRinkPlayer, wLinksPlayer, wLanesPlayer, wShedPlayer, wBxFighter and wNineBdPlayer (wWU9<Name>: the
+   wCourtPlayer, wRinkPlayer, wLinksPlayer, wLanesPlayer, wShedPlayer, wListsPlayer, wBxFighter and wNineBdPlayer (wWU9<Name>: the
    ultimate in their own sport), wRelease (wWU9Release: their card leaves with them), wGridPowNames, wSixRow,
    wBdCard, wLinksPowRow, wLanesRows and wShedRows (wWU9<Name>: the screens name their own ultimate: football's
    lineup, the Rink tab, the baseball stats card, and your Powers row in golf, bowling and curling; the court, the ring
@@ -77405,6 +77793,7 @@ const W_UMB9 = {
   links: { num: 4, sig: 'u9_flag', home: 'links', ult: { id: 'hollowflag', n: 'The Hollow Flag', d: 'The flag goes hollow for them: their reads shorter, their putts shakier.' }, flav: 'The Last Caddie. Carries your bag now, and knows every hole twice.' },
   lanes: { num: 10, sig: 'u9_bell', home: 'lanes', ult: { id: 'drownbell', n: 'The Drowning Bell', d: 'A bell under the floor: their balls skid long on heavy oil, and carry less.' }, flav: 'Set the pins in the Drowned Lanes. Knocks them down for you now.' },
   shed: { num: 8, sig: 'u9_stone', home: 'shed', ult: { id: 'sunkenstone', n: 'The Sunken Stone', d: 'The house goes under for them: their stones drag heavy and hardly curl.' }, flav: 'Skipped the Sunken Shed. Skips for you now.' },
+  lists: { num: 6, sig: 'u9_charge', home: 'lists', ult: { id: 'palecharge', n: 'The Pale Charge', d: 'Your lance breaks on any fair touch, and their tip sways a quarter more, for a course.' }, flav: 'Rode the Hollow Lists until there was nobody left to unhorse. Rides for you now.' },
 };
 // their signature cards: the kind's, but their own (rarity 's', so never offered as a reward)
 K('u9_deal', 'Deal from the Bottom', 'lich', 'atk', 1, 's', 'one', [['d', 6], ['draw', 1]], { fl: 'Never once from the top. Not for them.' });
@@ -77416,6 +77805,7 @@ K('u9_night', 'The Long Night', 'wraith', 'skl', 1, 's', 'all', [['s', 'weak', 1
 K('u9_flag', 'The Hollow Flag', 'wraith', 'skl', 1, 's', 'one', [['b', 5], ['s', 'vuln', 2]], { fl: 'The flag is there. The hole is not.', sport: 'golf' });
 K('u9_bell', 'The Drowning Bell', 'zombie', 'atk', 1, 's', 'all', [['d', 3], ['s', 'psn', 2, 'all']], { fl: 'A bell rings under the floor.', sport: 'bowling' });
 K('u9_stone', 'The Sunken Stone', 'lich', 'atk', 1, 's', 'one', [['d', 5], ['s', 'psn', 3]], { fl: 'It goes under, and takes them with it.', sport: 'curling' });
+K('u9_charge', 'The Pale Charge', 'vampire', 'atk', 1, 's', 'one', [['d', 7], ['s', 'vuln', 1]], { fl: 'Death on a pale horse, and the lance breaks on whatever it touches.', sport: 'jousting' });
 
 // the stars themselves, by id (the champion's character id), made once from the table and the characters (u3, u4*)
 const W_UMB9_STARS = {};
@@ -77512,6 +77902,9 @@ const wWU9LanesPlayer = wLanesPlayer;
 wLanesPlayer = function (p) { const m = wWU9LanesPlayer.apply(this, arguments), u = wUmbHomeUlt(p, 'lanes'); if (u) m.ult = u; return m; };
 const wWU9ShedPlayer = wShedPlayer;
 wShedPlayer = function (p) { const m = wWU9ShedPlayer.apply(this, arguments), u = wUmbHomeUlt(p, 'shed'); if (u) m.ult = u; return m; };
+// (jousting, issue #117 phase 11: the engine casts a rider's own ultimate when they ride, wJT.ultOf; the Powers row asks it)
+const wWU9ListsPlayer = wListsPlayer;
+wListsPlayer = function (p) { const m = wWU9ListsPlayer.apply(this, arguments), u = wUmbHomeUlt(p, 'lists'); if (u) m.ult = u; return m; };
 // boxing: the fighter's own powers (the engine's f.pw) are the minotaur's two specials and Brakka's ultimate (sp is the
 // special picked on the Ring tab, f.sp, so the tale of the tape, which reads f.pw.sp, names the one they bring)
 const wWU9BxFighter = wBxFighter;

@@ -51,7 +51,7 @@ DB.chars.nadir_lanes = { name: 'Ossery Brine, the Drowned Pinsetter', kind: 'zom
   greet: 'The sea came in under these lanes a long time ago, and we kept bowling. I set the pins down here, and I keep the PIN. Say PLAY when you want to bowl for it. Ask about the RULES first; the water changes them.',
   topics: {
     job: { t: 'I set the pins on the Drowned Lanes. I set them when the lamps were lit and the floor was dry, and I set them now. Every one of them comes up wet.' },
-    pin: { t: 'The Drowned Pin. One ninth of your Seal, and it has never once gone down clean. Beat my five at bowling and it is yours. Lose, and the next game costs a TOLL.' },
+    pin: { t: 'The Drowned Pin. One piece of your Seal, and it has never once gone down clean. Beat my five at bowling and it is yours. Lose, and the next game costs a TOLL.' },
     rules: { t: 'One team game, ten frames, the Baker format, your five against mine. My side bowls at your level and better at everything, a Lich reads the oil for us and weighs every ball before it leaves the hand, and we bring a full bag. Nobody goes home level: a roll-off. Before the first frame I draw the HEXES.' },
     hexes: { t: 'The water has its moods. Oil that turns to ichor under your ball, a pin too heavy to fall, gutters that pull, a black tide under your lane. You will hear which before the first frame.' },
     bell: { t: 'Once a game I ring the bell under the floor. The oil goes heavy for your five, and your ball carries less. Mind it.' },

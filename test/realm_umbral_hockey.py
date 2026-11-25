@@ -191,7 +191,7 @@ async def main():
           const g = WG.hkg.games[0], C = W_NADIR.finale;
           return { why, played: WG.hkg.games.length - n0, engine: C && C.engine, piece: C && C.piece, toll: C && C.toll, r: g && g.r, kind: WG.lastMatch && WG.lastMatch.kind, finale: U.finale || 0, tries: U.tries.finale || 0, pieces: U.pieces.length }; })()""")
         check(fn['why'] == '' and fn['played'] == 1 and fn['engine'] == 'rink' and not fn['piece'] and fn['toll'] == 0 and fn['kind'] == 'unadirhk'
-              and ((fn['r'] == 'win' and fn['finale'] == 1) or (fn['r'] == 'lose' and fn['tries'] == 1 and fn['finale'] == 0)) and fn['pieces'] == 9,
+              and ((fn['r'] == 'win' and fn['finale'] == 1) or (fn['r'] == 'lose' and fn['tries'] == 1 and fn['finale'] == 0)) and fn['pieces'] == 10,
               'a finale round in hockey plays through the same adapter: no piece and no toll, and the round is counted', fn)
         check(not errs, 'no page errors', errs[:5])
         await br.close()

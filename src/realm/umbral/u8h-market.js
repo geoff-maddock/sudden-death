@@ -17,7 +17,7 @@
 
    W_UMB8H, wUmbHexCut, wUmbTradable, wUmbTrade
    Wraps: the hex draws wUmbHexes, wUmb4aHexes, wUmbGfHexes, wUmbRingHexes, wUmbBkHexes, wUmbHkHexes, wUmbGlHexes,
-   wUmbBlHexes and wUmbCrHexes (wWU8H<Name>: trimmed), wUmbTollAtKickoff (wWU8HTollAtKickoff: the ward bound to the game that
+   wUmbBlHexes, wUmbCrHexes and wUmbJtHexes (wWU8H<Name>: trimmed), wUmbTollAtKickoff (wWU8HTollAtKickoff: the ward bound to the game that
    kicks off), W_ON_END.nadir (wWU8HOnNadir: the ward used up), wUseItem
    (wWU8HUseItem: the wares from the Bag), wCampBag (wWU8HCampBag: their buttons), wUmbShop (wWU8HUmbShop: the trophy
    list), wAudit (wWU8HAudit: the wares come from the dark shops), renderHelp (wWU8HRenderHelp). */
@@ -27,7 +27,7 @@ const W_UMB8H = {
   str: 2,
   noTrade: ['umbseal', 'belt'],
   // each sport's Nadir game kind (a champion's and the Seal's round), to tell its saved game from another of that sport
-  kindOf: { diamond: 'unadir_ball', gridiron: W_UMB4B.kind, ring: 'unbox', court: W_UMB4D.kind, rink: W_UMB4E.kind, links: W_UMB4F.kind, lanes: W_UMB4G.kind, shed: W_UMB4H.kind },   // (the Bandolier's tonic slot is added outside its gain, and would stay)
+  kindOf: { diamond: 'unadir_ball', gridiron: W_UMB4B.kind, ring: 'unbox', court: W_UMB4D.kind, rink: W_UMB4E.kind, links: W_UMB4F.kind, lanes: W_UMB4G.kind, shed: W_UMB4H.kind, lists: W_UMB4J.kind },   // (the Bandolier's tonic slot is added outside its gain, and would stay)
 };
 DB.items.uward = { name: 'Hex Ward', desc: 'A knot of black thread. Ready it from the Bag: the next Nadir game you play draws one hex fewer.', use: 'Bag → Ready. Used up when that game ends.', price: 0 };
 DB.items.ulampoil = { name: 'Lantern Oil', desc: 'A flask of violet oil. On the dark side, rest where you stand, once, as by a lantern.', use: 'Bag → Rest, on the dark side.', price: 0 };
@@ -86,6 +86,7 @@ const wWU8HHkHexes = wUmbHkHexes; wUmbHkHexes = function (id) { return wUmbCutHe
 const wWU8HGlHexes = wUmbGlHexes; wUmbGlHexes = function (id) { return wUmbCutHexes(id, wWU8HGlHexes.apply(this, arguments)); };
 const wWU8HBlHexes = wUmbBlHexes; wUmbBlHexes = function (id) { return wUmbCutHexes(id, wWU8HBlHexes.apply(this, arguments)); };
 const wWU8HCrHexes = wUmbCrHexes; wUmbCrHexes = function (id) { return wUmbCutHexes(id, wWU8HCrHexes.apply(this, arguments)); };
+const wWU8HJtHexes = wUmbJtHexes; wUmbJtHexes = function (id) { return wUmbCutHexes(id, wWU8HJtHexes.apply(this, arguments)); };
 // the ward is used up by the game it was readied for, won or lost (a game backed away from never ends: it keeps)
 const wWU8HOnNadir = W_ON_END.nadir;
 W_ON_END.nadir = function () {

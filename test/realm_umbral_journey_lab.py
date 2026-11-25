@@ -82,7 +82,7 @@ window.UJLAB = function (TRIES) {
   }
   out.shards = U.shards || 0;
   out.pieces = U.pieces.length;
-  if (out.pieces === 9) {
+  if (out.pieces === wUmbNeed().length) {
     WG.map = 'u:coliseum';
     for (let round = 0; round < 3 && !U.sealed; round++) {
       let won = false;

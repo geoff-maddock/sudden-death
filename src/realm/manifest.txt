@@ -224,6 +224,7 @@ src/realm/umbral/u4e-hockey.js
 src/realm/umbral/u4f-golf.js
 src/realm/umbral/u4g-bowling.js
 src/realm/umbral/u4h-curling.js
+src/realm/umbral/u4j-jousting.js
 src/realm/umbral/u4i-conds.js
 src/realm/umbral/u5-finale.js
 src/realm/umbral/u6-rewards.js

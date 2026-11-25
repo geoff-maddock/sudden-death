@@ -3,7 +3,8 @@
    carry the wWU0 prefix).
 
    The state, WG.umbral (plain JSON), from the unlock on: { at (dayAbs), year, crossed (times through the portal),
-   pieces [ids], beaten {champion: dayAbs}, tries {champion: n}, finale (the round reached, 0 before it), sealed (0/1) }.
+   pieces [ids], beaten {champion: dayAbs}, tries {champion: n}, finale (the round reached, 0 before it), sealed (0/1),
+   need [the piece ids the Seal asks for: every piece at the unlock; issue #117, phase 11, u3's wUmbNeed] }.
    Unlocked the first time the Crown is won on a journey (the 'champion' flag), or on loading a journey that won it
    before the Umbral existed. Phase 1 turns the unlock into its scene; here it is a line in the log.
    The dark maps: MAPS['u:' + id], built with the light ones, from them, by a fixed transform (nothing about the maps
@@ -46,7 +47,8 @@ const wUmbDark = m => !!(m || (typeof WG !== 'undefined' && WG && MAPS[WG.map]) 
 
 function wUmbralUnlock() {
   if (typeof WG === 'undefined' || !WG || WG.umbral) return false;
-  WG.umbral = { at: WG.dayAbs || 0, year: WG.year || 1, crossed: 0, pieces: [], beaten: {}, tries: {}, finale: 0, sealed: 0 };
+  // (need: the pieces this Umbral's Seal asks for, every one there is as it opens: u3's wUmbNeed)
+  WG.umbral = { at: WG.dayAbs || 0, year: WG.year || 1, crossed: 0, pieces: [], beaten: {}, tries: {}, finale: 0, sealed: 0, need: Object.keys(W_UMB_PIECES) };
   // the Road to Nowhere is on the map from now on, found or not
   wSetFlag('clue_den');
   wInvalidate('umbralden'); wInvalidate('world');
