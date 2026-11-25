@@ -1,0 +1,29 @@
+# The Tilting Lists, the jousting engine at the Tilting Lists (issue #117). Its parts, in load order. The Realm takes
+# them inside a scope (src/realm/lists/manifest.txt, through `scope wJT ...`), so none of their names reach the page.
+src/scoped/util.js
+# the riders, drawn (the scoped engines' one file); the mounts are this engine's own drawing (08-draw.js)
+src/figures/figures.js
+src/jt/parts/02-rules.js
+# phase 1: the lists, the mounts, the plan and the ratings; the pure course model; the CPU's plan; a match headless
+src/jt/parts/03-lists.js
+src/jt/parts/04-course.js
+src/jt/parts/05-cpu.js
+src/jt/parts/06-game.js
+# phase 2: the match on show and riding by hand; the drawing
+src/jt/parts/07-play.js
+src/jt/parts/08-draw.js
+# phase 3: the four and their roles, the arm, the shake, the squires' corner, pressure and nerve
+src/jt/parts/09-squad.js
+# phase 4: the plan and the read: the herald's card, your squire's reason
+src/jt/parts/10-read.js
+# phase 5: matches from the world: kept between courses, Manage, the tilting yard
+src/jt/parts/11-world.js
+# phase 6: monster powers: mana, the lance and shield powers by kind, curses and the squire's lift, the gallery's cheer and
+# the ultimate, situation powers, the CPU's casts
+src/jt/parts/12-powers.js
+# phase 7: gear (a rider's piece, in the powers' vocabulary) and potions (one a side a course, the CPU's at its skill)
+src/jt/parts/13-kit.js
+# phase 8: the Tilting Lists' ways: the churned sand (a rut a lane, in it or beside it) and the pennant wind
+src/jt/parts/14-ground.js
+# phase 11: the Umbral's lists: the Lich, the hexes and a rider's own ultimate (nothing acts unless a match asks for it)
+src/jt/parts/15-umbral.js

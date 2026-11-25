@@ -42,7 +42,7 @@ async def main():
           U.tries.gate = 0; out.fixed = wUmbFinaleSports().slice();
           return out; })()""")
         check(fn['placed'], 'Hollow Aurelia waits in the Hollow Coliseum', fn)
-        check('8 of the nine' in fn['short'] and 'still out' in fn['short'], 'without all nine pieces she won\'t play for the Seal, and says what is still out', fn)
+        check('8 of the ten' in fn['short'] and 'still out' in fn['short'], 'without all ten pieces she won\'t play for the Seal, and says what is still out', fn)
         check(fn['sports'][0] == 'card' and len(fn['sports']) == 3 and fn['fixed'] == fn['sports'], 'the three rounds are where your record is weakest (the most tries first), chosen once', fn)
 
         r1 = await pg.evaluate("""(() => { const U = WG.umbral, out = {}, keep = beginFight; beginFight = enc => { UI.busy = false; startCombat(enc.ids, enc.type, enc.sport, enc.trait); }; LAB = true;

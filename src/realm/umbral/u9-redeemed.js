@@ -20,6 +20,7 @@
      golf       Sexton Vale: The Hollow Flag, hollowflag (wLinksPlayer's ult)
      bowling    Ossery Brine: The Drowning Bell, drownbell (wLanesPlayer's ult)
      curling    Grisel Mourne: The Sunken Stone, sunkenstone (wShedPlayer's ult)
+     jousting   Isolde Grave: The Pale Charge, palecharge (wListsPlayer's ult, cast when she rides: issue #117, phase 11)
    A redeemed captain signed before this part (a plain player with the champion's name and kind) is made a star when
    the journey is next loaded, and given their card; one still waiting (in the prompt queue or at camp) too.
 
@@ -27,7 +28,7 @@
    Wraps: wStar (wWU9Star: the redeemed by id), wMakePlayer (wWU9MakePlayer: they stay the redeemed), wUmbSeal (wWU9Seal: the recruit is the star), wAddPlayer (wWU9AddPlayer:
    their own card), wShowRecruit (wWU9ShowRecruit: their card on the recruit card; passed over, they wait at camp),
    wCampRow (wWU9CampRow: the Superstar tag), wCampStars (wWU9CampStars: a line on the Stars tab), wSevenPlayer,
-   wCourtPlayer, wRinkPlayer, wLinksPlayer, wLanesPlayer, wShedPlayer, wBxFighter and wNineBdPlayer (wWU9<Name>: the
+   wCourtPlayer, wRinkPlayer, wLinksPlayer, wLanesPlayer, wShedPlayer, wListsPlayer, wBxFighter and wNineBdPlayer (wWU9<Name>: the
    ultimate in their own sport), wRelease (wWU9Release: their card leaves with them), wGridPowNames, wSixRow,
    wBdCard, wLinksPowRow, wLanesRows and wShedRows (wWU9<Name>: the screens name their own ultimate: football's
    lineup, the Rink tab, the baseball stats card, and your Powers row in golf, bowling and curling; the court, the ring
@@ -45,6 +46,7 @@ const W_UMB9 = {
   links: { num: 4, sig: 'u9_flag', home: 'links', ult: { id: 'hollowflag', n: 'The Hollow Flag', d: 'The flag goes hollow for them: their reads shorter, their putts shakier.' }, flav: 'The Last Caddie. Carries your bag now, and knows every hole twice.' },
   lanes: { num: 10, sig: 'u9_bell', home: 'lanes', ult: { id: 'drownbell', n: 'The Drowning Bell', d: 'A bell under the floor: their balls skid long on heavy oil, and carry less.' }, flav: 'Set the pins in the Drowned Lanes. Knocks them down for you now.' },
   shed: { num: 8, sig: 'u9_stone', home: 'shed', ult: { id: 'sunkenstone', n: 'The Sunken Stone', d: 'The house goes under for them: their stones drag heavy and hardly curl.' }, flav: 'Skipped the Sunken Shed. Skips for you now.' },
+  lists: { num: 6, sig: 'u9_charge', home: 'lists', ult: { id: 'palecharge', n: 'The Pale Charge', d: 'Your lance breaks on any fair touch, and their tip sways a quarter more, for a course.' }, flav: 'Rode the Hollow Lists until there was nobody left to unhorse. Rides for you now.' },
 };
 // their signature cards: the kind's, but their own (rarity 's', so never offered as a reward)
 K('u9_deal', 'Deal from the Bottom', 'lich', 'atk', 1, 's', 'one', [['d', 6], ['draw', 1]], { fl: 'Never once from the top. Not for them.' });
@@ -56,6 +58,7 @@ K('u9_night', 'The Long Night', 'wraith', 'skl', 1, 's', 'all', [['s', 'weak', 1
 K('u9_flag', 'The Hollow Flag', 'wraith', 'skl', 1, 's', 'one', [['b', 5], ['s', 'vuln', 2]], { fl: 'The flag is there. The hole is not.', sport: 'golf' });
 K('u9_bell', 'The Drowning Bell', 'zombie', 'atk', 1, 's', 'all', [['d', 3], ['s', 'psn', 2, 'all']], { fl: 'A bell rings under the floor.', sport: 'bowling' });
 K('u9_stone', 'The Sunken Stone', 'lich', 'atk', 1, 's', 'one', [['d', 5], ['s', 'psn', 3]], { fl: 'It goes under, and takes them with it.', sport: 'curling' });
+K('u9_charge', 'The Pale Charge', 'vampire', 'atk', 1, 's', 'one', [['d', 7], ['s', 'vuln', 1]], { fl: 'Death on a pale horse, and the lance breaks on whatever it touches.', sport: 'jousting' });
 
 // the stars themselves, by id (the champion's character id), made once from the table and the characters (u3, u4*)
 const W_UMB9_STARS = {};
@@ -152,6 +155,9 @@ const wWU9LanesPlayer = wLanesPlayer;
 wLanesPlayer = function (p) { const m = wWU9LanesPlayer.apply(this, arguments), u = wUmbHomeUlt(p, 'lanes'); if (u) m.ult = u; return m; };
 const wWU9ShedPlayer = wShedPlayer;
 wShedPlayer = function (p) { const m = wWU9ShedPlayer.apply(this, arguments), u = wUmbHomeUlt(p, 'shed'); if (u) m.ult = u; return m; };
+// (jousting, issue #117 phase 11: the engine casts a rider's own ultimate when they ride, wJT.ultOf; the Powers row asks it)
+const wWU9ListsPlayer = wListsPlayer;
+wListsPlayer = function (p) { const m = wWU9ListsPlayer.apply(this, arguments), u = wUmbHomeUlt(p, 'lists'); if (u) m.ult = u; return m; };
 // boxing: the fighter's own powers (the engine's f.pw) are the minotaur's two specials and Brakka's ultimate (sp is the
 // special picked on the Ring tab, f.sp, so the tale of the tape, which reads f.pw.sp, names the one they bring)
 const wWU9BxFighter = wBxFighter;

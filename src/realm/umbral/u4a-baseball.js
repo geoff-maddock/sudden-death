@@ -35,7 +35,7 @@ DB.chars.nadir_diamond = { name: 'Vesper Quill, the Stitcher', kind: 'witch', lo
   greet: 'Another nine through the door. I keep the STITCH, and I pitch for the Bone Nine. Say PLAY when you want to try to hit me. Ask about the RULES first. Everybody should.',
   topics: {
     job: { t: 'I pitch. I have pitched every game ever played on this diamond, and I have never once been taken out of one.' },
-    stitch: { t: 'The Iron Stitch. One ninth of your Seal, sewn into the oldest ball on this side of the door. Beat my nine and it is yours. Lose, and the next game costs a TOLL.' },
+    stitch: { t: 'The Iron Stitch. One piece of your Seal, sewn into the oldest ball on this side of the door. Beat my nine and it is yours. Lose, and the next game costs a TOLL.' },
     rules: { t: 'Three innings, our ground, our rules. My nine play at your level, a little better at everything, and they think faster than any coach you have met. Before the first pitch I draw the HEXES: two, for you.' },
     hexes: { t: 'A pitch that goes through the bat. Bases that will not stay put. A font that never runs dry. A chill in the hands. You will see which before we start, and they stay up on the scoreboard.' },
     dead: { t: 'The Dead Ball. It leaves my hand and it is not there, and then it is, and it is late. Nobody else throws it.' },

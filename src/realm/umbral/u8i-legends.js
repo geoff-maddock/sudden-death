@@ -371,7 +371,7 @@ wUmbFinale = function () {
   const U = wUmb();
   // (a shard set for a hex on a round that has none left by the time it starts, a ward readied since, say: given back)
   if (U && !U.sealed && wUmbShardSet('hex') && !wUmbFinaleLive() && !wUmbShardRoom()) { U.shardOn = null; if (!LAB) wLog('This round draws no hexes now, so your Legend\'s Shard would take nothing off. You keep it.', 'm'); wSave(); }
-  if (!U || LAB || U.sealed || !((U.shards || 0) > 0) || Object.keys(W_UMB_PIECES).some(p => !U.pieces.includes(p))) return wWU8IFinale.apply(this, arguments);
+  if (!U || LAB || U.sealed || !((U.shards || 0) > 0) || wUmbNeed().some(p => !U.pieces.includes(p))) return wWU8IFinale.apply(this, arguments);
   const r = U.finale || 0, piece = wUmbFinaleSports()[r], eng = W_UMB5.engine[piece], card = !eng;
   // (a game of the round left half-played picks up where it was: its hexes were drawn at its kickoff)
   if (wUmbFinaleLive()) return wWU8IFinale.apply(this, arguments);

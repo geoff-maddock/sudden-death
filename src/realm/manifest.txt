@@ -51,6 +51,8 @@ scope wGL src/realm/links/manifest.txt src/realm/links/exports.js
 scope wBL src/realm/lanes/manifest.txt src/realm/lanes/exports.js
 # The Curling Shed, the curling engine, in its own scope (issue #102): src/realm/shed/manifest.txt
 scope wCR src/realm/shed/manifest.txt src/realm/shed/exports.js
+# The Tilting Lists, the jousting engine, in its own scope (issue #117): src/realm/lists/manifest.txt
+scope wJT src/realm/lists/manifest.txt src/realm/lists/exports.js
 # the engines, by id (W_ENGINES)
 src/realm/w19b-engines.js
 src/realm/w20-diamond.js
@@ -181,6 +183,28 @@ src/realm/w143-gfroar.js
 src/realm/w144-ashbowl.js
 src/realm/w145-anvilring.js
 src/realm/w146-ballpark.js
+# the Tilting Lists, jousting on its own engine (issue #117): the view, riding by hand, Sir Ruddock's JOUST
+src/realm/w147-lists.js
+# jousting ratings, the four (two riders, two squires), the mounts, the Lists tab (issue #117, phase 3)
+src/realm/w148-listsfour.js
+# the plan and the read: the herald's card, your squire's reason (issue #117, phase 4)
+src/realm/w149-listscall.js
+# jousting from the world: matches, Manage, save and resume, fixtures; the tilting yard; Fenna Moss (issue #117, phase 5)
+src/realm/w150-listsgame.js
+src/realm/w151-listsyard.js
+src/realm/w152-listsfenna.js
+# powers at the Lists: mana, lance and shield powers, curses and the squire's lift, the cheer and the ultimate (issue #117, phase 6)
+src/realm/w153-listspowers.js
+# jousting gear and potions: Sir Ruddock's rack, the Bag row (issue #117, phase 7)
+src/realm/w154-listskit.js
+# the Tilting Lists' ways: the churned sand and the pennant wind (issue #117, phase 8)
+src/realm/w155-listsground.js
+# superstars at the Lists: their kinds, powers, curses and ultimates, drawn as themselves (issue #117, phase 9)
+src/realm/w156-listsstars.js
+# the Gilded Lance, the weekly jousting cup (issue #117, phase 10)
+src/realm/w157-listscup.js
+# the feel of jousting: sound at the Lists, the Lists' music, tips, medals (issue #117, phase 13; its Quick start is w112's)
+src/realm/w158-listsfeel.js
 src/realm/w132-pets.js
 src/realm/w133-petegg.js
 src/realm/w134-petshop.js
@@ -202,6 +226,7 @@ src/realm/umbral/u4e-hockey.js
 src/realm/umbral/u4f-golf.js
 src/realm/umbral/u4g-bowling.js
 src/realm/umbral/u4h-curling.js
+src/realm/umbral/u4j-jousting.js
 src/realm/umbral/u4i-conds.js
 src/realm/umbral/u5-finale.js
 src/realm/umbral/u6-rewards.js

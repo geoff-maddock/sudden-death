@@ -48,7 +48,7 @@ DB.chars.nadir_court = { name: 'Vesper Gloam, the Night Warden', kind: 'vampire'
   greet: 'You walked all the way through the cold for a game of basketball. I captain the Nadir on the Black Court, and I keep the NET. Say PLAY when you want to lose it. Ask about the RULES first, if you like; nobody listens.',
   topics: {
     job: { t: 'I run the point on the Black Court. I was running it when the torches on that wall were lit, and I will be running it when the last one goes out.' },
-    net: { t: 'The Black Net. One ninth of your Seal, and it has never once let a ball through cleanly. Beat my five at basketball and it is yours. Lose, and the next game costs a TOLL.' },
+    net: { t: 'The Black Net. One piece of your Seal, and it has never once let a ball through cleanly. Beat my five at basketball and it is yours. Lose, and the next game costs a TOLL.' },
     rules: { t: 'Real basketball, five on five, four quarters, our boards. My side plays harder than anything you have met, a Lich calls our sets, and our bench carries a full bag. I keep the LIGHTS for when it matters. Before the tip I draw the HEXES.' },
     hexes: { t: 'The Black Court has its moods. Your rim drifts on its bracket, a shadow comes out to guard you, a crooked whistle calls every touch against you, the cold gets into your fingers at the line. You will hear which before the tip.' },
     toll: { t: 'Twenty gold a game, after the first. Paid at the tip. Walking away from the card costs nothing.' },

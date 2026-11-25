@@ -6,7 +6,7 @@
      0  The Quiet       0-2 pieces   a few slow shadows; spikes on the approaches to the grounds
      1  The Stirring    3-5          the pits open; more shadows
      2  The Raging      6-7          the shadows hunt (two steps every third step) and see further
-     3  The Last Hour   8-9          more shadows still
+     3  The Last Hour   8 and up     more shadows still
    Each stage reached plays a short scene the next time the world is free (WG.umbral.dreadSeen: the highest whose scene
    has played; a save from before this part that is already past a stage sees only the highest one, once). The light
    side feels it too: the blight (u1's eclipses and hunters) is a step further on for each stage.
@@ -49,7 +49,7 @@ const W_UMB8C = {
   scenes: [null,
     { h: 'The Stirring', lines: ['Three pieces gone, and the Umbral notices.', 'The dead moon cracks across its face, and a thin light comes through the crack.', 'Out on the dark world the ground splits open in places. Something down there has woken up, and it is hungry.'] },
     { h: 'The Raging', lines: ['Six pieces. The Umbral is angry now.', 'The wind turns and carries ash the wrong way. The shadows on the dark world stop drifting.', 'They hunt now, and they hunt fast.'] },
-    { h: 'The Last Hour', lines: ['Eight pieces. One more, and then the Seal.', 'The sky over the dark world bleeds from the north. Every shadow on that side turns to face the portal.', 'It knows you are nearly done. It will not make the end easy.'] }],
+    { h: 'The Last Hour', lines: ['Eight pieces. Not many more, and then the Seal.', 'The sky over the dark world bleeds from the north. Every shadow on that side turns to face the portal.', 'It knows you are nearly done. It will not make the end easy.'] }],
 };
 DB.items.shadowsalt = { name: 'Shadow Salt', desc: `A pinch of grey salt. Scatter it on the dark side and the shadows can't see you for ${W_UMB8C.salt} steps.`, use: `Bag → Scatter, on the dark world: the shadows can't see you for ${W_UMB8C.salt} steps.`, price: 30 };
 // a dark-side ware: each dark shop keeps its own list (DB.shops['u_' + shop]), the light one's and the Umbral's wares
@@ -382,7 +382,7 @@ const wWU8CRenderHelp = renderHelp;
 renderHelp = function () {
   wWU8CRenderHelp.apply(this, arguments);
   const h = $('wHelpUmbral'); if (!h || !wUmbOn() || $('wHelpDread')) return;
-  h.insertAdjacentHTML('beforeend', `<p class="hint" id="wHelpDread"><b>The Dread.</b> The dark side wakes as you take its pieces: ${W_UMB8C.names.map((n, i) => `${n} (${W_UMB8C.stages[i]}${W_UMB8C.stages[i + 1] ? '-' + (W_UMB8C.stages[i + 1] - 1) : '-9'} pieces)`).join(', ')}.
+  h.insertAdjacentHTML('beforeend', `<p class="hint" id="wHelpDread"><b>The Dread.</b> The dark side wakes as you take its pieces: ${W_UMB8C.names.map((n, i) => `${n} (${W_UMB8C.stages[i]}${W_UMB8C.stages[i + 1] ? '-' + (W_UMB8C.stages[i + 1] - 1) : ' or more'} pieces)`).join(', ')}.
     Hungry shadows walk the dark world, more of them at each stage. One that sees you comes for you, and from the Raging they come two steps at a time; one that reaches you is a match.
     You only see one plainly when it is close: ${W_UMB8C.show[0]} steps in the Quiet and the Stirring, ${W_UMB8C.show[2]} from the Raging. Farther off it fades to a shimmer, so from the Raging they can see you before you see them. They keep out of a lantern's light, and Shadow Salt (from the dark shops) hides you from them.
     Spikes cost ${wUmbSpikeHp()} HP to walk on. From the Stirring, the cracked ground opens into pits: ${wUmbPitHp()} HP, and you climb out somewhere else. Wild matches come half as often on that side; the danger is one you can see.</p>`);

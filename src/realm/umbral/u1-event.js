@@ -19,7 +19,7 @@
 
    W_UMB1, wUmbScene, wUmbBlight, wUmbEclipse
    Wraps: wNextPrompt (wWU1NextPrompt: the scene, once, after the Crown's ending), wSay (wWU1Say: an innkeeper's hello
-   names the DREAMS), wStart (wWU1Start: the herald in or out of the Coliseum),
+   names the DREAMS; the herald's SEAL and PIECES count an older Umbral's nine, wUmbHeraldCount), wStart (wWU1Start: the herald in or out of the Coliseum),
    wUmbralUnlock (wWU1UmbralUnlock: the herald, the flag topics wait on), wDarkness (wWU1Darkness: the eclipse),
    wNewDay (wWU1NewDay: the eclipse said at dawn), wEncounterHook (wWU1EncounterHook: the blight's hunters), wAudit (wWU1Audit: the herald is placed by the unlock), wAmbient (wWU1Ambient: the dreams), wLookText (wWU1LookText: the
    statue), wOpenJournal (wWU1OpenJournal: the chapter shows once open), wRenderJournal (wWU1RenderJournal: its
@@ -32,7 +32,7 @@ const W_UMB1 = {
   speech: [
     'Champions. You won it fair, and that is the trouble.',
     'The Crown was half of a seal. The other half kept a door shut, at the end of a road nobody made.',
-    'When you lifted it, the Seal broke into nine pieces, one for every way there is to play. Nine champions on the other side took one each. They call themselves the Nadir.',
+    'When you lifted it, the Seal broke into ten pieces, one for every way there is to play. Ten champions on the other side took one each. They call themselves the Nadir.',
     'Go north, to the Road to Nowhere. The door is open now. Win the pieces back, bring them to the portal, forge the Seal, and close it.',
     'The one at the Gate, just through the door, is the gentlest. Start there. I will be here, by the statue, if you need telling twice.',
   ],
@@ -47,11 +47,11 @@ DB.chars.uherald = { name: 'The Pale Herald', kind: 'lich', look: { coat: '#d8d4
   topics: {
     job: { t: 'I announce. Not games. Endings. Ask me about the SEAL.' },
     portal: { t: 'At the end of the Road to Nowhere, north of the Roost. It goes both ways: rest on this side, play on that one. Time runs on both.' },
-    seal: { t: 'The Seal of the Crown. Nine pieces now, one for each way to play. Win all nine, bring them to the portal, and it can be forged whole again. Then the door shuts.' },
+    seal: { t: 'The Seal of the Crown. Ten pieces now, one for each way to play. Win them all, bring them to the portal, and it can be forged whole again. Then the door shuts.' },
     nadir: { t: 'The other league. The same as ours, wrong. Their champions hold the pieces, and their captain is someone you have heard of, who never left the last game she lost.' },
-    gate: { t: 'Just through the portal, where the road comes out. The card game, played straight. The gentlest of the nine. Start there.' },
+    gate: { t: 'Just through the portal, where the road comes out. The card game, played straight. The gentlest of the ten. Start there.' },
     road: { t: 'The Road to Nowhere. Nobody made it. It is on your map now, north of the Roost. Walk to its end.' },
-    pieces: { t: 'Nine. The baseball, the basketball, the golf, the card game, the bowling, the curling, the football, the boxing and the hockey. Each one held by a Nadir champion, each in their own region.' },
+    pieces: { t: 'Ten. The baseball, the basketball, the golf, the card game, the bowling, the curling, the football, the boxing, the hockey and the jousting. Each one held by a Nadir champion, each in their own region.' },
   } };
 // (the flag topics wait on, set by the unlock: the audit counts it as set)
 DB.engineFlags.push('umbral_open');
@@ -69,8 +69,18 @@ wSay = function (id, kw) {
   // (after the Seal, the dreams are over)
   if (kw && r && r.key === 'dreams' && W_UMB1_INNS.includes(id) && wUmb() && wUmb().sealed) r.text = 'The dreams? They stopped, the night the sun came back. Folk eat their breakfast again.';
   if (!kw && r && r.text && wFlag('umbral_open') && wUmbOpen() && W_UMB1_INNS.includes(id)) r.text += ' You look tired. Everyone does, since the DREAMS started.';
+  // (an Umbral opened before jousting's champion: the herald counts the pieces its Seal asks for; phase 11's review)
+  if (id === 'uherald' && r && (r.key === 'seal' || r.key === 'pieces')) { const t = wUmbHeraldCount(r.key); if (t) r.text = t; }
   return r;
 };
+// the herald's SEAL and PIECES for a Seal that asks for fewer pieces than there are (u3's wUmbNeed), or '' as written
+function wUmbHeraldCount(k) {
+  const all = Object.keys(W_UMB_PIECES), need = wUmbNeed(); if (need.length >= all.length) return '';
+  const n = wUmbNum(need.length), N = n.charAt(0).toUpperCase() + n.slice(1), sp = need.map(p => W_UMB_PIECES[p].sport.replace(/^the /, '')), more = all.filter(p => !need.includes(p)).map(p => W_UMB_PIECES[p].sport);
+  const list = 'the ' + sp.slice(0, -1).join(', the ') + ' and the ' + sp[sp.length - 1];
+  if (k === 'seal') return `The Seal of the Crown. ${N} pieces, one for each way there was to play when it broke. Win them all, bring them to the portal, and it can be forged whole again. Then the door shuts.`;
+  return `${N}. ${list.charAt(0).toUpperCase() + list.slice(1)}. Each one held by a Nadir champion, each in their own region. There is a piece for ${more.join(' and ')} on the other side too now, but your Seal broke before it came: win it if you like, the Seal doesn't need it.`;
+}
 
 /* ---------- the herald in the Coliseum ---------- */
 function wUmbHeraldSync() {
@@ -107,7 +117,7 @@ function wUmbScene(replay) {
     <div id="wUmbLines" class="wumblines" aria-live="polite"></div>
     <div class="row" id="wUmbEnd" hidden><button class="btn" id="wUmbGo">North, then</button></div>`, () => {
       cancelAnimationFrame(WUS.raf); WUS.raf = 0;
-      if (!replay) wLog('The crown cracked, the Coliseum went dark at noon, and a pale herald said the Seal of the Crown is broken into nine pieces, held by the Nadir on the other side of a portal at the end of the Road to Nowhere. Win them back and forge the Seal. The herald waits by the Coliseum\'s statue.', 'b');
+      if (!replay) wLog(`The crown cracked, the Coliseum went dark at noon, and a pale herald said the Seal of the Crown is broken into ${wUmbNum(wUmbNeed().length)} pieces, held by the Nadir on the other side of a portal at the end of the Road to Nowhere. Win them back and forge the Seal. The herald waits by the Coliseum's statue.`, 'b');
       WUI.hudKey = ''; wDrain();
     });
   const cv = $('wUmbCv'), c = cv.getContext('2d'), lines = $('wUmbLines'), t0 = performance.now();
@@ -224,10 +234,11 @@ wLookText = function (x, y) {
 /* ---------- the Journal's chapter ---------- */
 function wUmbJournal() {
   const U = wUmb(); if (!U) return [0, ''];
-  const got = U.pieces.length;
-  if (U.sealed) return ['sealed', `<div class="wumbj"><p>The Seal of the Crown is forged, in year ${U.sealedYear || WG.year}. You won back all nine pieces and beat Hollow Aurelia's Nadir Athletic in the Hollow Coliseum; the portal at the end of the Road to Nowhere is shut, and the eclipses are over.</p><button class="ghost" data-umbscene="1">See the first night again</button></div>`];
-  return [`${got}/9`, `<div class="wumbj"><p>The Crown cracked in your hands, and the Coliseum went dark at noon. The Pale Herald says the Seal of the Crown is broken into nine pieces, one for every way to play, and the Nadir hold them on the far side of a portal at the end of the Road to Nowhere, north of the Roost. Win them back, bring them to the portal, forge the Seal, and close the door. The herald waits by the statue in the Coliseum.</p>
-    <p class="hint">Pieces won: ${got} of 9.${U.crossed ? ` You have crossed ${U.crossed} time${U.crossed === 1 ? '' : 's'}.` : ' You have not crossed yet.'}</p>
+  // (the pieces this journey's Seal asks for: u3's wUmbNeed)
+  const got = wUmbGot(), need = wUmbNeed().length, nw = wUmbNum(need);
+  if (U.sealed) return ['sealed', `<div class="wumbj"><p>The Seal of the Crown is forged, in year ${U.sealedYear || WG.year}. You won back all ${nw} pieces and beat Hollow Aurelia's Nadir Athletic in the Hollow Coliseum; the portal at the end of the Road to Nowhere is shut, and the eclipses are over.</p><button class="ghost" data-umbscene="1">See the first night again</button></div>`];
+  return [`${got}/${need}`, `<div class="wumbj"><p>The Crown cracked in your hands, and the Coliseum went dark at noon. The Pale Herald says the Seal of the Crown is broken into ${nw} pieces, one for every way to play, and the Nadir hold them on the far side of a portal at the end of the Road to Nowhere, north of the Roost. Win them back, bring them to the portal, forge the Seal, and close the door. The herald waits by the statue in the Coliseum.</p>
+    <p class="hint">Pieces won: ${got} of ${need}.${U.crossed ? ` You have crossed ${U.crossed} time${U.crossed === 1 ? '' : 's'}.` : ' You have not crossed yet.'}</p>
     <button class="ghost" data-umbscene="1">See it again</button></div>`];
 }
 const wWU1OpenJournal = wOpenJournal;

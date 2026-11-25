@@ -37,7 +37,7 @@ async def main():
         await pg.evaluate("wSetFlag('champion'); WG.umbral.seen = WG.dayAbs; WG.hardcore = false; WG.umbral.dreadSeen = 3; RUN.gold = 999; wUmbWellInit(); wSave()")
 
         fs = await pg.evaluate("(() => Object.keys(W_NADIR).filter(k => W_NADIR[k].piece && k !== 'finale').map(k => [k, !!wUmbFeat(k)]))()")
-        check(len(fs) == 9 and all(f[1] for f in fs), 'every one of the nine champions has a feat', fs)
+        check(len(fs) == 10 and all(f[1] for f in fs), 'every one of the ten champions has a feat', fs)
 
         cd = await pg.evaluate(f"""(() => {{ const out = {{}};
           wNadirMatch('gate'); const b = document.querySelector('#modalBox .wumbfeat'); out.gate = b ? b.textContent : ''; {CLOSE}

@@ -21,7 +21,7 @@
    (wWU8JOnNadir: a piece won well), wNadirMatch (wWU8JNadirMatch: the feat on the card, and the no-powers choice),
    wStartLinks, wStartLanes and wStartShed (wWU8J<Name>: the choice into the game's ref), wGL/wBL/wCR start and simGame
    (wWU8J<Name>: powers off for your side), wUmbFinaleEntry (wWU8JFinaleEntry: a well-won piece's hex), wUmbSpikeHp,
-   wUmbShadowSight, wUmbShadowStep, wUmbPitHp, wUmbTollAtKickoff (also the hour a game kicked off, for the night feat), wBlackout (wWU8J<Name>: the boons), W_JTAB_FN.umbral
+   wUmbShadowSight, wUmbShadowStep, wUmbPitHp, wUmbTollAtKickoff (also the hour a game kicked off, for the night feat), wBlackout, wTryMove (wWU8J<Name>: the boons), W_JTAB_FN.umbral
    (wWU8JJournal: the Seal panel), wStart (wWU8JStart: an old journey's pieces keep the first-try rule), renderHelp
    (wWU8JRenderHelp). */
 
@@ -36,8 +36,9 @@ const W_UMB8J = {
     links: { k: 'nopowers', n: 'win with your side\'s powers off' },
     lanes: { k: 'nopowers', n: 'win with your side\'s powers off' },
     shed: { k: 'nopowers', n: 'win with your side\'s powers off' },
+    lists: { k: 'margin', by: 3, n: 'win by three points or more' },
   },
-  kinds: ['unadir_ball', 'unadirgf', 'unbox', 'unadirbk', 'unadirhk', 'unadirgl', 'unadirbl', 'unadircr'],
+  kinds: ['unadir_ball', 'unadirgf', 'unbox', 'unadirbk', 'unadirhk', 'unadirgl', 'unadirbl', 'unadircr', 'unadirjt'],
   // each piece's boon on the dark side: [held, won well]
   boons: {
     card: { n: 'Every card match on this side starts with Block', v: [4, 8], u: 'Block' },
@@ -49,6 +50,8 @@ const W_UMB8J = {
     football: { n: 'A blackout on this side costs less of your gold', v: [50, 100], u: '%' },
     boxing: { n: 'A champion\'s toll is cheaper', v: [10, 20], u: 'gold' },
     hockey: { n: 'The shadows never hunt two steps at a time', v: [1, 1], u: '' },
+    // (issue #117, phase 11: the cold on a dark ground takes its HP every so many steps, not every W_UMB4.cold.steps)
+    jousting: { n: 'The cold on the dark grounds bites only every few steps', v: [3, 4], u: 'steps' },
   },
   edgeBlock: 10,
   pend: null, nopowNext: 0, winHp: null,
@@ -202,6 +205,13 @@ wBlackout = function () {
   if (lost > 0) { const back = Math.round(lost * k / 100); RUN.gold += back; if (back) { wLog(`The Ash Ball: ${back} of that gold is still in your pocket.`, 'g'); wSave(); } }
   return r;
 };
+// (the Splintered Lance: the cold on a dark ground, u4's, takes its HP every so many steps, for the step's own count)
+const wWU8JTryMove = wTryMove;
+wTryMove = function () {
+  const k = wUmbBoon('jousting'); if (!k) return wWU8JTryMove.apply(this, arguments);
+  const s0 = W_UMB4.cold.steps; W_UMB4.cold.steps = Math.max(s0, k);
+  try { return wWU8JTryMove.apply(this, arguments); } finally { W_UMB4.cold.steps = s0; }
+};
 
 /* ---------- the Seal's edges ---------- */
 const wWU8JFinaleEntry = wUmbFinaleEntry;
@@ -216,7 +226,8 @@ wUmbFinaleEntry = function () {
 /* ---------- the Seal panel, in the journal ---------- */
 function wUmbSealPanel() {
   const U = wUmb(); if (!U) return '';
-  const rows = Object.keys(W_UMB_PIECES).map(p => {
+  // (the pieces this Umbral's Seal asks for, and any other held: an older Umbral's jousting piece, won, is listed, but never as still out)
+  const need = wUmbNeed(), rows = Object.keys(W_UMB_PIECES).filter(p => need.includes(p) || U.pieces.includes(p)).map(p => {
     const r = wUmbResonance(p), B8 = W_UMB8J.boons[p], F = wUmbFeat(wUmbChampOf(p) || ''), v = r ? B8.v[r - 1] : 0;
     const unit = x => B8.u === '%' ? x + '%' : x + ' ' + B8.u, now = !r ? '' : B8.u ? `: now ${unit(v)}` : ': yes';
     return `<li class="${r ? 'wfhave' : ''}"><b>${esc(W_UMB_PIECES[p].n)}</b> <small>${r === 2 ? 'won well' : r ? 'won' : 'still out'}. ${esc(B8.n)}${B8.u ? ` (${unit(B8.v[0])}, or ${unit(B8.v[1])} won well)` : ''}${now}.${F && !r ? ` The feat: ${esc(F.n)}.` : ''}</small></li>`;
@@ -249,7 +260,7 @@ const wWU8JQuick = wUmbQuick;
 wUmbQuick = function () {
   const q = wWU8JQuick.apply(this, arguments), at = q.steps.findIndex(s => /Dark traits/.test(s.h)), i = at < 0 ? q.steps.length : at;
   q.steps.splice(i, 0,
-    { h: 'The Dread: the dark side wakes', t: W_UMB8C.names.map((n, k) => `<b>${esc(n)}</b> (${W_UMB8C.stages[k]}${W_UMB8C.stages[k + 1] ? '-' + (W_UMB8C.stages[k + 1] - 1) : '-9'} pieces): ${esc(wUmbDreadDoes(k))}`).join(' ') },
+    { h: 'The Dread: the dark side wakes', t: W_UMB8C.names.map((n, k) => `<b>${esc(n)}</b> (${W_UMB8C.stages[k]}${W_UMB8C.stages[k + 1] ? '-' + (W_UMB8C.stages[k + 1] - 1) : ' or more'} pieces): ${esc(wUmbDreadDoes(k))}`).join(' ') },
     { h: 'Feats: win the pieces well', t: Object.keys(W_UMB8J.feats).map(id => { const C = W_NADIR[id]; return C && C.piece ? `<b>${esc(W_UMB_PIECES[C.piece].n)}</b>: ${esc(W_UMB8J.feats[id].n)}.` : ''; }).join(' ') + ' Or win at the first try. A piece won well sings twice as strongly on the dark side, and its game in the Seal draws a hex fewer.' });
   q.lede = q.lede.replace(' Last, the dark traits', ' Then the Dread and the feats, and last, the dark traits');
   q.tip = 'A piece won well (by its feat, or at the first try) takes a hex off its game in the Seal\'s final.';

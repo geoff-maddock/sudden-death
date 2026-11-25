@@ -1,8 +1,9 @@
 /* u4: the dark grounds (issue #99, phase 4's frame). Loads after u3-monsters.js; changes earlier parts only by
-   reassignment (saved originals carry the wWU4 prefix). The sports' own parts (u4a to u4h) load after it.
+   reassignment (saved originals carry the wWU4 prefix). The sports' own parts (u4a to u4h, and u4j) load after it.
 
    Every sport with an engine has its ground on the dark world too (W_UMB4.grounds): the light ground through u0's
-   transform, under its dark name. A Nadir champion waits at the far end of each, and the approach is guarded:
+   transform, under its dark name. (The Tilting Lists joined as the Hollow Lists with jousting's champion, issue #117,
+   phase 11: u4j-jousting.js.) A Nadir champion waits at the far end of each, and the approach is guarded:
      the cold     every W_UMB4.cold.steps steps on a dark ground costs your team 1 HP (never below 1)
      the guards   two of the Nadir, by the champion; each plays you an Umbral card match (an elite, tier U) and once
                   beaten stands aside for the rest of the journey (WG.umbral.guards)
@@ -25,8 +26,8 @@
    ground has its guards, and its gate is a real item). */
 
 const W_UMB4 = {
-  grounds: { g_ballpark: 'baseball', g_court: 'basketball', g_links: 'golf', g_lanes: 'bowling', g_shed: 'curling', g_bowl: 'football', g_ring: 'boxing', g_rink: 'hockey' },
-  names: { g_ballpark: 'The Bone Diamond', g_court: 'The Black Court', g_links: 'The Hollow Links', g_lanes: 'The Drowned Lanes', g_shed: 'The Sunken Shed', g_bowl: 'The Cinder Pit', g_ring: 'The Broken Ring', g_rink: 'The Dead Pond' },
+  grounds: { g_ballpark: 'baseball', g_court: 'basketball', g_links: 'golf', g_lanes: 'bowling', g_shed: 'curling', g_bowl: 'football', g_ring: 'boxing', g_rink: 'hockey', g_lists: 'jousting' },
+  names: { g_ballpark: 'The Bone Diamond', g_court: 'The Black Court', g_links: 'The Hollow Links', g_lanes: 'The Drowned Lanes', g_shed: 'The Sunken Shed', g_bowl: 'The Cinder Pit', g_ring: 'The Broken Ring', g_rink: 'The Dead Pond', g_lists: 'The Hollow Lists' },
   cold: { steps: 2, hp: 1 },
   gate: { plains: 'grain', bloom: 'mossberry', tide: 'brinekelp', ember: 'emberpepper', rime: 'frostmint' },
   guardNames: ['The Left Hand of the Nadir', 'The Right Hand of the Nadir'],

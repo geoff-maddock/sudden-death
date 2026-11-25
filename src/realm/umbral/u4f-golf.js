@@ -42,7 +42,7 @@ DB.chars.nadir_links = { name: 'Sexton Vale, the Last Caddie', kind: 'wraith', l
   greet: 'Nobody finishes a round here. They just stop playing. I keep the FLAG on the last green. Say PLAY when you want to try for it, and ask about the RULES first. They change.',
   topics: {
     job: { t: 'I caddied on these links when they were green. I still do. Every round on this side ends on my last hole.' },
-    flag: { t: 'The Hollow Flag. One ninth of your Seal, and it flies on a green nobody has ever reached in regulation. Beat my four at golf and it is yours. Lose, and the next round costs a TOLL.' },
+    flag: { t: 'The Hollow Flag. One piece of your Seal, and it flies on a green nobody has ever reached in regulation. Beat my four at golf and it is yours. Lose, and the next round costs a TOLL.' },
     rules: { t: 'Match play, captain\'s choice, your four against my four, one ball a side. My side plays at your level and better at everything, a Lich carries our bag and reads every green for us, and we bring a full bag of potions. Before the first tee I draw the HEXES.' },
     hexes: { t: 'A green that will not lie still. A cup that wanders off. Fog over the flag. A wind that turns while you swing. One of them, for you. You will hear which before the first tee.' },
     hollow: { t: 'Once a round I let the flag go hollow. Your reads come up short, and your hands shake on the putts. Mind it.' },

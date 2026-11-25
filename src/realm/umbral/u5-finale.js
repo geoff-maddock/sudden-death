@@ -1,9 +1,11 @@
 /* u5: the finale (issue #99, phase 5). Loads after the sports' parts (u4a..u4h); changes earlier parts only by
    reassignment (saved originals carry the wWU5 prefix).
 
-   Forging the Seal. Hollow Aurelia waits in the Hollow Coliseum (DB.chars.nadir_aurelia). With all nine pieces, PLAY
+   Forging the Seal. Hollow Aurelia waits in the Hollow Coliseum (DB.chars.nadir_aurelia). With all the pieces the Seal
+   asks for (u3's wUmbNeed: all ten, or the nine an Umbral opened before jousting's champion asks for), PLAY
    is the finale against Nadir Athletic: three rounds, each in a different way to play, the three where your Umbral
-   record is weakest (the champions that took you the most tries; chosen once, WG.umbral.finaleSports). Each round is
+   record is weakest among the pieces it asks for (the champions that took you the most tries; chosen once,
+   WG.umbral.finaleSports). Each round is
    that sport's game at tier U (its adapter, as its champion's was) or, for the card game, an Umbral card match; it
    draws W_UMB5.hexes hexes, one fewer where you won that sport's piece at the first try (the piece's edge: win them
    well). Win a round and the next waits (WG.umbral.finale: rounds won); lose and you try that round again. In a
@@ -20,7 +22,7 @@
 const W_UMB5 = {
   rounds: 3, hexes: 2,
   // a piece's way to play: an engine (W_ENGINES key), or the card game (null)
-  engine: { card: null, baseball: 'diamond', basketball: 'court', golf: 'links', bowling: 'lanes', curling: 'shed', football: 'gridiron', boxing: 'ring', hockey: 'rink' },
+  engine: { card: null, baseball: 'diamond', basketball: 'court', golf: 'links', bowling: 'lanes', curling: 'shed', football: 'gridiron', boxing: 'ring', hockey: 'rink', jousting: 'lists' },
   card: { ids: ['u_aurelia', 'u_gatekeeper'], type: 'boss' },
 };
 EN('u_aurelia', 'Hollow Aurelia', 'wraith', [210, 220], {
@@ -30,10 +32,10 @@ EN('u_aurelia', 'Hollow Aurelia', 'wraith', [210, 220], {
   lose: { n: 'The Losing Throw', ops: [['a', 6, 4]] },
 }, { seq: ['hold', 'crown', 'echo', 'lose'] }, { team: { name: 'Nadir Athletic', short: 'NDR', color: '#2a1e34', light: '#e4defa' }, aura: 'wisps', crown: 1, flav: 'Captain of Apex Athletic, once. She never left the last game she lost, and she has been playing it ever since.' });
 DB.chars.nadir_aurelia = { name: 'Hollow Aurelia', kind: 'wraith', look: { coat: '#2a1e34', acc: 'scarf', tall: 1 },
-  greet: 'You have been busy. Bring me all nine PIECES and we will play for the SEAL. Three games. My choice.',
+  greet: 'You have been busy. Bring me all the PIECES and we will play for the SEAL. Three games. My choice.',
   topics: {
     job: { t: 'I captain Nadir Athletic. I lost a game once. I am still playing it.' },
-    pieces: { t: 'Nine. One for every way to play. Without all of them there is nothing to forge, and nothing to play for.' },
+    pieces: { t: 'One for every way to play. Without all of them there is nothing to forge, and nothing to play for.' },
     seal: { t: 'Win three games against my side and the pieces lock together. The door shuts, and you go home. Lose, and you come back and try that game again. I will be here. I am always here.' },
     games: { t: 'I choose them. The three you are worst at, by your record on this side. A piece you won cleanly, at the first try, makes its game a little kinder.' },
     play: { t: 'Then let us begin.', act: 'ufinale' },
@@ -48,7 +50,7 @@ const wUmbChampOf = piece => Object.keys(W_NADIR).find(k => W_NADIR[k].piece ===
 function wUmbFinaleSports() {
   const U = wUmb(); if (!U) return [];
   if (U.finaleSports && U.finaleSports.length === W_UMB5.rounds) return U.finaleSports;
-  const ps = Object.keys(W_UMB_PIECES), tries = p => { const c = wUmbChampOf(p); return (c && U.tries[c]) || 0; };
+  const ps = wUmbNeed(), tries = p => { const c = wUmbChampOf(p); return (c && U.tries[c]) || 0; };
   U.finaleSports = ps.map((p, i) => [p, tries(p), i]).sort((a, b) => b[1] - a[1] || a[2] - b[2]).slice(0, W_UMB5.rounds).map(x => x[0]);
   return U.finaleSports;
 }
@@ -70,8 +72,8 @@ function wUmbFinaleEntry() {
 function wUmbFinale() {
   const U = wUmb(); if (!U) return 'Nobody here plays.';
   if (U.sealed) return 'The Seal is forged. Hollow Aurelia is gone, and the stands are empty.';
-  const missing = Object.keys(W_UMB_PIECES).filter(p => !U.pieces.includes(p));
-  if (missing.length) return `You hold ${U.pieces.length} of the nine pieces. Hollow Aurelia will not play for the Seal until you hold them all (still out: ${missing.map(p => W_UMB_PIECES[p].n).join(', ')}).`;
+  const need = wUmbNeed(), missing = need.filter(p => !U.pieces.includes(p));
+  if (missing.length) return `You hold ${wUmbGot()} of the ${wUmbNum(need.length)} pieces. Hollow Aurelia will not play for the Seal until you hold them all (still out: ${missing.map(p => W_UMB_PIECES[p].n).join(', ')}).`;
   const r = U.finale || 0, piece = wUmbFinaleSports()[r];
   wUmbFinaleEntry();
   wLog(`The Seal, round ${r + 1} of ${W_UMB5.rounds}: ${W_UMB_PIECES[piece].sport}.${wUmbClean(piece) ? ` (You won ${W_UMB_PIECES[piece].n} cleanly: one hex fewer.)` : ''}`, 'b');
@@ -96,7 +98,7 @@ W_ON_END.nadir = function (r, ref) {
 };
 function wUmbSeal() {
   const U = wUmb(); U.sealed = WG.dayAbs; U.sealedYear = WG.year; U.finale = W_UMB5.rounds;
-  wLog(`The Seal is forged. The nine pieces lock together in your captain's hands, the portal at the end of the Road to Nowhere closes, and the eclipse lifts. Year ${WG.year}.`, 'g');
+  wLog(`The Seal is forged. The ${wUmbNum(wUmbNeed().length)} pieces lock together in your captain's hands, the portal at the end of the Road to Nowhere closes, and the eclipse lifts. Year ${WG.year}.`, 'g');
   wUmbHeraldSync(); // (the herald has nothing more to say: he goes)
   const m = MAPS.coliseum; wEnterMap('coliseum', m.spawn[0], m.spawn[1]); WG.face = 'u';
   wInvalidate('umbralden'); wSave();
@@ -104,9 +106,10 @@ function wUmbSeal() {
   if (!LAB) U.sealScene = 1;
 }
 function wUmbSealScene() {
+  const n = wUmbNum(wUmbNeed().length), N = n.charAt(0).toUpperCase() + n.slice(1);
   const close = modal(`<header><h3>The Seal of the Crown</h3></header>
     <div class="wumblines"><p class="wumbn">The last whistle goes, and the Hollow Coliseum goes very quiet.</p>
-    <p class="wumbn">Nine pieces, from nine games, lock together in your captain's hands: a seal, warm, and heavier than it looks.</p>
+    <p class="wumbn">${N} pieces, from ${n} games, lock together in your captain's hands: a seal, warm, and heavier than it looks.</p>
     <p class="wumbh">Hollow Aurelia looks at it for a long time. "That was a good game," she says, and she is gone.</p>
     <p class="wumbn">The stands empty like a breath going out. Far to the north, at the end of the Road to Nowhere, the portal folds shut.</p>
     <p class="wumbn">You walk out into the Crown Coliseum at noon. The sun is out. The block beside the statue is white again, and somebody has carved your team's name in it.</p></div>
