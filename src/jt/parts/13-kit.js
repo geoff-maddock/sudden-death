@@ -24,7 +24,7 @@ const JT_POTIONS = {
 };
 // a CPU gives a potion worth this much (by skill: a Squire, now and then, whatever comes first)
 const JT_KIT = { take: [99, 2.5, 2], squire: .25 };
-const JT_W7 = { rosterOne: jtRosterOne, start: jtStart, rideFx: jtRideFx, corners: jtCornersDue };
+const JT_W7 = { rosterOne: jtRosterOne, start: jtStart, rideFx: jtRideFx, corners: jtCornersDue, summary: jtSummary };
 function jtGx(fx) { if (!fx || typeof fx !== 'object') return null; const o = JSON.parse(JSON.stringify(fx)); delete o.r; for (const k in o) if (!jtOwn(JT_FX0, k) || !Number.isFinite(+o[k])) delete o[k]; return Object.keys(o).length ? o : null; }
 jtRosterOne = function (p) { const m = JT_W7.rosterOne(p); const gx = p && p.gear ? jtGx(p.gear.fx) : null; if (gx) m.gx = gx; else delete m.gx; return m; };
 jtStart = function (opts) {
@@ -34,6 +34,8 @@ jtStart = function (opts) {
   if (Array.isArray(o.bags) && !G.yard) Object.assign(G, { bags: [0, 1].map(s => o.bags[s] && typeof o.bags[s] === 'object' ? Object.assign({}, o.bags[s]) : null), pots: [], potCourse: [-1, -1], potAsk: [-1, -1], tonic: [-1, -1], oil: [-1, -1] });
   return g;
 };
+// (phase 12: a match with bags sums up the potions given, G.pots, for the lab and the Realm's checks)
+jtSummary = function () { const S = JT_W7.summary(); if (S && G && G.bags) S.pots = JSON.parse(JSON.stringify(G.pots || [])); return S; };
 const jtGxOf = (s, ri) => { const m = G && G.teams && ri != null ? G.teams[s].roster[ri] : null; return (m && m.gx) || null; };
 // the rider's fx: the powers', then their gear's and the course's potions (null when there is nothing at all)
 jtRideFx = function (s) {

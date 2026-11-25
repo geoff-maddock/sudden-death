@@ -304,9 +304,11 @@ function jtCpuPick(s, sk, Q, plan) {
   let k = Q.lead >= 2 || shaky || helmy ? 'shield' : 'lance';
   // (a curse on a rider with too little heat left, or one already cursed, is wasted: the shield's instead)
   if (k === 'lance' && (L.curse || !can('lance'))) k = 'shield';
-  if (!can(k)) return null;
+  // (phase 12's lab: a shield power it can't cast (not the mana, or not in this match) leaves the lance's, not nothing: a
+  // harpy, always shaky in the saddle, never cast its lance power at all)
+  if (!can(k)) { if (k !== 'shield' || L.curse || !can('lance')) return null; k = 'lance'; }
   const why = k === 'shield' ? (Q.lead >= 2 ? `ahead by ${Q.lead}: ${S.n}, to keep it` : shaky ? `${S.n}: the rider is shaky in the saddle` : helmy ? `their lances go at the helm: ${S.n}` : `${S.n}, for the course that counts`)
-    : Q.lead < 0 ? `behind by ${-Q.lead}: ${L.n}, for the points` : big ? `${L.n}, for the course that counts` : `level: ${L.n}`;
+    : Q.lead < 0 ? `behind by ${-Q.lead}: ${L.n}, for the points` : big ? `${L.n}, for the course that counts` : Q.lead > 0 ? `ahead by ${Q.lead}: ${L.n}` : `level: ${L.n}`;
   return { k, why };
 }
 // on Play, as the riders set off: the CPU casts for its side (and your squire for yours, under Auto powers in Manage).

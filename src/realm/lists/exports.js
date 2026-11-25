@@ -7,7 +7,8 @@
    strikePts, fair, foul and atText read a strike; heatTotal(s, h), total(s), board() (the tourney board), matchText(s).
    rules and at (the herald's words) are the tables. G is the match, plain JSON. The page comes in phase 2: until then
    the lists are never on.
-   Phase 1 is the course model and one match, CPU against CPU: lists, plan, mounts, zones, stats, skills (the tables),
+   Phase 1 is the course model and one match, CPU against CPU: lists, plan, mounts, zones, stats, skills (the tables, copies;
+   model holds the live ones the model reads, sway, brk, rock, seat, mount, skill, job, arm, shake and corner, for a lab to tune in the page),
    rate(kind) and rs(kind) (a kind's ratings, 1 to 12 and 0 to 1), zoneAt(x, y, guard), edge; the pure model, every
    random number from the rnd passed in (Math.random when left out; planRules is the plan table): sway(o) and rideSpeed(o), charge(o, rnd) (a CPU
    rider's ride), strike(a, d, rnd), seat(st, d, lean, rnd), impact(rides, leans, rnd); start(opts) puts a match on
@@ -55,7 +56,8 @@
    r); start(opts) and simMatch(opts) take bags ([yours or null, theirs]: a match without bags has no potions); potions
    (the table), kitRules, potionWhy(s, id), potion(id) (yours, in your plan beat: '' or why not), advice(bag) (your
    squire's word), cpuPotion(s), potionValues(s, bag), rideFx(s) (what a rider rides with this course: powers, gear and
-   potions, or null), rideOpts(s, plan) (what the model is given for side s's rider on a plan).
+   potions, or null), rideOpts(s, plan) (what the model is given for side s's rider on a plan); summary() adds pots (the potions given)
+   in a match with bags (phase 12).
    Phase 8 is the Tilting Lists' ways (14-ground.js): start(opts) and simMatch(opts) take ground (true: the churned sand
    and the pennant wind; lab: { sand: false } or { wind: false } leaves one out) and lineBy (lab: a line a side, 'rut' or
    'side', or null); groundRules and lines are the tables; ground (G.ground, a copy: each lane's rut, the wind, the log
@@ -81,7 +83,7 @@ return {
   heatTotal: (s, h) => jtHeatTotal(s, h), total: s => jtTotal(s), board: () => jtBoard(), matchText: s => jtMatchText(s),
   // the course model and a match (phase 1)
   lists: JSON.parse(JSON.stringify(JT_LISTS)), planRules: JSON.parse(JSON.stringify(JT_PLAN)), mounts: JSON.parse(JSON.stringify(JT_MOUNT)), zones: JSON.parse(JSON.stringify(JT_ZONE)),
-  stats: JT_STATS.slice(), skills: JSON.parse(JSON.stringify(JT_SKILL)), model: { sway: JT_SWAY, brk: JT_BREAK, rock: JT_ROCK, seat: JT_SEAT },
+  stats: JT_STATS.slice(), skills: JSON.parse(JSON.stringify(JT_SKILL)), model: { sway: JT_SWAY, brk: JT_BREAK, rock: JT_ROCK, seat: JT_SEAT, mount: JT_MOUNT, skill: JT_SKILL, job: JT_JOB, arm: JT_ARM, shake: JT_SHAKE, corner: JT_CORNER },
   rate: k => jtRate(k), rs: k => jtRs(k), zoneAt: (x, y, g) => jtZoneAt(x, y, g), edge: (z, x, y, g) => jtEdge(z, x, y, g),
   sway: o => jtSway(o), rideSpeed: o => jtSpeed(o), charge: (o, rnd) => jtCharge(o, rnd || Math.random), strike: (a, d, rnd) => jtStrike(a, d, rnd || Math.random),
   seat: (st, d, lean, rnd, own) => jtSeat(st, d, lean, rnd || Math.random, own), impact: (rides, leans, rnd) => jtImpact(rides, leans || [.5, .5], rnd || Math.random),

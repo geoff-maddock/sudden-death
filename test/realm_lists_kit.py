@@ -158,6 +158,18 @@ async def main():
           for (let i = 0; i < 9 && !document.getElementById('modal').hidden; i++) document.querySelector('#modalBox .btn, #modalBox button').click();
           return JSON.stringify(wMatchBag('lists')) === before; })()""")
         check(sm, 'Simulate leaves your bag alone', sm)
+        # (phase 12's review) a Simulate whose two hours roll the day over onto a league round day: the clubs' own matches
+        # at the Lists that round are jousted on the engine with no bag on either side (the other club's bag is for your
+        # match only); your match had theirs
+        ro = await pg.evaluate("""(() => { const L = wLeague(), cl = wLeagueClubs().filter(c => L.table[c]), seen = [], keep = wJT.simMatch;
+          WG.rivals = WG.rivals || true; while ((WG.dayAbs + 1) % W_LEAGUE.every) WG.dayAbs++; WG.min = 1440 - 30;
+          L.next = { day: WG.dayAbs + 1, games: [{ a: cl[0], b: cl[1], g: 'g_lists' }, { a: cl[2], b: cl[3], g: 'g_lists' }] };
+          wJT.simMatch = o => { const r = keep(o); seen.push({ teams: [r.teams[0].name, r.teams[1].name], pots: r.pots ? r.pots.length : null }); return r; };
+          try { wJtg().met = {}; wStartLists({ club: 'local', how: 'sim' }); } finally { wJT.simMatch = keep; }
+          for (let i = 0; i < 9 && !document.getElementById('modal').hidden; i++) document.querySelector('#modalBox .btn, #modalBox button').click();
+          return { seen, live: wListsLive(), day: WG.dayAbs % W_LEAGUE.every }; })()""")
+        check(len(ro['seen']) == 3 and ro['seen'][0]['pots'] is not None and all(x['pots'] is None for x in ro['seen'][1:]) and not ro['live'] and ro['day'] == 0,
+              'a Simulate that rolls the day over onto a league round: the clubs\' own matches at the Lists carry no bag, only your match had theirs', ro)
         ex = await pg.evaluate("(() => { W_LISTS_MODE = 'play'; wListsGame({ seed: 6, mode: 'play' }); wJT.pause(true); __to(() => wJT.phase === 'plan'); const r = wListsPotion('jtoil'); wListsRows(); const h = $('wListsBagRow').hidden; wLeaveLists(); return { r, h, bags: wJT.G.bags || null }; })()")
         check(ex['r'] != '' and ex['h'] and ex['bags'] is None, 'an exhibition takes no potions, and has no Bag row', ex)
         cd = await pg.evaluate("(() => { wOpenListsCard(); const t = $('modalBox').textContent; document.querySelector('#modalBox [data-close]').click(); return /What their squires bring/.test(t); })()")

@@ -250,11 +250,13 @@ function jtCornersDue(skip) {
 /* ---------- the mounts ---------- */
 // the mount a rider of these ratings rides best, with the reason (the Realm's captain; your choice on the Lists tab). By
 // the lab (seeded matches, a Knight a side, against Destriers): a steady lance does best on a Charger in a short heat
-// (an elf), a rider who keeps a gallop up on a Courser (a harpy), the rest on a Destrier, a long heat most of all
+// (an elf), a rider who keeps a gallop up on a Courser over a long one (a harpy), the rest on a Destrier (phase 12: a
+// Courser in a short heat was the captain's pick for every good rider, and it cost them; the Realm's matches saw an
+// unhorsing in most matches with the riders on Chargers and Coursers)
 function jtMountFor(rs, courses) {
   const r = rs || {}, long = (courses || JT_RULES.courses) >= 5;
   if ((r.lance ?? .5) >= .8 && !long) return { m: 'charger', why: 'a lance that steady can take its sway for the harder hit' };
-  if ((r.ride ?? .5) >= .7) return { m: 'courser', why: 'it keeps up a gallop all heat and gets its wind back quickly' };
+  if ((r.ride ?? .5) >= .7 && long) return { m: 'courser', why: 'it keeps up a gallop all heat and gets its wind back quickly' };
   return { m: 'destrier', why: long ? 'steady to aim from and to sit a hit on, over a long heat' : 'steady to aim from and to sit a hit on' };
 }
 

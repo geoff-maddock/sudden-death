@@ -45,10 +45,14 @@ const JT_PLAN = {
   guard: { angled: { n: 'angled' }, square: { n: 'square' } },
   pace: { canter: { n: 'a canter', speed: .68, sway: 1, wind: .12 }, gallop: { n: 'a gallop', speed: 1, sway: 1.35, wind: .3 } }
 };
+// (phase 12's lab: as first set, a Charger (hit 1.08, steady 0) and a Courser (steady 0) left their riders unhorsed in 85
+// to 96% of matches against 37% on Destriers. A Charger and a Courser now steady the seat nearly as a Destrier does, and the
+// Charger hits a little softer (1.02) and sways a little less (1.2); with the captain putting fewer riders on them, the
+// Realm's matches see an unhorsing about as often as the engine's own calibration. Each is still the best pick somewhere)
 const JT_MOUNT = {
-  charger: { n: 'Charger', speed: 1.06, hit: 1.08, sway: 1.24, steady: 0, rec: .12, wind: 1.3 },
+  charger: { n: 'Charger', speed: 1.06, hit: 1.02, sway: 1.2, steady: .06, rec: .12, wind: 1.3 },
   destrier: { n: 'Destrier', speed: .95, hit: .95, sway: .82, steady: .07, rec: .12, wind: 1 },
-  courser: { n: 'Courser', speed: 1.02, hit: .93, sway: .97, steady: 0, rec: .3, wind: .65 }
+  courser: { n: 'Courser', speed: 1.02, hit: .93, sway: .97, steady: .06, rec: .3, wind: .65 }
 };
 const JT_MOUNT_DEF = 'destrier';
 const jtMount = id => JT_MOUNT[jtOwn(JT_MOUNT, id) ? id : JT_MOUNT_DEF];

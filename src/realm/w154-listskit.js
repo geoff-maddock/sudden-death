@@ -16,7 +16,7 @@
    W_LISTS_KIT.prize lists what the Gilded Lance (phase 10) may hand out.
    wListsPotion(id)   gives one of yours ('' or why not)
    Wraps: wGearLive (wW154GearLive: the Lists), wListsPlayer (wW154ListsPlayer: gear's ratings and the piece),
-   wStartLists (wW154StartLists: their bag goes in), wResumeLists (wW154ResumeLists: an older save's bag), wListsRows
+   wStartLists (wW154StartLists: their bag goes in, for that match only), wResumeLists (wW154ResumeLists: an older save's bag), wListsRows
    (wW154ListsRows: the Bag row), wListsRow (wW154ListsRow: the gear on the Lists tab), wOpenListsCard
    (wW154OpenListsCard: the bags on the card), wListsLogHTML (wW154ListsLogHTML: the potions), wListsHowHTML
    (wW154ListsHow: #wListsHowKit), renderHelp (wW154RenderHelp: #wHelpListsKit); wJT.start and wJT.simMatch (the bags go
@@ -84,9 +84,12 @@ wStartLists = function (o) {
   WJTK.next = [null, Object.assign({}, W_LISTS_KIT.opp[(o && o.tier) || (o && o.club ? wBallTier(o.club) : 1)] || {})];
   try { return wW154StartLists(o); } finally { WJTK.next = null; }
 };
+// (the bag is taken by the first match started after it is set, and only that one: a Simulate's two hours can roll the
+// day over onto a league round, whose clubs' matches at the Lists are jousted on the engine too, with no bag; phase 12)
 const wW154Start = wJT.start, wW154SimMatch = wJT.simMatch;
-wJT.start = o => wW154Start(WJTK.next ? Object.assign({}, o, { bags: WJTK.next }) : o);
-wJT.simMatch = o => wW154SimMatch(WJTK.next ? Object.assign({}, o, { bags: WJTK.next }) : o);
+const wJtkTake = o => { const b = WJTK.next; WJTK.next = null; return b ? Object.assign({}, o, { bags: b }) : o; };
+wJT.start = o => wW154Start(wJtkTake(o));
+wJT.simMatch = o => wW154SimMatch(wJtkTake(o));
 // a match saved before bags came in: potions from here on (the other club's bag by its tier)
 const wW154ResumeLists = wResumeLists;
 wResumeLists = function () {

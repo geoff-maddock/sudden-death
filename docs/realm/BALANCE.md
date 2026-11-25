@@ -1583,6 +1583,130 @@ at twice, its powers still at 2) read the control 37% and the Frost Wyrm 66%, an
 move about 10 points between runs, so a superstar adds from nothing to about 20 points as one player in four. The
 Djinn (+20 here, the best draw in the realm) is the one to watch; a run at 200 or more a cell would settle it.
 
+## Jousting at the Tilting Lists (issue #117, phase 12)
+
+`python3 test/realm_lists_lab.py N`: every match is the jousting engine ridden to a result, headless, as Simulate rides
+it (two heats of three courses, the Lists' ways and powers on), your four riding as a Knight, theirs at the tier's skill.
+Every match draws both fours afresh (each rider bringing the pair of powers their name picks) and each cell has its own
+run of seeds. About 150 ms a match: every rider is new, so the CPU works out its odds and its corner afresh. The lab
+takes parts and rows (`... 400 '' tiers,gaps`, `... 300 '' single elf,sit`), so the numbers below were run in sixteen
+processes at once, about 45 minutes for the lot. A cell of 400 is good to about 2.5 points either way, one of 300 to
+about 3; your four in every run was the journey's werewolf, goblin and minotaur and a call-up elf (the captain rides the
+elf and the werewolf). Before is the first run, on phase 11's settings, at 300 a cell.
+
+### What it found, and what changed
+
+1. **An unhorsing in about 90% of matches** (Knight against Knight, the same kinds both sides), where the engine's own
+   calibration (`realm_lists_sim`, `realm_lists_four`: plain riders, and real kinds, on Destriers) reads a third. The
+   Realm's captain put most riders on Chargers and Coursers (a Charger for a steady lance, a Courser for any good
+   rider), and those had no steadiness at all (a Destrier's 0.07) and, for the Charger, a hit of 1.08: on the same fours
+   (80 to 150 each), every rider on a Charger 85 to 96%, on a Courser 51 to 89%, on a Destrier 37 to 49%. The seat is a
+   threshold against a hit with little spread, so a small change in hold or hit moves the rate by half. Changed:
+   - **a Charger and a Courser steady the seat nearly as a Destrier does** (`JT_MOUNT` steady 0 to 0.06); the Charger
+     hits a little softer (1.08 to 1.02) and sways a little less (1.24 to 1.2);
+   - **the captain (`jtMountFor`) puts a good rider on a Courser only in a long heat** (it did in any heat; in a short
+     one it cost them: a werewolf on Coursers 4 points under Destriers, paired seeds).
+   Tried and dropped: holding the seat harder (`JT_SEAT.base` 0.55 to 0.75, with stiffer mounts). It brought the Realm's
+   matches to a third, but two plain riders on Destriers to one in twenty, the CPU stopped galloping (a gallop's harder
+   hit was worth little), a fine rider beat a poor one 30 to 10 rather than 34 or more, and the Charger and the Courser
+   lost their cases. The engine's calibration stays where phases 1 and 3 set it: plain Knights 34%, real kinds 32% (300
+   each, `realm_lists_sim` and `realm_lists_four`, unchanged and passing).
+   **What is left:** this journey's four, with an elf on a Charger and a werewolf (seats of 5 and 8), still sees an
+   unhorsing in 64 to 71% of its matches (90% before); both its riders on Destriers, 57%. A light seat comes off, as a
+   harpy or an elf should; a four of dwarves, golems or ogres sees far fewer. Cutting it further means moving the seat
+   for every rider, which is what was tried above.
+2. **The mounts.** Each is the best pick somewhere, on paired seeds (`realm_lists_four`, 400 matches a cell, a kind's
+   four against vampires on Destriers): an elf in a short heat wins 272 on Chargers, 257 on Coursers, 220 on Destriers; a
+   dwarf in a long heat 185, 204 and 210; a harpy in a long heat 151, 205 and 165.
+3. **A harpy never cast its lance power.** A rider shaky in the saddle (a seat under 0.4: a harpy, a skeleton) always
+   reaches for the shield power, so with only the lance power to cast (`powOnly`) a harpy cast Dive 0 times a match,
+   a skeleton its Bone Lance 0.17. The CPU now casts the lance's when it can't cast the shield's (not the mana, or not in
+   this match): 2.1 and 2.4 a match. Its reason for a lance power when a point ahead now says so ("ahead by 1"), not
+   "level".
+
+### After (400 a cell)
+
+**Tiers, as the world sets them** (their level yours plus the tier less one, `W_JTG.oppBonus` a point on each of
+their four, their skill by tier, round every club; no bags):
+
+| | Tier 1 | Tier 2 | Tier 3 |
+|---|---|---|---|
+| Before (300) | 85.3% | 47.7% | 31.7% |
+| After | 79.3% | 46.8% | 30.3% |
+
+Beside curling's 80/49/31% (98/53/24% after its play change), golf's 66 to 79 / 46 to 54 / 20 to 24% and bowling's
+74/50/23%. `W_JTG.oppBonus` (1/1/1, a guess copied from curling) is kept: a point a rider moves a match by less than the
+noise (1/1/3 read 74.5, 43.3 and 29.5% beside 1/1/1's 73.5, 44.5 and 25.8%, 400 each, in one run while tuning), as on
+the ice.
+
+**Level gap** (even kinds, both Knights, no bonus): a level below 52.8%, even 50.3%, +1 47.5%, +2 47%, +3 43.5% (before:
+49.3, 47, 50, 45.7 and 45%). A level is a point on one of seven ratings: 2 to 3 points a level, curling's "levels
+matter, but not much".
+
+**Their skill** (even level, your Knight): a Squire 83.8% (81.3% before), a Knight 50.3% (45%), an Archmage 31.5%
+(31.3%). The ladder with the same kinds on both sides: an Archmage beats a Knight 68.8% (65.7%), a Knight beats a Squire
+85.5% (83%); Archmage against Archmage 46.8%, Squire against Squire 50.8%. Jousting's rates (both sides): a Knight breaks
+0.55 of its courses, a Squire 0.45, an Archmage 0.58; helm breaks about 0.01 a course (0.03 between Squires, who aim
+anywhere); the tilt for the crown in 7 to 13% of matches.
+
+**Sides.** Phase 1 saw side 0 win 52.5% of 1,000 Knight-against-Knight matches. The same four on both sides (one draw,
+copied), 6,000 matches a row over six processes: as Simulate rides it 49.7%, no powers or ground 50.2%, two plain fours
+49.2% (and 50.6% of 4,000 in the bare engine; run on a build while tuning, but nothing tuned touches one side and not
+the other). One standard error is 0.65: there is no side's edge. It was noise.
+
+**Powers** (even): both 47.5%, neither 50.3%, yours only 58.8%, theirs only 39.3% (before: 50.3, 52, 62.7 and 41.7%).
+
+**The plan** (your side held to one plan all match): against a Knight's mix, auto 46%, the shield and the body plans
+36.3 to 53.8% (none clearly above), the helm plans 21.5 to 25.5%. Against an Archmage, who reads what you ride: auto
+33%, the body plans 20 to 35.8%, the shield plans 15.5 to 29.5%, the helm plans 5.3 to 9.8%. A Knight's mix can't be
+beaten by always riding one plan; an Archmage punishes it, worst of all a plan always at the shield or the helm.
+
+**The mounts** (both your riders on one, against the captain's pick for theirs): three courses a heat, the captain's
+pick 49.3%, Chargers 50%, Destriers 51%, Coursers 48.3%; five courses, 54.8, 48, 45.5 and 49%. Before: 49.7, 48.7, 51.7
+and 46.7%; 48.7, 47, 48.7 and 51.3%. Nothing decides; what they change is the match's character (an unhorsing in 76.5%
+of matches on Chargers, 57% on Destriers).
+
+**The squires** (your corner): the captain's (a Knight's corner) 52.8%, no corner at all 43.5%, a Squire's (two jobs on
+a whim) 49.3%; each job left out 47 to 48.3%. One run is noisy at this size: over fourteen runs of 400 or 500 while
+tuning (about 5,800 matches a row), no corner averaged 45.4% against the captain's 48.3%, and a whim 49%. The squires'
+work is worth about 3 to 9 points; which two jobs matters little (steady is worth the most). A larger model in the corner
+(`JT_CORNER.n` 240 to 720) and stronger jobs (the girth's 0.07 to 0.12, steadying 0.5 to 0.6) read no better in 500 a row
+(the captain's corner 45.8 to 50.8%, a whim's 48.2 to 52.2%), so both were left. The corner's skill edge is thin, as
+phase 3 found (`realm_lists_four`: a Knight's corner beats a Squire's 1,030 to 970).
+
+**The Lists' ways** (both Knights): on 47.5%, off 47.5%, the sand alone 49.3%, the wind alone 47.8%, your side held to
+the rut 50%, beside it 46.5%. A Squire against a Knight: 18.5% with the ways on, 21.5% off (before: 19% and 17.7%;
+phase 8 saw 29% and 23%). The Squire's gain with the ways on is gone.
+
+**Gear and potions** (by tier: plain; their bag only, as Simulate rides it; both bags; the full kit, both bags and a
+piece on each of your four):
+
+| | Plain | Their bag | Both bags | Full kit |
+|---|---|---|---|---|
+| Tier 1 | 76.8% | 78.3% | 81.3% | 79% |
+| Tier 2 | 49.3% | 48% | 49.8% | 51.5% |
+| Tier 3 | 34.5% | 31.5% | 27.3% | 31.5% |
+
+A side gives 1 to 1.2 potions a match. Every cell is within about 5 points of plain: nothing decides.
+
+**The Gilded Lance** (Simulate every round, their bags in): won 18.5% (14.7% before), out in the quarter-final 21%, the
+semi-final 40%, the final 20.5%. Beside the Brass Broom's 24% and the Divot Cup's 14.5%; its fee (40), rounds' tiers
+(1, 2, 2) and prize (150 gold, 20 fans, a pick of three) are every engine cup's and are kept.
+
+### One thing at a time
+
+`realm_lists_lab.py 300 '' single` (300 a cell, about 4 points of noise on a difference). With only that one power
+castable by your side (a four of that kind against the same four with none), every power reads from -8 to +14 points:
+the largest are the minotaur's Gore (+13.6), the skeleton's Rattle (+12.3), the troll's Regrow (+9) and the gorgon's
+Serpent Tip (+8.7); the vampire's Mist reads -8.4. Powers with the same effect read -3 to +6 (an eighth less often broken
+on you: the dwarf's Iron Shield, the witch's Ward, the lich's Bone Ward, the goblin's Duck and Weave), so much of that
+spread is noise. Nothing moves a match as granite moved curling (+25 to 35). Ultimates are cast about once in two
+matches and move it -3 to +7 points. The situation powers: The Last Course 51.7%, Back in the Saddle 52.7%, For the
+Crown 49%, against 46.7% with none. Each piece of gear on all four: 43.7 to 54.3% against 51%. Each potion, two in the
+bag: Squire's Oil 52% (1.25 given a match), the Steadying Tonic 51.7% (0.64), against 52.7%; a Knight never gave the
+Stamina Draught or Ruddock's Liniment (they wait for a mount under half its wind or an arm under 55%, which a
+three-course heat rarely reaches: they are for long heats, and the curses that tire a mount).
+
 ### Superstars at the Lists (issue #117, phase 9)
 
 `realm_stars_lab.py 400 '' jt` (three of your own and the extra player as your four, the captain's pick, a whole match
@@ -1603,7 +1727,13 @@ The first try's kinds were no better than the best league kinds (both riders of 
 400 matches each: the lich 60%, the golem 56%, the superstars 57-63%), so they added nothing. Each gained a point or
 two where a rider needs it (lance, seat, couch), which put two of them against two average riders at 60-66% (the lich
 56-58%). One superstar in a four now adds about 4 to 9 points. One rider of two rides each heat, and jousting is
-noisy, so a superstar moves a match less here than on the ice. Phase 12's lab will look again.
+noisy, so a superstar moves a match less here than on the ice. Phase 12's lab (`realm_lists_lab.py`) measures the
+engine itself; `realm_stars_lab.py ... jt` stays the superstars' lab (the run after phase 12's mounts: below).
+
+After phase 12 (`realm_stars_lab.py 300 '' jt`, 300 each, about 3 points of noise): the control 51.3%, the Phoenix 54%,
+the Kraken 49%, the Behemoth 55.7%, the Djinn 50%, the Hydra 52.3%, the Frost Wyrm 52.7%, each riding a heat in nearly
+every match (the control in half). A superstar adds from nothing to about 4 points as one rider in four, a little
+under phase 9's 4 to 9 at 400 a row; the two runs overlap inside their noise.
 
 ## Pets (issue #104, phase 8)
 
@@ -2183,6 +2313,26 @@ lance breaks on any fair touch and your tip sways a quarter more, for a course),
 The mount's wind alone barely matters over three courses a heat (fresh mounts each heat), so Hollow Mounts also slows the
 charge. No hex takes more than about 6 points. The champion as played, about 14% across the two runs: where curling's
 sits, a little under the 15 to 25% band.
+
+**Phase 12's lab** (`python3 test/realm_lists_lab.py 400 '' umbral`, 400 a row, paired within the run; before is the
+first run on phase 11's settings at 300, after is on phase 12's mounts, the same rows):
+
+| your win, level parity | before | after |
+|---|---|---|
+| an Archmage (no bonus, no bags) | 38% | 40.3% |
+| the Lich | 22% | 32% |
+| tier 3 as the world sets it | 34.3% | 33.3% |
+| tier U on your own kinds | 21.3% | 27.8% |
+| the Nadir four, no hexes | 28% | 28.8% |
+| ... without The Pale Charge | 26.7% | 30.3% |
+| Grave Mist / Hollow Mounts / The Cold Saddle / Shrouded Shields | 25 / 18.3 / 26 / 24.7% | 25.5 / 19.5 / 25.5 / 23.8% |
+| **the champion as played, one hex drawn a try** | **21.3%** | **23.3%** |
+| two hexes (the finale's round) | 19.7% | 17.3% |
+
+Over the runs of 400 while tuning, the Lich read 27.5 to 32% against the Archmage's 34.5 to 40%, and the champion as
+played 19 to 23%: inside the 15 to 25% band, a little above phase 11's 14% (measured with the engine alone, on other
+fours, with an unhorsing in most matches). No hex takes more than about 7 points. `W_JTG.oppBonus[4]`, the hexes and
+the Lich's hands are kept.
 
 ### Umbral: bowling (#99, 4g)
 
