@@ -45,7 +45,7 @@ const JT_GND = {
 };
 const JT_LINE = { rut: { n: 'in the rut', v: 'rides the rut' }, side: { n: 'beside the rut', v: 'rides beside the rut' } };
 const JT_LINES = Object.keys(JT_LINE);
-const JT_W13 = { start: jtStart, plan: jtPlan, suggest: jtSuggest, select: jtSelect, rideOpts: jtRideOpts, charge: jtCharge, yourSway: jtYourSway, tipNow: jtTipNow,
+const JT_W13 = { start: jtStart, plan: jtPlan, suggest: jtSuggest, select: jtSelect, rideOpts: jtRideOpts, chargePrep: jtChargePrep, yourSway: jtYourSway, tipNow: jtTipNow,
   yourRide: jtYourRide, close: jtCourseClose, herald: jtHerald, playNext: jtPlayNext, snapshot: jtSnapshot, summary: jtSummary, view: jtView, pennant: jtPennant,
   listsDraw: jtListsDraw, targetDraw: jtTargetDraw, draw: jtDraw };
 const jtGndR = v => Math.round(v * 1000) / 1000;
@@ -104,12 +104,16 @@ function jtGndFor(s, plan) {
 }
 jtRideOpts = function (s, plan) { const o = JT_W13.rideOpts(s, plan); if (jtGndOn()) o.gnd = jtGndFor(s, plan); return o; };
 // the ride on the ground: the line's sway (through the hands' spread) and speed, and the wind's push less what the hands aim into it
-jtCharge = function (o, rnd) {
-  const g = o && o.gnd; if (!g) return JT_W13.charge(o, rnd);
-  const H = o.hands || { aim: 1, couch: .3 }, ride = JT_W13.charge(Object.assign({}, o, { hands: Object.assign({}, H, { aim: (H.aim ?? 1) * g.sway }) }), rnd);
-  ride.speed *= g.speed; ride.tip = { x: ride.tip.x + g.push - g.into, y: ride.tip.y };
-  ride.gnd = { line: g.line, push: jtGndR(g.push), into: jtGndR(g.into) };
-  return ride;
+// (jtCharge draws through jtChargePrep, so the ground reaches every ride drawn)
+jtChargePrep = function (o) {
+  const g = o && o.gnd; if (!g) return JT_W13.chargePrep(o);
+  const H = o.hands || { aim: 1, couch: .3 }, f = JT_W13.chargePrep(Object.assign({}, o, { hands: Object.assign({}, H, { aim: (H.aim ?? 1) * g.sway }) })), gnd = { line: g.line, push: jtGndR(g.push), into: jtGndR(g.into) };
+  return rnd => {
+    const ride = f(rnd);
+    ride.speed *= g.speed; ride.tip = { x: ride.tip.x + g.push - g.into, y: ride.tip.y };
+    ride.gnd = Object.assign({}, gnd);
+    return ride;
+  };
 };
 
 /* ---------- on Play ---------- */
@@ -169,11 +173,11 @@ function jtWindWhy(push, f, squire, word) {
 }
 // side s's strike on plan, on the model (its points, an unhorsing three), JT_GND.read.n times on a stream of its own
 function jtLineVal(s, plan, read) {
-  const o = 1 - s, ri = jtRiders()[o], rnd = engRng(JT_GND.read.seed + G.n * 7 + s), ride = jtRideOpts(s, plan);
+  const o = 1 - s, ri = jtRiders()[o], rnd = engRng(JT_GND.read.seed + G.n * 7 + s), ride = jtChargePrep(jtRideOpts(s, plan));
   const ang = read ? jtHabitOf(s).angled : 0, d0 = { rs: read ? jtRsOf(o, ri) : jtRs(''), mount: read ? jtMountOf(o) : JT_MOUNT_DEF };
   let v = 0;
   for (let i = 0; i < JT_GND.read.n; i++) {
-    const a = jtCharge(ride, rnd), d = Object.assign({ guard: rnd() < ang ? 'angled' : 'square' }, d0), st = jtStrike(a, d, rnd), se = jtSeat(st, d, .5, rnd, { broke: true });
+    const a = ride(rnd), d = Object.assign({ guard: rnd() < ang ? 'angled' : 'square' }, d0), st = jtStrike(a, d, rnd), se = jtSeat(st, d, .5, rnd, { broke: true });
     v += se.unhorse ? JT_RULES.unhorse : JT_RULES.pts[st.at] || 0;
   }
   return v / JT_GND.read.n;

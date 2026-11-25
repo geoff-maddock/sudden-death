@@ -35,12 +35,16 @@ const jtGauss = rnd => { let u = 0, v = 0; while (!u) u = rnd(); while (!v) v = 
 // the lance and couch ratings and the couch's moment; hands scales the spread (a skill's, or 1 on Play)
 // (phase 3: a tired arm (o.arm, 0 to 1) sways more and sags; a rider still shaken by a rocking hit (o.shaken, 0 to 1)
 // sways more; pressure (o.press) sways them more by how little nerve they have: JT_ARM, JT_SHAKE and jtNerveK, 09-squad.js)
-function jtSway(o) {
-  const P = jtPace(o.pace), M = jtMount(o.mount), r = o.rs || {}, w = clamp(o.wind ?? 1, 0, 1), c = clamp(o.couch || 0, -1, 1);
+function jtSway(o) { return jtSwayAt(o)(o.couch); }
+// (the same, with everything but the couch's moment worked out once: the sway at a couch, couch => { sigma, droop }, for
+// a ride drawn many times (jtChargePrep). The products are taken in the same order as ever, so the numbers are the same)
+function jtSwayAt(o) {
+  const P = jtPace(o.pace), M = jtMount(o.mount), r = o.rs || {}, w = clamp(o.wind ?? 1, 0, 1);
   const lance = 1 + JT_SWAY.lance * (.5 - (r.lance ?? .5)) * 2, arm = 1.2 - .6 * (r.couch ?? .5), tired = 1 - clamp(o.arm ?? 1, 0, 1);
-  const sigma = JT_SWAY.base * P.sway * M.sway * lance * (1 + JT_SWAY.wind * (1 - w)) * (1 + JT_SWAY.late * Math.max(0, c) + JT_SWAY.early * Math.max(0, -c)) * (o.hands ?? 1)
-    * (1 + JT_ARM.sway * tired) * (1 + JT_SHAKE.sway * clamp(o.shaken || 0, 0, 1)) * jtNerveK(o.press || 0, r.nerve) * (o.fx ? o.fx.sway : 1);
-  return { sigma, droop: JT_SWAY.droop * Math.max(0, -c) * arm * (1 + JT_ARM.droop * tired) + JT_ARM.sag * tired };
+  const pre = JT_SWAY.base * P.sway * M.sway * lance * (1 + JT_SWAY.wind * (1 - w)), hands = o.hands ?? 1, armK = 1 + JT_ARM.sway * tired, shakeK = 1 + JT_SHAKE.sway * clamp(o.shaken || 0, 0, 1);
+  const nerveK = jtNerveK(o.press || 0, r.nerve), fxK = o.fx ? o.fx.sway : 1, droopK = 1 + JT_ARM.droop * tired, sag = JT_ARM.sag * tired;
+  return couch => { const c = clamp(couch || 0, -1, 1);
+    return { sigma: pre * (1 + JT_SWAY.late * Math.max(0, c) + JT_SWAY.early * Math.max(0, -c)) * hands * armK * shakeK * nerveK * fxK, droop: JT_SWAY.droop * Math.max(0, -c) * arm * droopK + sag }; };
 }
 // the speed at impact: the pace, the mount, its wind (a blown mount slows) and the ride rating
 function jtSpeed(o) {
@@ -53,17 +57,23 @@ const jtWindCost = (pace, rs, mount) => jtPace(pace).wind * (1.15 - .3 * ((rs ||
 
 /* a CPU or sim rider's ride: o = { plan: { aim, guard, pace }, rs, mount, wind, hands: { aim, couch } (the skill's);
    phase 3: arm, shaken, press (the sway and, under pressure, the couch's timing), girth (the seat) } */
-function jtCharge(o, rnd) {
+function jtCharge(o, rnd) { return jtChargePrep(o)(rnd); }
+// (the same ride, made ready to draw: rnd => a ride, with everything that doesn't need a random number worked out once,
+// for a ride drawn many times on the model, as the CPU's odds and its corner do; the numbers are the same as ever)
+function jtChargePrep(o) {
   const p = o.plan || {}, plan = { aim: jtPick('aim', p.aim, 'shield'), guard: jtPick('guard', p.guard, 'square'), pace: jtPick('pace', p.pace, 'canter') };
-  const H = o.hands || { aim: 1, couch: .3 }, rs = o.rs || {}, mount = jtOwn(JT_MOUNT, o.mount) ? o.mount : JT_MOUNT_DEF, x = { arm: o.arm, shaken: o.shaken, press: o.press };
-  const fx = o.fx || null, speed = jtSpeed({ pace: plan.pace, mount, rs, wind: o.wind, fx }) * (1 + .03 * jtGauss(rnd));
+  const H = o.hands || { aim: 1, couch: .3 }, rs = o.rs || {}, mount = jtOwn(JT_MOUNT, o.mount) ? o.mount : JT_MOUNT_DEF;
+  const fx = o.fx || null, speed0 = jtSpeed({ pace: plan.pace, mount, rs, wind: o.wind, fx });
   // (phase 6: a power's fx: a curse's late couch, its sway, its speed; the ride carries it to the strike and the seat)
-  const couch = clamp(jtGauss(rnd) * H.couch * (1.3 - .6 * (rs.couch ?? .5)) * jtNerveK(o.press || 0, rs.nerve) + (fx ? fx.late : 0), -1, 1);
-  const sw = jtSway(Object.assign({ pace: plan.pace, mount, rs, wind: o.wind, couch, hands: H.aim, fx }, x)), A = JT_PLAN.aim[plan.aim];
-  const ride = { aim: plan.aim, guard: plan.guard, pace: plan.pace, mount, rs, speed, couch, tip: { x: A.x + jtGauss(rnd) * sw.sigma, y: A.y + jtGauss(rnd) * sw.sigma - sw.droop },
-    girth: +o.girth || 0, shaken: clamp(+o.shaken || 0, 0, 1) };
-  if (fx) ride.fx = fx;
-  return ride;
+  const cH = H.couch, cR = 1.3 - .6 * (rs.couch ?? .5), cN = jtNerveK(o.press || 0, rs.nerve), late = fx ? fx.late : 0;
+  const swAt = jtSwayAt({ pace: plan.pace, mount, rs, wind: o.wind, hands: H.aim, fx, arm: o.arm, shaken: o.shaken, press: o.press }), A = JT_PLAN.aim[plan.aim];
+  const girth = +o.girth || 0, shaken = clamp(+o.shaken || 0, 0, 1);
+  return rnd => {
+    const speed = speed0 * (1 + .03 * jtGauss(rnd)), couch = clamp(jtGauss(rnd) * cH * cR * cN + late, -1, 1), sw = swAt(couch);
+    const ride = { aim: plan.aim, guard: plan.guard, pace: plan.pace, mount, rs, speed, couch, tip: { x: A.x + jtGauss(rnd) * sw.sigma, y: A.y + jtGauss(rnd) * sw.sigma - sw.droop }, girth, shaken };
+    if (fx) ride.fx = fx;
+    return ride;
+  };
 }
 // the force of a ride's strike: its speed against a gallop's, the mount's weight, and a clean couch (0.5 to 1.3 or so)
 const jtForce = a => (a.speed / JT_LISTS.speed) * jtMount(a.mount).hit * (1 - .25 * Math.abs(a.couch || 0));

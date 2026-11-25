@@ -66,14 +66,16 @@ function jtOdds(rs, mount, hk, wind, X0) {
   for (const aim of JT_AIMS) for (const pace of JT_PACES) for (const g of JT_GUARDS) for (const reach of [false, true]) {
     const a = { pts: 0, brk: 0, helm: 0, unh: 0 }, b = { pts: 0, brk: 0, helm: 0, unh: 0 };
     let rnd = engRng(JT_ODDS.seed);
+    const xP = jtChargePrep({ plan: { aim, guard: 'square', pace }, rs, mount, wind: w, hands, arm: X.arm, shaken: X.shaken, press: X.press });
     for (let i = 0; i < N; i++) {
-      const x = jtCharge({ plan: { aim, guard: 'square', pace }, rs, mount, wind: w, hands, arm: X.arm, shaken: X.shaken, press: X.press }, rnd), d = { guard: g, rs: other, mount: JT_MOUNT_DEF };
+      const x = xP(rnd), d = { guard: g, rs: other, mount: JT_MOUNT_DEF };
       const st = jtStrike(x, d, rnd), se = jtSeat(st, d, .5, rnd, own(reach));
       a.pts += se.unhorse ? JT_RULES.unhorse : JT_RULES.pts[st.at] || 0; if (st.broke) a.brk++; if (st.broke && st.zone === 'helm') a.helm++; if (se.unhorse) a.unh++;
     }
     rnd = engRng(JT_ODDS.seed + 1);
+    const yP = jtChargePrep({ plan: { aim, guard: 'square', pace }, rs: other, mount: JT_MOUNT_DEF, wind: 1, hands: { aim: 1, couch: .3 } });
     for (let i = 0; i < N; i++) {
-      const y = jtCharge({ plan: { aim, guard: 'square', pace }, rs: other, mount: JT_MOUNT_DEF, wind: 1, hands: { aim: 1, couch: .3 } }, rnd), me = { guard: g, rs, mount, girth: X.girth, shaken: X.shaken };
+      const y = yP(rnd), me = { guard: g, rs, mount, girth: X.girth, shaken: X.shaken };
       const st = jtStrike(y, me, rnd), se = jtSeat(st, me, H.lean, rnd, own(reach));
       b.pts += se.unhorse ? JT_RULES.unhorse : JT_RULES.pts[st.at] || 0; if (st.broke) b.brk++; if (st.broke && st.zone === 'helm') b.helm++; if (se.unhorse) b.unh++;
     }

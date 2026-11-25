@@ -46891,12 +46891,16 @@ const jtGauss = rnd => { let u = 0, v = 0; while (!u) u = rnd(); while (!v) v = 
 // the lance and couch ratings and the couch's moment; hands scales the spread (a skill's, or 1 on Play)
 // (phase 3: a tired arm (o.arm, 0 to 1) sways more and sags; a rider still shaken by a rocking hit (o.shaken, 0 to 1)
 // sways more; pressure (o.press) sways them more by how little nerve they have: JT_ARM, JT_SHAKE and jtNerveK, 09-squad.js)
-function jtSway(o) {
-  const P = jtPace(o.pace), M = jtMount(o.mount), r = o.rs || {}, w = clamp(o.wind ?? 1, 0, 1), c = clamp(o.couch || 0, -1, 1);
+function jtSway(o) { return jtSwayAt(o)(o.couch); }
+// (the same, with everything but the couch's moment worked out once: the sway at a couch, couch => { sigma, droop }, for
+// a ride drawn many times (jtChargePrep). The products are taken in the same order as ever, so the numbers are the same)
+function jtSwayAt(o) {
+  const P = jtPace(o.pace), M = jtMount(o.mount), r = o.rs || {}, w = clamp(o.wind ?? 1, 0, 1);
   const lance = 1 + JT_SWAY.lance * (.5 - (r.lance ?? .5)) * 2, arm = 1.2 - .6 * (r.couch ?? .5), tired = 1 - clamp(o.arm ?? 1, 0, 1);
-  const sigma = JT_SWAY.base * P.sway * M.sway * lance * (1 + JT_SWAY.wind * (1 - w)) * (1 + JT_SWAY.late * Math.max(0, c) + JT_SWAY.early * Math.max(0, -c)) * (o.hands ?? 1)
-    * (1 + JT_ARM.sway * tired) * (1 + JT_SHAKE.sway * clamp(o.shaken || 0, 0, 1)) * jtNerveK(o.press || 0, r.nerve) * (o.fx ? o.fx.sway : 1);
-  return { sigma, droop: JT_SWAY.droop * Math.max(0, -c) * arm * (1 + JT_ARM.droop * tired) + JT_ARM.sag * tired };
+  const pre = JT_SWAY.base * P.sway * M.sway * lance * (1 + JT_SWAY.wind * (1 - w)), hands = o.hands ?? 1, armK = 1 + JT_ARM.sway * tired, shakeK = 1 + JT_SHAKE.sway * clamp(o.shaken || 0, 0, 1);
+  const nerveK = jtNerveK(o.press || 0, r.nerve), fxK = o.fx ? o.fx.sway : 1, droopK = 1 + JT_ARM.droop * tired, sag = JT_ARM.sag * tired;
+  return couch => { const c = clamp(couch || 0, -1, 1);
+    return { sigma: pre * (1 + JT_SWAY.late * Math.max(0, c) + JT_SWAY.early * Math.max(0, -c)) * hands * armK * shakeK * nerveK * fxK, droop: JT_SWAY.droop * Math.max(0, -c) * arm * droopK + sag }; };
 }
 // the speed at impact: the pace, the mount, its wind (a blown mount slows) and the ride rating
 function jtSpeed(o) {
@@ -46909,17 +46913,23 @@ const jtWindCost = (pace, rs, mount) => jtPace(pace).wind * (1.15 - .3 * ((rs ||
 
 /* a CPU or sim rider's ride: o = { plan: { aim, guard, pace }, rs, mount, wind, hands: { aim, couch } (the skill's);
    phase 3: arm, shaken, press (the sway and, under pressure, the couch's timing), girth (the seat) } */
-function jtCharge(o, rnd) {
+function jtCharge(o, rnd) { return jtChargePrep(o)(rnd); }
+// (the same ride, made ready to draw: rnd => a ride, with everything that doesn't need a random number worked out once,
+// for a ride drawn many times on the model, as the CPU's odds and its corner do; the numbers are the same as ever)
+function jtChargePrep(o) {
   const p = o.plan || {}, plan = { aim: jtPick('aim', p.aim, 'shield'), guard: jtPick('guard', p.guard, 'square'), pace: jtPick('pace', p.pace, 'canter') };
-  const H = o.hands || { aim: 1, couch: .3 }, rs = o.rs || {}, mount = jtOwn(JT_MOUNT, o.mount) ? o.mount : JT_MOUNT_DEF, x = { arm: o.arm, shaken: o.shaken, press: o.press };
-  const fx = o.fx || null, speed = jtSpeed({ pace: plan.pace, mount, rs, wind: o.wind, fx }) * (1 + .03 * jtGauss(rnd));
+  const H = o.hands || { aim: 1, couch: .3 }, rs = o.rs || {}, mount = jtOwn(JT_MOUNT, o.mount) ? o.mount : JT_MOUNT_DEF;
+  const fx = o.fx || null, speed0 = jtSpeed({ pace: plan.pace, mount, rs, wind: o.wind, fx });
   // (phase 6: a power's fx: a curse's late couch, its sway, its speed; the ride carries it to the strike and the seat)
-  const couch = clamp(jtGauss(rnd) * H.couch * (1.3 - .6 * (rs.couch ?? .5)) * jtNerveK(o.press || 0, rs.nerve) + (fx ? fx.late : 0), -1, 1);
-  const sw = jtSway(Object.assign({ pace: plan.pace, mount, rs, wind: o.wind, couch, hands: H.aim, fx }, x)), A = JT_PLAN.aim[plan.aim];
-  const ride = { aim: plan.aim, guard: plan.guard, pace: plan.pace, mount, rs, speed, couch, tip: { x: A.x + jtGauss(rnd) * sw.sigma, y: A.y + jtGauss(rnd) * sw.sigma - sw.droop },
-    girth: +o.girth || 0, shaken: clamp(+o.shaken || 0, 0, 1) };
-  if (fx) ride.fx = fx;
-  return ride;
+  const cH = H.couch, cR = 1.3 - .6 * (rs.couch ?? .5), cN = jtNerveK(o.press || 0, rs.nerve), late = fx ? fx.late : 0;
+  const swAt = jtSwayAt({ pace: plan.pace, mount, rs, wind: o.wind, hands: H.aim, fx, arm: o.arm, shaken: o.shaken, press: o.press }), A = JT_PLAN.aim[plan.aim];
+  const girth = +o.girth || 0, shaken = clamp(+o.shaken || 0, 0, 1);
+  return rnd => {
+    const speed = speed0 * (1 + .03 * jtGauss(rnd)), couch = clamp(jtGauss(rnd) * cH * cR * cN + late, -1, 1), sw = swAt(couch);
+    const ride = { aim: plan.aim, guard: plan.guard, pace: plan.pace, mount, rs, speed, couch, tip: { x: A.x + jtGauss(rnd) * sw.sigma, y: A.y + jtGauss(rnd) * sw.sigma - sw.droop }, girth, shaken };
+    if (fx) ride.fx = fx;
+    return ride;
+  };
 }
 // the force of a ride's strike: its speed against a gallop's, the mount's weight, and a clean couch (0.5 to 1.3 or so)
 const jtForce = a => (a.speed / JT_LISTS.speed) * jtMount(a.mount).hit * (1 - .25 * Math.abs(a.couch || 0));
@@ -47036,14 +47046,16 @@ function jtOdds(rs, mount, hk, wind, X0) {
   for (const aim of JT_AIMS) for (const pace of JT_PACES) for (const g of JT_GUARDS) for (const reach of [false, true]) {
     const a = { pts: 0, brk: 0, helm: 0, unh: 0 }, b = { pts: 0, brk: 0, helm: 0, unh: 0 };
     let rnd = engRng(JT_ODDS.seed);
+    const xP = jtChargePrep({ plan: { aim, guard: 'square', pace }, rs, mount, wind: w, hands, arm: X.arm, shaken: X.shaken, press: X.press });
     for (let i = 0; i < N; i++) {
-      const x = jtCharge({ plan: { aim, guard: 'square', pace }, rs, mount, wind: w, hands, arm: X.arm, shaken: X.shaken, press: X.press }, rnd), d = { guard: g, rs: other, mount: JT_MOUNT_DEF };
+      const x = xP(rnd), d = { guard: g, rs: other, mount: JT_MOUNT_DEF };
       const st = jtStrike(x, d, rnd), se = jtSeat(st, d, .5, rnd, own(reach));
       a.pts += se.unhorse ? JT_RULES.unhorse : JT_RULES.pts[st.at] || 0; if (st.broke) a.brk++; if (st.broke && st.zone === 'helm') a.helm++; if (se.unhorse) a.unh++;
     }
     rnd = engRng(JT_ODDS.seed + 1);
+    const yP = jtChargePrep({ plan: { aim, guard: 'square', pace }, rs: other, mount: JT_MOUNT_DEF, wind: 1, hands: { aim: 1, couch: .3 } });
     for (let i = 0; i < N; i++) {
-      const y = jtCharge({ plan: { aim, guard: 'square', pace }, rs: other, mount: JT_MOUNT_DEF, wind: 1, hands: { aim: 1, couch: .3 } }, rnd), me = { guard: g, rs, mount, girth: X.girth, shaken: X.shaken };
+      const y = yP(rnd), me = { guard: g, rs, mount, girth: X.girth, shaken: X.shaken };
       const st = jtStrike(y, me, rnd), se = jtSeat(st, me, H.lean, rnd, own(reach));
       b.pts += se.unhorse ? JT_RULES.unhorse : JT_RULES.pts[st.at] || 0; if (st.broke) b.brk++; if (st.broke && st.zone === 'helm') b.helm++; if (se.unhorse) b.unh++;
     }
@@ -48068,7 +48080,10 @@ function jtAfterJobs(s, jobs) {
 /* what one course is worth to side s (its points less the other side's, on average) with its rider in state X, riding
    the plans it would ride (mine: [{ plan, w }], drawn by their shares) against the other rider's (op, the same):
    played out JT_CORNER.n times on a stream of its own (the same numbers for every state, so the states are compared
-   fairly; the match's random numbers are never touched) */
+   fairly; the match's random numbers are never touched). While a corner is chosen (jtCornerPlan) the sums are kept by
+   the rides they start from (JT_CM_MEMO): two ways of sharing the jobs that leave the rider the same (two squires of
+   the same care, a fresh mount tended) ride the same courses, so they are worked out once, to the same numbers */
+let JT_CM_MEMO = null;
 function jtCornerM(s, X, op, mine) {
   const keep = ['wind', 'arm', 'shaken', 'girth'].map(k => G[k][s]), o = 1 - s, cu = jtCursed(s) ? G.curse[s] : null;
   let rides;
@@ -48078,14 +48093,18 @@ function jtCornerM(s, X, op, mine) {
     if (cu && X.lift) G.curse[s] = null;
     rides = mine.map(d => jtRideOpts(s, d.plan));
   } finally { ['wind', 'arm', 'shaken', 'girth'].forEach((k, i) => { G[k][s] = keep[i]; }); if (cu) G.curse[s] = cu; }
+  const mk = JT_CM_MEMO ? JSON.stringify(rides) : null;
+  if (mk != null && JT_CM_MEMO.has(mk)) return JT_CM_MEMO.get(mk);
   const theirs = op.map(d => jtRideOpts(o, d.plan)), rnd = engRng(JT_CORNER.seed), ln = [0, 1].map(x => JT_SKILL[jtHandsK(x)].lean);
+  const rideP = rides.map(jtChargePrep), theirP = theirs.map(jtChargePrep);
   const draw = D => { let r = rnd(); for (let i = 0; i < D.length; i++) { r -= D[i].w; if (r <= 0) return i; } return D.length - 1; };
   const pts = (I, x) => I.res[x].unhorse ? JT_RULES.unhorse : JT_RULES.pts[I.res[x].at] || 0;
   let m = 0;
   for (let i = 0; i < JT_CORNER.n; i++) {
-    const a = jtCharge(rides[draw(mine)], rnd), b = jtCharge(theirs[draw(op)], rnd), I = jtImpact(s ? [b, a] : [a, b], ln, rnd);
+    const a = rideP[draw(mine)](rnd), b = theirP[draw(op)](rnd), I = jtImpact(s ? [b, a] : [a, b], ln, rnd);
     m += pts(I, s) - pts(I, o) - (I.res[o].unhorse ? JT_CORNER.heat * jtAfterNext() : 0) + (I.res[s].unhorse ? JT_CORNER.heat * jtAfterNext() : 0);
   }
+  if (mk != null) JT_CM_MEMO.set(mk, m / JT_CORNER.n);
   return m / JT_CORNER.n;
 }
 // a Knight's mix as plans and shares (the shares under JT_READ.min left out)
@@ -48115,6 +48134,11 @@ function jtCornerPlan(s, sk, allow) {
   }
   // each way to share two of the jobs between the two squires: the next course in the state it leaves, and what lasts
   // (the wind and the arm) for one more course when the heat has one (counting every course left did worse: measured)
+  const memo0 = JT_CM_MEMO; JT_CM_MEMO = new Map();
+  try { return jtCornerBest(s, sk, jobs); } finally { JT_CM_MEMO = memo0; }
+}
+// (a Knight's or an Archmage's corner, jtCornerPlan: each way of sharing the jobs, on the model)
+function jtCornerBest(s, sk, jobs) {
   const op = jtCornerOpp(s, sk), mine = jtPlansOf(s), after = Math.min(1, jtAfterNext()), base = jtCornerM(s, Object.assign(jtAfterJobs(s, []), { shaken: 0 }), op, mine);
   // (phase 6: a curse left on that tires the mount costs its wind for the course after too)
   const cw = jtCursed(s) ? (G.curse[s].fx.wind || 1) - 1 : 0, wk = cw > 0 ? cw * jtWindCost('canter', jtRsOf(s, (jtRiders() || [])[s]), jtMountOf(s)) : 0;
@@ -48977,7 +49001,7 @@ const JT_GND = {
 };
 const JT_LINE = { rut: { n: 'in the rut', v: 'rides the rut' }, side: { n: 'beside the rut', v: 'rides beside the rut' } };
 const JT_LINES = Object.keys(JT_LINE);
-const JT_W13 = { start: jtStart, plan: jtPlan, suggest: jtSuggest, select: jtSelect, rideOpts: jtRideOpts, charge: jtCharge, yourSway: jtYourSway, tipNow: jtTipNow,
+const JT_W13 = { start: jtStart, plan: jtPlan, suggest: jtSuggest, select: jtSelect, rideOpts: jtRideOpts, chargePrep: jtChargePrep, yourSway: jtYourSway, tipNow: jtTipNow,
   yourRide: jtYourRide, close: jtCourseClose, herald: jtHerald, playNext: jtPlayNext, snapshot: jtSnapshot, summary: jtSummary, view: jtView, pennant: jtPennant,
   listsDraw: jtListsDraw, targetDraw: jtTargetDraw, draw: jtDraw };
 const jtGndR = v => Math.round(v * 1000) / 1000;
@@ -49036,12 +49060,16 @@ function jtGndFor(s, plan) {
 }
 jtRideOpts = function (s, plan) { const o = JT_W13.rideOpts(s, plan); if (jtGndOn()) o.gnd = jtGndFor(s, plan); return o; };
 // the ride on the ground: the line's sway (through the hands' spread) and speed, and the wind's push less what the hands aim into it
-jtCharge = function (o, rnd) {
-  const g = o && o.gnd; if (!g) return JT_W13.charge(o, rnd);
-  const H = o.hands || { aim: 1, couch: .3 }, ride = JT_W13.charge(Object.assign({}, o, { hands: Object.assign({}, H, { aim: (H.aim ?? 1) * g.sway }) }), rnd);
-  ride.speed *= g.speed; ride.tip = { x: ride.tip.x + g.push - g.into, y: ride.tip.y };
-  ride.gnd = { line: g.line, push: jtGndR(g.push), into: jtGndR(g.into) };
-  return ride;
+// (jtCharge draws through jtChargePrep, so the ground reaches every ride drawn)
+jtChargePrep = function (o) {
+  const g = o && o.gnd; if (!g) return JT_W13.chargePrep(o);
+  const H = o.hands || { aim: 1, couch: .3 }, f = JT_W13.chargePrep(Object.assign({}, o, { hands: Object.assign({}, H, { aim: (H.aim ?? 1) * g.sway }) })), gnd = { line: g.line, push: jtGndR(g.push), into: jtGndR(g.into) };
+  return rnd => {
+    const ride = f(rnd);
+    ride.speed *= g.speed; ride.tip = { x: ride.tip.x + g.push - g.into, y: ride.tip.y };
+    ride.gnd = Object.assign({}, gnd);
+    return ride;
+  };
 };
 
 /* ---------- on Play ---------- */
@@ -49101,11 +49129,11 @@ function jtWindWhy(push, f, squire, word) {
 }
 // side s's strike on plan, on the model (its points, an unhorsing three), JT_GND.read.n times on a stream of its own
 function jtLineVal(s, plan, read) {
-  const o = 1 - s, ri = jtRiders()[o], rnd = engRng(JT_GND.read.seed + G.n * 7 + s), ride = jtRideOpts(s, plan);
+  const o = 1 - s, ri = jtRiders()[o], rnd = engRng(JT_GND.read.seed + G.n * 7 + s), ride = jtChargePrep(jtRideOpts(s, plan));
   const ang = read ? jtHabitOf(s).angled : 0, d0 = { rs: read ? jtRsOf(o, ri) : jtRs(''), mount: read ? jtMountOf(o) : JT_MOUNT_DEF };
   let v = 0;
   for (let i = 0; i < JT_GND.read.n; i++) {
-    const a = jtCharge(ride, rnd), d = Object.assign({ guard: rnd() < ang ? 'angled' : 'square' }, d0), st = jtStrike(a, d, rnd), se = jtSeat(st, d, .5, rnd, { broke: true });
+    const a = ride(rnd), d = Object.assign({ guard: rnd() < ang ? 'angled' : 'square' }, d0), st = jtStrike(a, d, rnd), se = jtSeat(st, d, .5, rnd, { broke: true });
     v += se.unhorse ? JT_RULES.unhorse : JT_RULES.pts[st.at] || 0;
   }
   return v / JT_GND.read.n;
@@ -49320,14 +49348,16 @@ function jtLichOdds(rs, mount, hk, wind, X0, V) {
   for (const aim of JT_AIMS) for (const pace of JT_PACES) for (const g of JT_GUARDS) for (const reach of [false, true]) {
     const a = { pts: 0, brk: 0, helm: 0, unh: 0 }, b = { pts: 0, brk: 0, helm: 0, unh: 0 };
     let rnd = engRng(JT_ODDS.seed);
+    const xP = jtChargePrep({ plan: { aim, guard: 'square', pace }, rs, mount, wind: w, hands, arm: X.arm, shaken: X.shaken, press: X.press });
     for (let i = 0; i < N; i++) {
-      const x = jtCharge({ plan: { aim, guard: 'square', pace }, rs, mount, wind: w, hands, arm: X.arm, shaken: X.shaken, press: X.press }, rnd), d = { guard: g, rs: V.rs, mount: V.mount };
+      const x = xP(rnd), d = { guard: g, rs: V.rs, mount: V.mount };
       const st = jtStrike(x, d, rnd), se = jtSeat(st, d, VH.lean, rnd, own(reach));
       a.pts += se.unhorse ? JT_RULES.unhorse : JT_RULES.pts[st.at] || 0; if (st.broke) a.brk++; if (st.broke && st.zone === 'helm') a.helm++; if (se.unhorse) a.unh++;
     }
     rnd = engRng(JT_ODDS.seed + 1);
+    const yP = jtChargePrep({ plan: { aim, guard: 'square', pace }, rs: V.rs, mount: V.mount, wind: vw, hands: { aim: VH.aim, couch: VH.couch } });
     for (let i = 0; i < N; i++) {
-      const y = jtCharge({ plan: { aim, guard: 'square', pace }, rs: V.rs, mount: V.mount, wind: vw, hands: { aim: VH.aim, couch: VH.couch } }, rnd), me = { guard: g, rs, mount, girth: X.girth, shaken: X.shaken };
+      const y = yP(rnd), me = { guard: g, rs, mount, girth: X.girth, shaken: X.shaken };
       const st = jtStrike(y, me, rnd), se = jtSeat(st, me, H.lean, rnd, own(reach));
       b.pts += se.unhorse ? JT_RULES.unhorse : JT_RULES.pts[st.at] || 0; if (st.broke) b.brk++; if (st.broke && st.zone === 'helm') b.helm++; if (se.unhorse) b.unh++;
     }

@@ -34,7 +34,9 @@ run_one() {
   [ "$t" = realm_gridiron_bench ] && lim=420
   # (nine champions through every engine, about 80 Simulated games: under 30s alone, past 240 beside other heavy checks)
   [ "$t" = realm_umbral_redeemed ] && lim=420
-  # realm_lists_sim rides hundreds of seeded matches to check the course model's rates: about 240s beside other heavy checks
+  # realm_lists_sim rides about 15,000 seeded matches to check the course model's rates and the plans as a game: about 80s
+  # alone and 90s beside other heavy checks since the corner's sums were made quicker, but CI's shards run the lists'
+  # checks two to three times slower than that, so it keeps the longer limit as headroom
   [ "$t" = realm_lists_sim ] && lim=420
   if [ "$TO" = perl ]; then perl -e 'alarm shift @ARGV; exec @ARGV' $lim nice -n $nc "$PY" "test/$t.py" > "/tmp/sd-$t.log" 2>&1
   else "$TO" --foreground -k 10 $lim nice -n $nc "$PY" "test/$t.py" > "/tmp/sd-$t.log" 2>&1; fi; code=$?

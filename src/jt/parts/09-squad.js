@@ -146,7 +146,10 @@ function jtAfterJobs(s, jobs) {
 /* what one course is worth to side s (its points less the other side's, on average) with its rider in state X, riding
    the plans it would ride (mine: [{ plan, w }], drawn by their shares) against the other rider's (op, the same):
    played out JT_CORNER.n times on a stream of its own (the same numbers for every state, so the states are compared
-   fairly; the match's random numbers are never touched) */
+   fairly; the match's random numbers are never touched). While a corner is chosen (jtCornerPlan) the sums are kept by
+   the rides they start from (JT_CM_MEMO): two ways of sharing the jobs that leave the rider the same (two squires of
+   the same care, a fresh mount tended) ride the same courses, so they are worked out once, to the same numbers */
+let JT_CM_MEMO = null;
 function jtCornerM(s, X, op, mine) {
   const keep = ['wind', 'arm', 'shaken', 'girth'].map(k => G[k][s]), o = 1 - s, cu = jtCursed(s) ? G.curse[s] : null;
   let rides;
@@ -156,14 +159,18 @@ function jtCornerM(s, X, op, mine) {
     if (cu && X.lift) G.curse[s] = null;
     rides = mine.map(d => jtRideOpts(s, d.plan));
   } finally { ['wind', 'arm', 'shaken', 'girth'].forEach((k, i) => { G[k][s] = keep[i]; }); if (cu) G.curse[s] = cu; }
+  const mk = JT_CM_MEMO ? JSON.stringify(rides) : null;
+  if (mk != null && JT_CM_MEMO.has(mk)) return JT_CM_MEMO.get(mk);
   const theirs = op.map(d => jtRideOpts(o, d.plan)), rnd = engRng(JT_CORNER.seed), ln = [0, 1].map(x => JT_SKILL[jtHandsK(x)].lean);
+  const rideP = rides.map(jtChargePrep), theirP = theirs.map(jtChargePrep);
   const draw = D => { let r = rnd(); for (let i = 0; i < D.length; i++) { r -= D[i].w; if (r <= 0) return i; } return D.length - 1; };
   const pts = (I, x) => I.res[x].unhorse ? JT_RULES.unhorse : JT_RULES.pts[I.res[x].at] || 0;
   let m = 0;
   for (let i = 0; i < JT_CORNER.n; i++) {
-    const a = jtCharge(rides[draw(mine)], rnd), b = jtCharge(theirs[draw(op)], rnd), I = jtImpact(s ? [b, a] : [a, b], ln, rnd);
+    const a = rideP[draw(mine)](rnd), b = theirP[draw(op)](rnd), I = jtImpact(s ? [b, a] : [a, b], ln, rnd);
     m += pts(I, s) - pts(I, o) - (I.res[o].unhorse ? JT_CORNER.heat * jtAfterNext() : 0) + (I.res[s].unhorse ? JT_CORNER.heat * jtAfterNext() : 0);
   }
+  if (mk != null) JT_CM_MEMO.set(mk, m / JT_CORNER.n);
   return m / JT_CORNER.n;
 }
 // a Knight's mix as plans and shares (the shares under JT_READ.min left out)
@@ -193,6 +200,11 @@ function jtCornerPlan(s, sk, allow) {
   }
   // each way to share two of the jobs between the two squires: the next course in the state it leaves, and what lasts
   // (the wind and the arm) for one more course when the heat has one (counting every course left did worse: measured)
+  const memo0 = JT_CM_MEMO; JT_CM_MEMO = new Map();
+  try { return jtCornerBest(s, sk, jobs); } finally { JT_CM_MEMO = memo0; }
+}
+// (a Knight's or an Archmage's corner, jtCornerPlan: each way of sharing the jobs, on the model)
+function jtCornerBest(s, sk, jobs) {
   const op = jtCornerOpp(s, sk), mine = jtPlansOf(s), after = Math.min(1, jtAfterNext()), base = jtCornerM(s, Object.assign(jtAfterJobs(s, []), { shaken: 0 }), op, mine);
   // (phase 6: a curse left on that tires the mount costs its wind for the course after too)
   const cw = jtCursed(s) ? (G.curse[s].fx.wind || 1) - 1 : 0, wk = cw > 0 ? cw * jtWindCost('canter', jtRsOf(s, (jtRiders() || [])[s]), jtMountOf(s)) : 0;
