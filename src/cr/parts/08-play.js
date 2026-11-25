@@ -17,7 +17,7 @@
    - Watch: the CPU throws both sides, its own sweepers sweeping. You play: your side's stones are yours.
    The stone moves on the page at CR_PLAY.speed times real time, a step at a time, the same steps the sim takes. */
 const CR_PLAY = { speed: 2.5, pace: { addr: .9, rest: 1.4, end: 2.4, over: 2.6 }, meter: { low: .82, high: 1.22, rise: .3, line: 1, win: .02 }, you: { ang: .25, hitAng: .4, v: .01 } };
-const CR_HOOK = { onPhase: null, onPick: null, onOver: null, onChart: null };
+const CR_HOOK = { onPhase: null, onPick: null, onOver: null, onChart: null, onCommit: null };
 const CR_MODES = ['watch', 'manage', 'play'];
 let GP = null;
 
@@ -30,6 +30,9 @@ function crGo(ph, wait, msg) {
   GP.ph = ph; GP.t = 0; GP.wait = wait || 0; if (msg != null) GP.msg = msg;
   if (CR_HOOK.onPhase) try { CR_HOOK.onPhase(ph); } catch (e) { console.error(e); }
 }
+// a choice a reload must not take back (a power cast before your stone): onCommit hears it, so the page can keep the
+// game as it stands (issue #120)
+function crCommit() { if (CR_HOOK.onCommit) try { CR_HOOK.onCommit(); } catch (e) { console.error(e); } }
 const crName = (s, ri) => (G.teams[s].roster[ri] || {}).n || 'Someone';
 const crYours = s => GP.mode === 'play' && s === GP.you;
 const crPosName = s => CR_RULES.posN[crPos(s)];
@@ -174,17 +177,23 @@ function crSettle() {
   GP.last = ev;
   // (every stone's path this game, for the ice chart)
   GP.paths.push({ s: ev.side, path: X.Q.path.map(p => [p[0], p[1]]) });
+  const e = ev.rule.end, say = GP.said = crSettleSay(ev, X.ham);
+  crGo('rest', G.over ? CR_PLAY.pace.over : e ? CR_PLAY.pace.end : CR_PLAY.pace.rest, say);
+  if (G.over && CR_HOOK.onOver) try { CR_HOOK.onOver(crSummary()); } catch (er) { console.error(er); }
+}
+
+// a stone come to rest, said plainly (ham: who had the hammer as it was thrown); kept as GP.said, the last stone's line
+function crSettleSay(ev, ham) {
   const R = ev.rule, e = R.end;
   let say = `${crName(ev.side, ev.ri)}: ${CR_SHOTS[ev.plan.shot] || 'a stone'}${ev.made ? ', made' : ''}${R.fgz ? ': it took a guard out before the fifth stone, so the free guard zone puts it back and the stone is removed' : ''}.`;
-  if (e) say += e.s < 0 ? ` End ${e.end}: a blank, nobody scores.` : ` End ${e.end}: ${G.teams[e.s].name} score ${e.n}${e.s !== X.ham ? ', a steal' : ''}.`;
+  if (e) say += e.s < 0 ? ` End ${e.end}: a blank, nobody scores.` : ` End ${e.end}: ${G.teams[e.s].name} score ${e.n}${e.s !== ham ? ', a steal' : ''}.`;
   if (ev.ghost) say += ' It slid through the guard like smoke.';
   if (ev.gust) say += ` A gust pushes their stone back ${ev.gust} inches.`;
   // (the Drifting House and Hoarfrost, when they act: 15-umbral.js)
   if (G.hex) say += crHexSay(ev);
   if (G.hallSaid) say += ' ' + G.hallSaid;
   if (G.over) say += ` ${G.teams[G.over.win].name} win, ${G.over.text}.`;
-  crGo('rest', G.over ? CR_PLAY.pace.over : e ? CR_PLAY.pace.end : CR_PLAY.pace.rest, say);
-  if (G.over && CR_HOOK.onOver) try { CR_HOOK.onOver(crSummary()); } catch (er) { console.error(er); }
+  return say;
 }
 
 /* ---------- the beat ---------- */
@@ -199,7 +208,9 @@ function crTick(dt) {
   else if (P === 'rest') { if (GP.t >= GP.wait) crGo(G.over ? 'over' : 'next'); }
 }
 function crPlayNext() {
-  const s = crUp(); if (s < 0) { crGo('over'); return; }
+  // (a game kept after the stone that decided it, and resumed, says its end here: a game played on says it as that
+  // stone settles, crSettle, and goes from its rest to over, never through next)
+  const s = crUp(); if (s < 0) { crGo('over'); if (G.over && CR_HOOK.onOver) try { CR_HOOK.onOver(crSummary()); } catch (er) { console.error(er); } return; }
   const ri = crThrower(s), no = crSideNo(s) + 1, e = G.end + 1, hm = G.hammer === s ? ', with the hammer' : '';
   // (the Umbral's hexes, named before the first stone: 15-umbral.js)
   // (and Hennock's word on Old Grey, in a game with the frozen deep: 16-deep.js)
@@ -228,7 +239,7 @@ function crSetMode(m) {
 function crCastMine(k) {
   if (!GP || GP.mode !== 'play' || !['aim', 'swing'].includes(GP.ph) || (GP.meter && GP.meter.st === 'gone') || !crYours(crUp())) return 'Only before your stone.';
   const why = crCast(GP.you, k); if (why) return why;
-  const c = G.casts[G.casts.length - 1]; GP.msg = `${crName(GP.you, c.ri)} casts ${c.n}.`; crPick(); return '';
+  const c = G.casts[G.casts.length - 1]; GP.msg = `${crName(GP.you, c.ri)} casts ${c.n}.`; crPick(); crCommit(); return '';
 }
 // Manage: your rink's game ({ style: 'auto' | 'draw' | 'hit' })
 function crManage(o) { if (!GP) return false; if (['auto', 'draw', 'hit'].includes(o && o.style)) GP.mgr.style = o.style; crPick(); return true; }

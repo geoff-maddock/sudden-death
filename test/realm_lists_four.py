@@ -8,7 +8,7 @@
 # jobs; tend gives back a share of the lost wind, steady the shake and the arm, the girth a seat for one course; care
 # sets how much. A Squire's corner picks anything, a Knight's works it out and beats it; any corner beats none.
 # Pressure: the last course behind and the tilt; nerve takes it off. On Play your squires' jobs are yours, your corner
-# suggesting. Phase 1's targets hold with real kinds. (Each mount's case, 3,600 matches, is realm_lists_mounts.)
+# suggesting. Phase 1's targets hold with real kinds. (Each mount's case is realm_lists_mounts, realm_lists_mounts_destrier and realm_lists_mounts_courser.)
 # The Realm: every player has jousting ratings within a point of their kind, each level adds a point; an older save's
 # players get theirs; the four: your players first, call-ups at your level; roles swap, a reserve steps in; a mount is
 # picked or the captain's; your four go to the engine with their ratings, roles and mounts. The Lists tab, the practice

@@ -4,7 +4,7 @@
    Sound. Sudden Death's own effects (sfx), following your Sound effects setting: a whistle at each kickoff (as the ball comes
    down; the game's first is set up before the field shows) and at the half, and at the end of each play a thud for a tackle, a crunch for a sack, a slap for an incompletion, the crowd
    for a big gain, a horn and the crowd for a touchdown or a field goal, and a groan when the ball is lost (an interception
-   or a fumble) or the other side scores. The realm's music plays on, as it does at any ground.
+   or a fumble) or the other side scores. The ground's own tune plays on this view (w160), as it does on the ground's map.
    Tips. TIPS.w_grid once your team can play football (W_GFG.minOwn players), TIPS.w_gcup once you have won a
    football game, from a watcher like w20f's.
    Achievements. Football games won (realmGridWins) and Cinder Cups (realmGcups), on SD's ACH.
@@ -66,5 +66,5 @@ const wW47RenderHelp = renderHelp;
 renderHelp = function () {
   wW47RenderHelp();
   const d = $('wHelpGcup'); if (!d || $('wHelpGfFeel')) return;
-  d.insertAdjacentHTML('afterend', `<p class="hint" id="wHelpGfFeel"><b>On the gridiron</b> you hear the whistle at each kickoff, the hits, and the crowd for a big gain or a score; sounds follow your Sound effects setting, and the realm's music plays on. Football games won and Cinder Cups have medals in the record book.</p>`);
+  d.insertAdjacentHTML('afterend', `<p class="hint" id="wHelpGfFeel"><b>On the gridiron</b> you hear the whistle at each kickoff, the hits, and the crowd for a big gain or a score; sounds follow your Sound effects setting, and the ground's own tune plays. Football games won and Cinder Cups have medals in the record book.</p>`);
 };

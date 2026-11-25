@@ -10,7 +10,7 @@
      the 7 for a left-hander's ball);
    - the sea under the floor: a soft swell every few seconds, louder at high tide;
    - the end: the horn and the gallery when you win (or at the end of a game you only watch), a low note when you lose.
-   The realm's music plays on, as at any ground (the Lanes' own track, Strike Lamps, is w26's).
+   The ground's own tune plays on this view (w160), as on the ground's map (the Lanes' own track, Strike Lamps, is w26's).
    Tips. TIPS.w_lanes once your team can bowl (W_LNG.minOwn players), TIPS.w_gutter once you have won a bowling match.
    Medals, on SD's ACH, from matches from the world (exhibitions and practice don't count): bowling matches won
    (realmLanesWins), Gutter Cups (realmGutters), a turkey by your side (realmTurkeys), a clean game, every frame a mark
@@ -98,5 +98,5 @@ const wW121RenderHelp = renderHelp;
 renderHelp = function () {
   wW121RenderHelp();
   const d = $('wHelpLanesCup'); if (!d || $('wHelpLanesFeel')) return;
-  d.insertAdjacentHTML('afterend', `<p class="hint" id="wHelpLanesFeel"><b>At the lanes</b> you hear the ball roll down the wood and the pins when it gets there (a crash for a strike), the gallery for a strike (louder for a double and a turkey), a bright pair of notes for a spare, the ring of a lone corner pin that won't fall, and the sea under the floor; sounds follow your Sound effects setting, and the realm's music plays on. Bowling matches won, Gutter Cups, a turkey, a clean game, the 7-10 converted and a 300 have medals in the record book.</p>`);
+  d.insertAdjacentHTML('afterend', `<p class="hint" id="wHelpLanesFeel"><b>At the lanes</b> you hear the ball roll down the wood and the pins when it gets there (a crash for a strike), the gallery for a strike (louder for a double and a turkey), a bright pair of notes for a spare, the ring of a lone corner pin that won't fall, and the sea under the floor; sounds follow your Sound effects setting, and the ground's own tune plays. Bowling matches won, Gutter Cups, a turkey, a clean game, the 7-10 converted and a 300 have medals in the record book.</p>`);
 };

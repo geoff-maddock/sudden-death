@@ -11,7 +11,7 @@
    A turn is in parts so a shot can be struck by hand (07-play.js): glNext (who plays, and may their putt be given),
    glGive, glPlan, then glHit (the CPU's swing) or glStrike (yours), and glShoot counts it.
    glSimGame plays a whole game at once through glTurn, so the sim and the game on show can't drift apart. */
-const GL_HOOK = { onOver: null, onShot: null, onPhase: null, onPick: null };
+const GL_HOOK = { onOver: null, onShot: null, onPhase: null, onPick: null, onCommit: null };
 // the swing's spread, before the hitter's rating (k: 1.4 less it; 1.5 less it on the green) and the skill's: power (p) and
 // accuracy (e) on a full shot, the same for a chip (sp, se), and a putt's angle (pa, radians) and pace (pv)
 const GL_SWING = { p: 0.07, e: 0.8, sp: 0.17, se: 0.6, pa: 0.02, pv: 0.12 };

@@ -15,7 +15,8 @@
    The plan (JT_PLAN): an aim (shield, body or helm, each with its aim point), a guard (angled or square) and a pace
    (canter or gallop). A gallop hits harder and spends more of the mount's wind, but the tip sways more.
    The mounts (JT_MOUNT): Charger (fast, hits hard, sways more, and its weight carries its rider through a hit),
-   Destrier (steady, easy to aim, hits softer), Courser (light in the hit, but quick to get its wind back, and easy on it at a gallop). Each rider rides one
+   Destrier (steady, easy to aim, hits softer), Courser (light: it hits softest and sways under an ordinary rider, but
+   settles under a good one (ridden, the ride rating), gets its wind back quickly and is easy on it at a gallop). Each rider rides one
    (opts.mounts, picked on the Lists tab in the Realm); left out, JT_MOUNT_DEF.
    The ratings (JT_STATS, 1 to 12, worked on as 0 to 1): lance (the sway), couch (the couch window, and how long the
    arm holds it), seat (the balance after a hit), shield (a strike on the shield breaks less), ride (pace, the seat a little, and the
@@ -53,10 +54,17 @@ const JT_PLAN = {
 // against a Destrier's 16%, and the CPU gallops on it in 93% of courses. A Charger's weight now carries its own rider
 // through a hit (steady 0.06 to 0.2), and the ride rating sits a hit too (JT_SEAT.ride, 04-course.js): 42%, its case for
 // an elf in a short heat kept)
+// #120, phase 4: each mount the clear pick somewhere, on paired seeds at six seed bases (realm_lists_mounts, _destrier,
+// _courser). The Courser was the safe pick almost everywhere (it never blows), so the Destrier had no case of its own and
+// the Courser's was thin. A Courser is now light in a rider's hands: it sways more (0.97 to 1.1) under an ordinary
+// rider and less under a good one (ridden: the ride rating takes up to 0.28 of its sway, from an average ride's 0.5; a
+// ride of 12 sways 0.79, a troll's 6 1.11), and it hits softer (0.93 to 0.9). So a steady lance does best on a Charger,
+// a lance that sways on a Destrier, and a hard rider on a Courser, more so in a long heat. The Charger and the Destrier
+// are as they were (plain Knights on Destriers play exactly as before)
 const JT_MOUNT = {
   charger: { n: 'Charger', speed: 1.06, hit: 1.02, sway: 1.2, steady: .2, rec: .12, wind: 1.3 },
   destrier: { n: 'Destrier', speed: .95, hit: .95, sway: .82, steady: .07, rec: .12, wind: 1 },
-  courser: { n: 'Courser', speed: 1.02, hit: .93, sway: .97, steady: .06, rec: .3, wind: .65 }
+  courser: { n: 'Courser', speed: 1.02, hit: .9, sway: 1.1, ridden: .28, steady: .06, rec: .3, wind: .65 }
 };
 const JT_MOUNT_DEF = 'destrier';
 const jtMount = id => JT_MOUNT[jtOwn(JT_MOUNT, id) ? id : JT_MOUNT_DEF];

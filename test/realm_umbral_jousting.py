@@ -259,6 +259,29 @@ async def main():
         check('Nine' in os_['seal'] and 'Ten' not in os_['seal'] and os_['pieces'].startswith('Nine.') and 'Ten' not in os_['pieces'], 'the herald counts the nine an older Umbral asks for (the SEAL and the PIECES)', [os_['seal'], os_['pieces']])
         check(not os_['lanceOut'] and os_['rows'] == 9, 'the Seal panel of an older Umbral lists its nine, and never the jousting piece as still out', os_['rows'])
         check('The nine pieces lock together' in os_['forged'] and os_['scene'], 'forged with the lance won as well, an older Umbral\'s Seal is nine pieces, in the log and the scene', os_['forged'])
+        # (#120, phase 3) the rest of the count's words: the herald's GATE, the opening scene replayed from the Journal
+        # (its clock run past the speech) and How to play's door, pieces and Seal; and a new Umbral still says ten
+        async def words():
+            return await pg.evaluate("""(async () => { wDrain(); const out = {}; out.gate = wSay('uherald', 'gate').text || ''; out.aurelia = wSay('nadir_aurelia', 'pieces').text || ''; out.journal = wUmbJournal()[1];
+              const keepSp = WUS.speed; WUS.speed = 60; out.opened = wUmbScene(true) !== false;
+              for (let i = 0; i < 60 && document.querySelectorAll('#wUmbLines p').length < 5 + W_UMB1.speech.length; i++) await new Promise(r => setTimeout(r, 100));
+              WUS.speed = keepSp;
+              out.scene = (document.getElementById('wUmbLines') || {}).textContent || ''; const sk = document.getElementById('wUmbSkip'); if (sk) sk.click(); wDrain();
+              const h = document.getElementById('wHelpUmbral'); if (h) h.remove(); renderHelp(); out.help = (document.getElementById('wHelpUmbral') || {}).textContent || '';
+              return out; })()""")
+        old_w = await words()
+        check('the nine' in old_w['gate'] and 'ten' not in old_w['gate'], 'an older Umbral: the herald\'s GATE is the gentlest of the nine', old_w['gate'])
+        check('into nine pieces' in old_w['scene'] and 'Nine champions' in old_w['scene'] and 'ten' not in old_w['scene'].lower().replace('often', ''),
+              'an older Umbral: the opening scene, replayed, says the Seal broke into nine pieces held by nine champions', old_w['scene'][-500:])
+        check('into nine pieces, one for every way there was to play when it broke' in old_w['help'] and 'your Seal asks for nine of them' in old_w['help'] and 'With all nine' in old_w['help'] and 'into ten' not in old_w['help'],
+              'an older Umbral: How to play counts nine pieces at the door, the pieces and the Seal (ten champions, nine of them its Seal\'s)', old_w['help'][:900])
+        check(old_w['aurelia'].startswith('Nine') and 'there was to play' in old_w['aurelia'] and 'into nine pieces, one for every way there was to play when it broke' in old_w['journal'],
+              'an older Umbral: Hollow Aurelia\'s PIECES and the Journal speak of the nine there were when it broke', [old_w['aurelia'], old_w['journal'][:300]])
+        await pg.evaluate("(() => { WG.umbral.need = Object.keys(W_UMB_PIECES); })()")
+        new_w = await words()
+        await pg.evaluate("(() => { WG.umbral.need = W_UMB_NINE.slice(); })()")
+        check('the ten' in new_w['gate'] and 'into ten pieces' in new_w['scene'] and 'Ten champions' in new_w['scene'] and 'into ten pieces' in new_w['help'] and 'Ten Nadir champions hold them' in new_w['help'] and 'With all ten' in new_w['help'] and new_w['aurelia'].startswith('One for every way to play') and 'pieces, one for every way to play,' in new_w['journal'],
+              'a new Umbral: the GATE, the scene and How to play still count ten', [new_w['gate'], new_w['help'][:300]])
 
         # ---------- the redeemed champion ----------
         rd = await pg.evaluate("""(() => { const s = wStar('nadir_lists'), p = wMakePlayer({ kind: s.kind, n: s.name, num: s.num, lvl: 6, star: s.id }, 'redeemed'), m = wListsPlayer(p);

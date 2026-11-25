@@ -1614,7 +1614,7 @@ elf and the werewolf). Before is the first run, on phase 11's settings, at 300 a
    **What was left:** this journey's four, with an elf on a Charger and a werewolf (seats of 5 and 8), still saw an
    unhorsing in 64 to 71% of its matches (90% before); both its riders on Destriers, 57%. The follow-up below found why
    and fixed it.
-2. **The mounts.** Each is the best pick somewhere, on paired seeds (`realm_lists_mounts` and `realm_lists_mounts_even`,
+2. **The mounts.** (Retuned in #120: "Mounts retune (#120)" below has the cases as they now stand.) Each is the best pick somewhere, on paired seeds (`realm_lists_mounts` and `realm_lists_mounts_even`,
    400 matches a cell, a kind's four against vampires on Destriers): an elf in a short heat wins 272 on Chargers, 257 on
    Coursers, 220 on Destriers; a dwarf in a long heat 185, 204 and 210; a harpy in a long heat 151, 205 and 165. (After
    the follow-up: the elf 303, 261 and 235; the dwarf 189, 182 and 195; the harpy 194, 240 and 184. On two more seed
@@ -1683,6 +1683,61 @@ only at the check's seeds: on other seed bases the three mounts come within the 
 did before the follow-up too, so the check now asks only that no mount is far ahead in that case), and an Archmage still saves its
 gallop. The cost: a Charger now sits a hit better than a Destrier, so the Destrier's "sits a hit on" is gone from its
 words (How to play, the Lists tab, the captain's reason).
+
+### Mounts retune (#120)
+
+Phase 12 left one mount case that held on every seed base: the Charger under an elf in a short heat. The Destrier's (a
+dwarf in a long heat) held only at the check's seeds, and the Courser's (a harpy in a long heat) came within 20 of the
+Charger. The cause: a Courser never blows (its wind cost at a gallop is less than it gets back), so it did as well as
+a Destrier, or better, almost everywhere, and the Destrier had no case of its own. Run on paired seeds, a kind's four
+on each mount against vampires on Destriers, a Knight a side, 400 matches a cell (`test/realm_lists_mounts*.py`).
+
+**Changed** (the Courser only; the Charger and the Destrier are as they were):
+- **a Courser is light in a rider's hands** (`JT_MOUNT.courser.ridden` 0.28, read in `jtSwayAt`): the ride rating
+  takes up to 0.28 of its sway either way from an average ride's 0.5. Its sway goes 0.97 to 1.1, so a ride of 12 sways
+  0.79 (a Destrier 0.82), a werewolf's 10 1.0 and a troll's 6 1.11;
+- **it hits softer** (`hit` 0.93 to 0.9);
+- **the captain** (`jtMountFor`): a Charger for a lance of 0.8 or more in a short heat, as before; a Courser for a ride
+  of 0.8 or more (a rating of about 10) in a long heat (0.7 before); a Destrier for the rest, with a reason for a lance
+  that sways. The Lists tab, How to play and the ride rating's words say so. (The phase first put the Charger under a
+  steady lance in a long heat too, where an elf wins about 70 matches in 400 more on one. Its review measured it on the
+  same matches: at five courses the tiers saw an unhorsing in 70.2, 52 and 48.8% of matches against 62, 38 and 43.5%
+  before, the Charger's lesson from phase 12 again, so the long heat keeps its Destrier. With that, and the Courser's new
+  rule, the same five-course matches read 58.8, 35.8 and 39.2%, the win rates unmoved.)
+
+**The cases** (the named mount's lead over the better of the other two, matches in 400, negative when behind, at six seed bases: 10000, 30000, 70000,
+then 50000, 90000, 110000; the checks ask the mount to be ahead at each of the first three, and by 15 or more a base over the three together,
+since one base's lead varies by about 10 between bases):
+
+| Case | Before | After |
+|---|---|---|
+| Charger: an elf, three courses | +27, +29, +42, +50 (the first four) | +52, +37, +68, +64, +49, +60 |
+| Destrier: a troll (lance 4), three courses | -14, -5, +6, +35, +18, +5 | +19, +34, +25, +39, +47, +31 |
+| Courser: a minotaur (ride 12), five courses | -1, +22, +17, +8, -10, +2 | +60, +52, +60, +46, +17, +65 |
+| (old) Destrier: a dwarf, five courses | +8, -5 (the Courser ahead), +6, -27 (the Courser) | (no longer a case) |
+| (old) Courser: a harpy, five courses | +24, 0 (level with the Charger), +46, -3 (the Charger ahead) | (no longer a case: the Charger's steadiness suits a seat of 3) |
+
+In a short heat a minotaur also does better on a Courser (+45 and +23 at the first two bases), and a werewolf (ride 10) about as
+well on one as on a Destrier. The captain keeps the Destrier in a short heat all the same: with a Courser under every
+rider of 0.8 or more, the Realm's three-course matches (the tiers below) saw an unhorsing in 66.5, 48.8 and 48.3% of
+matches against 54.3, 39.5 and 39.5% in the same run before (a Courser keeps its wind, so it gallops more and hits
+harder), the Charger's lesson from phase 12. A softer Courser (hit 0.85 or 0.8) brought those back but lost its case:
+its case, like the Charger's, is the hit.
+
+**The Realm.** With the captain's Courser kept to long heats, a three-course match (as the tiers, Simulate and the
+Umbral ride it) rides exactly as before: the review's paired run (`Math.random`, the run's stream and the engine seeded
+alike for each match) found 400 of 400 matches identical at each tier on the two builds. Only a Courser you pick
+yourself rides differently there (an elf and a werewolf both on Coursers: 77.5, 42 and 28.5% against 81.2, 45.2 and 35%,
+as meant: a Courser under an ordinary rider is the worse pick). So the lab's shifts below in the three-course rows (the
+tiers, and the Chargers' and Destriers' rates) are between runs, not the model: the lab draws its four from a fresh
+journey each run. Its five-course numbers below were taken with the Charger in long heats too (above). The lab (tiers, 800 a cell; the four is drawn afresh each run, so runs differ by a few points with nothing
+changed): before 79.4, 52.5 and 35.9% (an unhorsing in 58.9, 36.1 and 36.6%), after 81.5, 49.6 and 31.8% (62, 42.1 and
+44.3%); a run of 400 on the same three-course mounts read 76.8, 50.3 and 34.5% (57.5, 38.8 and 40%), and one before
+78.8, 53 and 35.3% (54.3, 39.5 and 39.5%). **The mounts** (both your riders on one, 400 a cell): three courses, the
+captain's pick 49.8%, Chargers 45.3%, Destriers 50.5%, Coursers 45.3% (before: 49.8, 50.5, 50.3 and 42%); an unhorsing
+in 46, 44.5, 38.8 and 45% of matches (46.3, 45.5, 40.8 and 51.5%). Five courses 48.3, 48.8, 44.8 and 42.8% (48.5, 51.8,
+49.3 and 48.8%); an unhorsing in 60.3, 56.8, 55.5 and 61.3% (57, 56.8, 53 and 61.3%). No mount decides a match: the lab's
+four rides an elf and a werewolf, so one mount for both is never the best for each.
 
 ### After (400 a cell)
 

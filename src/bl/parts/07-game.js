@@ -114,7 +114,8 @@ function blCount(s, stand, first, ball, roll) {
 // the game so far, short
 function blSummary() {
   if (!G) return null;
-  return { over: G.over, pst: JSON.parse(JSON.stringify(G.pst || [[], []])), teams: G.teams.map(T => ({ name: T.name, roster: T.roster.map(m => m.n) })), order: G.order.map(o => o.slice()), tot: [blTotal(0), blTotal(1)], game: [blTotalOf(G.fr[0], G.frames), blTotalOf(G.fr[1], G.frames)], ro: G.ro,
+  // (win: who won, as the sim's result has always said; the page's end now says it too, issue #120's review)
+  return { win: G.over ? G.over.win : -1, over: G.over, pst: JSON.parse(JSON.stringify(G.pst || [[], []])), teams: G.teams.map(T => ({ name: T.name, roster: T.roster.map(m => m.n) })), order: G.order.map(o => o.slice()), tot: [blTotal(0), blTotal(1)], game: [blTotalOf(G.fr[0], G.frames), blTotalOf(G.fr[1], G.frames)], ro: G.ro,
     marks: [blMarks(0), blMarks(1)], st: JSON.parse(JSON.stringify(G.st)), skill: G.skill.slice(), tide: G.tide, balls: G.n, casts: JSON.parse(JSON.stringify(G.casts || [])), pots: JSON.parse(JSON.stringify(G.pots || [])) };
 }
 // a whole game headless: leaves the game on the lanes (and the engine's random stream) as they were
@@ -127,16 +128,30 @@ function blSimGame(opts) {
   try {
     blStart(opts);
     let n = 0; while (!G.over && n++ < 400) blTurn();
-    return Object.assign({ win: G.over ? G.over.win : -1 }, blSummary());
+    return blSummary();
   } finally { G = keep; GB = keepB; GP = keepP; engRand = keepR; }
 }
 
 // the game as it stands between balls, plain JSON (a match saved and left); and back
-function blSnapshot() { return JSON.parse(JSON.stringify({ G, mode: GP ? GP.mode : 'watch', streak: GP ? GP.streak : [0, 0], mgr: GP ? GP.mgr : null })); }
+// (said: the last ball's line; swing: a ball of yours with its speed pressed, your setup and the meter as they stand, #120)
+function blSnapshot() {
+  const M = GP && GP.ph === 'swing' && GP.meter && GP.meter.st === 'down' ? GP.meter : null;
+  return JSON.parse(JSON.stringify({ G, mode: GP ? GP.mode : 'watch', streak: GP ? GP.streak : [0, 0], mgr: GP ? GP.mgr : null, said: GP ? GP.said || '' : '', swing: M ? { sel: GP.sel, meter: M } : null }));
+}
+// back to a kept game: the last ball's line, then the next ball. A ball kept with its speed pressed is bowled now on that
+// speed, as if the mark were never pressed: released late, at the bottom of the meter (#120)
 function blResume(sn) {
   G = JSON.parse(JSON.stringify(sn.G)); GB = null;
   blPlayStart({ mode: sn.mode });
   GP.streak = (sn.streak || [0, 0]).slice(); if (sn.mgr) GP.mgr = Object.assign({}, sn.mgr);
-  GP.msg = `Back at the lanes: ${blMatchText(0).toLowerCase()}.`;
+  GP.said = sn.said || '';
+  const back = `${GP.said ? GP.said + ' ' : ''}Back at the lanes: ${blMatchText(0).toLowerCase()}.`, W = sn.swing;
+  if (W && W.sel && W.meter && GP.mode === 'play') {
+    GP.sel = W.sel; GP.meter = W.meter; GP.ph = 'swing'; GP.t = 0;
+    let n = 0; while (GP.ph === 'swing' && GP.meter && GP.meter.st === 'down' && n++ < 4000) blMeterTick(0.02);
+    GP.msg = `${back} The ball left at the top of the swing goes without the mark. ${GP.msg}`;
+    return G;
+  }
+  GP.msg = back;
   return G;
 }

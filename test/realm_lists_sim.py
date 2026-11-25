@@ -4,7 +4,7 @@
 # The plan plays off itself: an angled shield turns strikes on it into glances (but the helm is a bigger mark), a helm
 # strike misses more, a gallop hits harder but the tip strays more, and an early couch droops the tip. A broken lance
 # rocks the rider, and a good seat, a square guard and a good lean keep them on; a glance never unhorses. The mounts:
-# a Charger hits hardest and sways most, a Destrier sways least, a Courser gets its wind back quickest. The CPU's plan:
+# a Charger hits hardest and sways most, a Destrier sways least (under an average rider), a Courser gets its wind back quickest. The CPU's plan:
 # a Knight behind with too few courses left goes for the helm at a gallop, ahead it weighs the points against it
 # double, and in the tilt it rides the best expected margin; an Archmage saves its gallop for the heat's last course;
 # a Squire picks anything. The plan is a real choice: at a Knight's hands no aim is best everywhere and each is best

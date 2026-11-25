@@ -10,8 +10,13 @@
    The result: a win pays XP to everyone who curled (half to the rest of the team), gold and fans by tier, and the player
    of the match a little more; a loss a quarter of the XP and costs nothing else. A curling match never ends level (the
    extra end). Every match adds your curlers' lines to WG.crstats, and goes in the head to head and the league table.
-   Save and leave keeps the match between stones, and it is waiting when you come back, after a reload too. Concede
-   counts as a loss.
+   Save and leave keeps the match between stones, and it is waiting when you come back, after a reload too. The match
+   is kept from its first stone, and saved at once as each stone is released (with its release: a reload mid-slide
+   brings it to rest on that release, without your sweeping) and as it comes to rest (issue #120): a reload never brings
+   a stone back, and a match that has begun is never called off. It is saved at once, too, as you cast a power before
+   your stone (wCR.onCommit): a reload doesn't give it back. A match kept after the stone that decided it (or with a
+   stone left sliding that decides it) is settled as the page comes back (wShedKeptEnd, called by w159), its result
+   card shown, never left waiting. Concede counts as a loss.
 
    WG.shg     { live: null | { world, snap }, met: { club: dayAbs }, opp: { club: { lvl, team } }, games: [last W_SHG.keep], w, l }
               world = { kind: 'shgame', ref, club, tier, how, day, name, ids, cold }, plain data; the end dispatches
@@ -19,9 +24,10 @@
               in order (null for a call-up)
    WG.crstats { pid: { g, stones, made, ends } }, this journey
    wShedProblems(), wStartShed({ club, how, tier?, kind?, ref? }), wResumeShed(), wShedLeaveGame(), wShedConcede(),
-   wOpenShedCard()
+   wOpenShedCard(), wShedKeptOver(), wShedKeptEnd()
    Wraps: wShedBarNote (wW125ShedBarNote: Save and leave and Concede in a real match), wLeaveShed (wW125LeaveShed),
-   wCR.onOver and wCR.onPhase (a real match settles, and is kept between stones), wShedGame (wW125ShedGame: the Shed's
+   wCR.onOver and wCR.onPhase (a real match settles, and is kept between stones), wCR.onCommit (kept as a power is
+   cast), wShedGame (wW125ShedGame: the Shed's
    ways), wShedRows (wW125ShedRows: Manage's row), wRunAct (wW125RunAct: MATCH opens the card), wNextPrompt
    (wW125NextPrompt: a match waiting after a reload), wCampShed and wRenderCamp (wW125CampShed, wW125RenderCamp: Curl a
    match and Resume on the Shed tab), wCampStats (wW125CampStats: the Curling view's lines), wStatsCard (wW125StatsCard:
@@ -32,9 +38,11 @@ const W_SHG = {
   // extra rating points for each of their four, by tier; first guesses until the lab measures them (phase 10)
   oppBonus: { 1: 1, 2: 1, 3: 1 },
   minutes: 120, keep: 10, saveMs: 12000,
+  // the beats a stone is settled in: released (kept with its release, wCR.snapshot) and come to rest; kept and saved at once
+  settled: ['slide', 'rest'],
 };
 const W_SHG_HOW = { play: 'Play', manage: 'Manage', sim: 'Simulate' };
-const WSHG = { saved: 0, asked: false, msg: '' };
+const WSHG = { saved: 0, asked: false, msg: '', card: '' };
 W_SHED_MODES.manage = { n: 'Manage', title: 'Your captain throws your side by your call: the draw game or the hitting game, in the row under the ice. Your four throw on their ratings.' };
 (() => { const play = $('wShedModes').querySelector('[data-cmode="play"]'); play.insertAdjacentHTML('beforebegin', `<button class="ghost" data-cmode="manage" title="${esc(W_SHED_MODES.manage.title)}">Manage</button>`); })();
 
@@ -100,6 +108,8 @@ function wStartShed(o) {
   if (how === 'sim') { const seed = (Math.random() * 1e9) | 0, s = wShedDecide(wCR.simGame(Object.assign({ seed }, opts)), seed); wShedResultCard(wShedSettle(s)); return ''; }
   wShedGame(Object.assign({}, opts, { mode: how, title: `${mine.name} against ${opp.name}` }));
   WCR.world = true;
+  // (kept from the first stone: a reload before it brings the match back, never calls it off: #120)
+  B.live.snap = wCR.snapshot();
   wShedBarNote();
   wSave();
   return '';
@@ -112,6 +122,8 @@ function wResumeShed() {
   if (WSHG.keepMode == null) WSHG.keepMode = W_SHED_MODE;
   W_SHED_MODE = L.snap.mode || W_SHED_MODE;
   wCR.resume(L.snap);
+  // (a stone left sliding has come to rest on its release: kept and saved at once, so a second reload can't throw it again)
+  if (L.snap.slide) { L.snap = wCR.snapshot(); wSave(); }
   $('wShedTitle').textContent = `${L.snap.G.teams[0].name} against ${L.snap.G.teams[1].name}`;
   showView('shed');
   wShedBarNote(); wShedRows(); wShedBoard();
@@ -152,6 +164,8 @@ function wShedConcede() {
 }
 function wShedScore(sn) {
   const G = sn.G, t = s => G.sc[s].reduce((a, b) => a + (b || 0), 0), e = G.end;
+  // (a match its last stone decided is finished: who won it)
+  if (G.over) return `finished: ${G.teams[G.over.win].name} won${G.over.text ? `, ${G.over.text}` : ''}`;
   return `${t(0)} to ${t(1)}${e ? ` after ${e} end${e === 1 ? '' : 's'}` : ''}`;
 }
 
@@ -159,10 +173,35 @@ function wShedScore(sn) {
 const wW125OnPhase = wCR.onPhase;
 wCR.onPhase = ph => {
   wW125OnPhase(ph);
-  if (ph !== 'next' || !wShedWorld() || wCR.G.over) return;
+  if (!wShedWorld() || !wCR.G) return;
+  const settled = W_SHG.settled.includes(ph);
+  if (!settled && (ph !== 'next' || wCR.G.over)) return;
   const L = WG.shg.live, first = !L.snap; L.snap = wCR.snapshot();
-  const now = Date.now(); if (first || now - WSHG.saved > W_SHG.saveMs) { WSHG.saved = now; wSave(); }
+  // (a stone released, and come to rest, is saved at once, the deciding one too: a reload never brings a stone back. The
+  // next beat is saved at most every W_SHG.saveMs: nothing new is settled in it, #120)
+  const now = Date.now(); if (first || settled || now - WSHG.saved > W_SHG.saveMs) { WSHG.saved = now; wSave(); }
 };
+// a power cast before your stone is kept and saved at once (#120)
+const wW125OnCommit = wCR.onCommit;
+wCR.onCommit = () => {
+  if (wW125OnCommit) wW125OnCommit();
+  if (!wShedWorld() || !wCR.G) return;
+  WG.shg.live.snap = wCR.snapshot(); WSHG.saved = Date.now(); wSave();
+};
+// a match kept after the stone that decided it, or with a stone left sliding (the page went as it slid): the stone comes
+// to rest on its release first, and a match it decided is settled now, never left waiting; its result card waits for
+// the world (wNextPrompt). One it didn't decide is kept with the stone at rest, waiting. Returns the result's words, or ''
+function wShedKeptOver() { const L = wShedLive() && WG.shg.live; return !!(L && L.snap && L.snap.G && (L.snap.G.over || L.snap.slide)); }
+function wShedKeptEnd() {
+  if (WCR || !wShedKeptOver()) return '';
+  const L = WG.shg.live;
+  wCR.resume(L.snap);
+  if (!wCR.G.over) { L.snap = wCR.snapshot(); wSave(); return ''; }
+  const s = wCR.summary(); if (!s) return '';
+  const msg = wShedSettle(s);
+  WSHG.asked = true; if (!LAB) WSHG.card = msg;
+  return msg;
+}
 const wW125OnOver = wCR.onOver;
 wCR.onOver = s => {
   if (WCR && WCR.world && wShedLive()) { WCR.msg = wShedSettle(s); WCR.endMode = wCR.mode; wShedModeBack(); }
@@ -298,7 +337,12 @@ wRunAct = function (act, id) { if (act === 'shcard') return wOpenShedCard(); ret
 
 const wW125NextPrompt = wNextPrompt;
 wNextPrompt = function () {
-  if (!LAB && wShedLive() && !WSHG.asked && !WCR && !WD && !WG.cardOffer && !WG.event && wActive()) {
+  // (a decided match is settled, not waiting: its result card, settled here if the page came back somewhere else first)
+  if (!LAB && !WCR && !WD && !WG.cardOffer && !WG.event && wActive()) {
+    if (!WKEPT.loading && wShedKeptOver()) wKeptOne(wShedKeptEnd);
+    if (WSHG.card) { const m = WSHG.card; WSHG.card = ''; wShedResultCard(m); if (!$('modal').hidden) return true; }
+  }
+  if (!LAB && wShedLive() && !WSHG.asked && !wShedKeptOver() && !WCR && !WD && !WG.cardOffer && !WG.event && wActive()) {
     WSHG.asked = true;
     const L = WG.shg.live, sn = L.snap;
     const close = modal(`<header><h3>A curling match is waiting</h3></header><div class="wmsg"><p>Your match against ${esc(wBallName(L.world.club))} is where you left it${sn ? `: ${esc(wShedScore(sn))}` : ''}.</p><p class="hint">You can also pick it up later from the Shed tab on the Team screen.</p></div>

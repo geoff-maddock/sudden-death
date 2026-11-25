@@ -31,7 +31,7 @@ const JT_ROCK = { shield: { square: .8, angled: .6 }, body: 1, helm: 1.15, glanc
 const JT_SEAT = { reach: .3, high: 15, base: .55, seat: .45, ride: .35, square: .1, lean: .3, shake: .22, rocked: .7 };
 const jtGauss = rnd => { let u = 0, v = 0; while (!u) u = rnd(); while (!v) v = rnd(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); };
 
-// the tip's spread at impact (inches, one sigma) and its droop (inches down), from the pace, the mount and its wind,
+// the tip's spread at impact (inches, one sigma) and its droop (inches down), from the pace, the mount (and, on a Courser, the ride rating) and its wind,
 // the lance and couch ratings and the couch's moment; hands scales the spread (a skill's, or 1 on Play)
 // (phase 3: a tired arm (o.arm, 0 to 1) sways more and sags; a rider still shaken by a rocking hit (o.shaken, 0 to 1)
 // sways more; pressure (o.press) sways them more by how little nerve they have: JT_ARM, JT_SHAKE and jtNerveK, 09-squad.js)
@@ -41,7 +41,9 @@ function jtSway(o) { return jtSwayAt(o)(o.couch); }
 function jtSwayAt(o) {
   const P = jtPace(o.pace), M = jtMount(o.mount), r = o.rs || {}, w = clamp(o.wind ?? 1, 0, 1);
   const lance = 1 + JT_SWAY.lance * (.5 - (r.lance ?? .5)) * 2, arm = 1.2 - .6 * (r.couch ?? .5), tired = 1 - clamp(o.arm ?? 1, 0, 1);
-  const pre = JT_SWAY.base * P.sway * M.sway * lance * (1 + JT_SWAY.wind * (1 - w)), hands = o.hands ?? 1, armK = 1 + JT_ARM.sway * tired, shakeK = 1 + JT_SHAKE.sway * clamp(o.shaken || 0, 0, 1);
+  // (#120, phase 4: a light mount (ridden, the Courser) sways less under a good rider and more under a poor one)
+  const mk = M.ridden ? 1 - M.ridden * ((r.ride ?? .5) - .5) * 2 : 1;
+  const pre = JT_SWAY.base * P.sway * M.sway * mk * lance * (1 + JT_SWAY.wind * (1 - w)), hands = o.hands ?? 1, armK = 1 + JT_ARM.sway * tired, shakeK = 1 + JT_SHAKE.sway * clamp(o.shaken || 0, 0, 1);
   const nerveK = jtNerveK(o.press || 0, r.nerve), fxK = o.fx ? o.fx.sway : 1, droopK = 1 + JT_ARM.droop * tired, sag = JT_ARM.sag * tired;
   return couch => { const c = clamp(couch || 0, -1, 1);
     return { sigma: pre * (1 + JT_SWAY.late * Math.max(0, c) + JT_SWAY.early * Math.max(0, -c)) * hands * armK * shakeK * nerveK * fxK, droop: JT_SWAY.droop * Math.max(0, -c) * arm * droopK + sag }; };

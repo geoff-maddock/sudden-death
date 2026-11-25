@@ -129,7 +129,7 @@ async def main():
 
         if 'tiers' in PARTS:
             out['tiers'] = await pg.evaluate(f"""(() => {{ const o = {{}}; for (const t of [1, 2, 3]) o[t] = __lab.play({N}, i => ({{ teams: [__lab.mine(), __lab.opp(__lab.clubs[i % __lab.clubs.length], t)], skill: wListsSkillOf(t) }})); return o; }})()""")
-            print('Tiers, as the world sets them:', ', '.join(f'{k} {fmt(v)}' for k, v in out['tiers'].items()))
+            print('Tiers, as the world sets them:', ', '.join(f"{k} {fmt(v)} unhorsing in {v['rates']['unh']}%" for k, v in out['tiers'].items()))
         if 'gaps' in PARTS:
             out['gaps'] = await pg.evaluate(f"""(() => {{ const o = {{}}; for (const g of [-1, 0, 1, 2, 3]) o[g] = __lab.play({N}, () => ({{ teams: [__lab.mine(), __lab.four(3 + g, 0)], skill: [1, 1] }})); return o; }})()""")
             print('Level gap:', ', '.join(f'{k} {fmt(v)}' for k, v in out['gaps'].items()))
@@ -163,7 +163,7 @@ async def main():
               for (const c of [3, 5]) {{ const row = {{}}, go = m => __lab.play({N}, () => {{ const A = __lab.mine(c), B = __lab.four(3, 0, null, 'Them', c); return {{ teams: [A, B], skill: [1, 1], courses: c, mounts: [m ? [m, m] : A.mounts, B.mounts] }}; }});
                 row.captain = go(null); for (const m of ['charger', 'destrier', 'courser']) row[m] = go(m); o[c] = row; }}
               return o; }})()""")
-            for c, row in out['mounts'].items(): print(f'Your mounts, {c} courses a heat:', ', '.join(f"{k} {v['win']}%" for k, v in row.items()))
+            for c, row in out['mounts'].items(): print(f'Your mounts, {c} courses a heat (win, matches with an unhorsing):', ', '.join(f"{k} {v['win']}% ({v['rates']['unh']}%)" for k, v in row.items()))
         if 'squires' in PARTS:
             out['squires'] = await pg.evaluate(f"""(() => {{ const go = cb => __lab.play({N}, () => ({{ teams: [__lab.mine(), __lab.four(3, 0)], skill: [1, 1], cornerBy: [cb, null] }}));
               return {{ captain: go(null), none: go('none'), noTend: go('no-tend'), noSteady: go('no-steady'), noGirth: go('no-girth'), whim: go(0) }}; }})()""")

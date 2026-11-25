@@ -15,7 +15,8 @@
    what the page needs: the phase, whose shot, your choice, the clubs and hitters you may pick, the meter), tick(dt)
    (the tests move the game on by hand). Your shot: select({ ri, club, shape, traj, spin }), aimAt, aimTurn, aimPush,
    press (Space), drag(pull, deg) (the phone's swing), offer(give), setMode; swingNums, win and readLine are the numbers
-   behind the meter and the read; scr and unscr map the picture; shown is the match as drawn (it waits for the ball, as the picture does). onPhase and onPick hear a new beat and a new choice. */
+   behind the meter and the read; scr and unscr map the picture; shown is the match as drawn (it waits for the ball, as the picture does). onPhase and onPick hear a new beat and a new choice;
+   onCommit a choice a reload must not take back (a full swing's power pressed, the caddie's word, a power cast: #120). */
 return {
   rules: JSON.parse(JSON.stringify(GL_RULES)), get G() { return G; },
   newGame: o => { GD = null; return glNewGame(o); }, pars: n => glPars(n), parOf: h => glParOf(h), holeNo: () => glHoleNo(),
@@ -74,4 +75,5 @@ return {
   meterRules: Object.assign({}, GL_METER), pace: Object.assign({}, GL_PACE), hands: Object.assign({}, GL_HANDS), shapes: JSON.parse(JSON.stringify(GL_SHAPES)), trajs: JSON.parse(JSON.stringify(GL_TRAJ)),
   scr: (x, y) => glScr(x, y), unscr: (sx, sy) => glUnscr(sx, sy), cam: () => Object.assign({}, GLC), animBall: () => glAnimBall(),
   set onPhase(f) { GL_HOOK.onPhase = f; }, get onPhase() { return GL_HOOK.onPhase; }, set onPick(f) { GL_HOOK.onPick = f; }, get onPick() { return GL_HOOK.onPick; },
+  set onCommit(f) { GL_HOOK.onCommit = f; }, get onCommit() { return GL_HOOK.onCommit; },
 };

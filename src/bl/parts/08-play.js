@@ -20,7 +20,7 @@ const BL_METER = { rise: .95, top: 1.1, fall: 1.25, low: -.22, win: .045, pwin: 
 const BL_PACE = { addr: .8, rest: 1.1, mark: 1.9, strike: 2.3, lane: 2.3, over: 2.6 };
 const BL_REVS = { less: .8, normal: 1, more: 1.2 };
 const BL_HANDS = { drag: 220, dragDeg: 10, bend: 14 };
-const BL_HOOK = { onPhase: null, onPick: null, onOver: null, onChart: null };
+const BL_HOOK = { onPhase: null, onPick: null, onOver: null, onChart: null, onCommit: null };
 const BL_MODES = ['watch', 'manage', 'play'];
 let GP = null;
 
@@ -37,6 +37,9 @@ function blGo(ph, wait, msg) {
   GP.ph = ph; GP.t = 0; GP.wait = wait || 0;
   if (BL_HOOK.onPhase) try { BL_HOOK.onPhase(ph); } catch (e) { console.error(e); }
 }
+// a choice a reload must not take back (a ball's speed pressed, the coach's word, the pinch bowler, the re-rack, a power
+// cast): onCommit hears it, so the page can keep the game as it stands (issue #120)
+function blCommit() { if (BL_HOOK.onCommit) try { BL_HOOK.onCommit(); } catch (e) { console.error(e); } }
 const blName = (s, ri) => (G.teams[s].roster[ri] || {}).n || 'Someone';
 const blYours = s => GP && GP.mode === 'play' && s === GP.you;
 
@@ -54,7 +57,7 @@ function blSelReset() { GP.sel = blSelFromPlan(blSuggest(GP.you)); GP.meter = nu
 function blSelect(o) {
   if (!GP || GP.ph !== 'aim' || !GP.sel) return false;
   const S = GP.sel, b = v => clamp(Math.round(v * 10) / 10, 1, BL_LANE.boards), s = GP.you;
-  let why = '', again = false;
+  let why = '', again = false, spent = false;
   if (o.stand != null) S.stand = b(o.stand);
   if (o.arrow != null) S.arrow = b(o.arrow);
   if (o.ball === 'strike' || o.ball === 'spare') S.ball = o.ball;
@@ -63,12 +66,13 @@ function blSelect(o) {
   if (o.split === 'safe' || o.split === 'convert') { G.split[s] = o.split; again = true; }
   if (o.tempo === 'quick' || o.tempo === 'steady') G.stance[s].tempo = o.tempo;
   if (o.weight === 'heavy' || o.weight === 'light') { G.stance[s].ball = o.weight; again = true; }
-  if (o.word) { if (G.word[s] > 0 && !G.wordOn[s]) { G.word[s]--; G.wordOn[s] = true; again = true; } else why = G.wordOn[s] ? 'The coach\'s word is on for this ball.' : 'One coach\'s word a game.'; }
-  if (o.rerack) { const r = blRerack(s); if (r.ok) { if (G.offspot) G.offspot[s] = null; GP.msg = 'Moll sets the rack again, every pin on its spot.'; } else why = r.why; }
-  if (o.pinch != null) { const r = blPinch(s, o.pinch); if (r.ok) { again = true; GP.msg = `${blName(s, o.pinch)} bowls this frame for ${blName(s, r.for)}.`; } else why = r.why; }
+  if (o.word) { if (G.word[s] > 0 && !G.wordOn[s]) { G.word[s]--; G.wordOn[s] = true; again = spent = true; } else why = G.wordOn[s] ? 'The coach\'s word is on for this ball.' : 'One coach\'s word a game.'; }
+  if (o.rerack) { const r = blRerack(s); if (r.ok) { if (G.offspot) G.offspot[s] = null; GP.msg = 'Moll sets the rack again, every pin on its spot.'; spent = true; } else why = r.why; }
+  if (o.pinch != null) { const r = blPinch(s, o.pinch); if (r.ok) { again = spent = true; GP.msg = `${blName(s, o.pinch)} bowls this frame for ${blName(s, r.for)}.`; } else why = r.why; }
   if (o.suggest) GP.sel = blSelFromPlan(blSuggest(s));
   else if (again) GP.sel = Object.assign(blSelFromPlan(blSuggest(s)), { revs: S.revs });
   if (BL_HOOK.onPick) try { BL_HOOK.onPick(); } catch (e) { console.error(e); }
+  if (spent) blCommit();
   return why || true;
 }
 // cast one of your side's powers before your ball: k 'pow', 'ult', 'steady' or a situation power. '' or why not
@@ -79,6 +83,7 @@ function blCastMine(k) {
   // a power that changes the ball (more hook) changes the coach's setup too
   GP.sel = Object.assign(blSelFromPlan(blSuggest(GP.you)), { revs: GP.sel.revs });
   if (BL_HOOK.onPick) try { BL_HOOK.onPick(); } catch (e) { console.error(e); }
+  blCommit();
   return '';
 }
 // a setup and a release (p the speed on the meter, err how far off the mark) as a throw the ball model takes
@@ -112,13 +117,13 @@ function blPress() {
   if (GP.ph === 'aim') { GP.meter = Object.assign({ st: 'up', v: 0, p: null }, blMeterFor(GP.you)); blGo('swing', 0, `${blName(GP.you, blBowler(GP.you))} on the approach…`); return true; }
   if (GP.ph !== 'swing' || !GP.meter) return false;
   const M = GP.meter;
-  if (M.st === 'up') { M.p = M.v; M.st = 'down'; return true; }
+  if (M.st === 'up') { M.p = M.v; M.st = 'down'; blCommit(); return true; }
   if (M.st === 'down') { blRelease3(M.v); return true; }
   return false;
 }
 function blMeterTick(dt) {
   const M = GP.meter, K = BL_METER; if (!M) return;
-  if (M.st === 'up') { M.v += (M.rise || K.rise) * dt; if (M.v >= K.top) { M.v = K.top; M.p = K.top; M.st = 'down'; } }
+  if (M.st === 'up') { M.v += (M.rise || K.rise) * dt; if (M.v >= K.top) { M.v = K.top; M.p = K.top; M.st = 'down'; blCommit(); } }
   else if (M.st === 'down') { M.v -= (M.fall || K.fall) * dt; if (M.v <= K.low) blRelease3(K.low); }
 }
 // the third press (or the bottom of the meter): the ball leaves the hand
@@ -196,7 +201,9 @@ function blTick(dt) {
 }
 function blPlayNext() {
   const s = blUp();
-  if (s < 0) { blGo('over'); return; }
+  // (a game kept after the ball that decided it, and resumed, says its end here: a game played on says it as that
+  // ball comes to rest, blAnimDone, and goes from its rest to over, never through next)
+  if (s < 0) { blGo('over'); if (G.over && BL_HOOK.onOver) try { BL_HOOK.onOver(blSummary()); } catch (e) { console.error(e); } return; }
   const ri = blBowler(s), fr = blFrameNo(s), now = blSheet(s)[blCur(s)] || [], tenth = blCur(s) === blSheetN() - 1;
   const ball = !now.length ? 'first ball' : tenth && (now.length === 2 || now[0] === 10) ? 'fill ball' : 'second ball';
   const chant = G.rb[s] === 0 && G.stand[s].length === 10 && GP.streak[s] === 2 ? 'The gallery chants: TUR-KEY! TUR-KEY! ' : '';

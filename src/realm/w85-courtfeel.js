@@ -6,8 +6,8 @@
    baskets (louder for a three, loudest for a dunk or an alley-oop), a click for theirs, a chime for a power and a
    bigger one for an ultimate (either side's), the whistle for a foul's free throws, a timeout and goaltending, the buzzer at each
    break, the yard's roar and a hot hand (either side's: the yard cheers a show), and a horn and the crowd when you
-   win. In a game you only watch, the first side (the home one) is yours for the crowd. Only while the court is on screen. The realm's music
-   plays on, as it does at any ground.
+   win. In a game you only watch, the first side (the home one) is yours for the crowd. Only while the court is on screen. The ground's own tune
+   plays on this view (w160), as on the ground's map.
    Tips. TIPS.w_court once your team can play basketball (W_BKG.minOwn players), TIPS.w_net once you have won a
    basketball game, from a watcher like w47's.
    Achievements. Basketball games won (realmCourtWins) and Charter Nets (realmNets), on SD's ACH.
@@ -86,5 +86,5 @@ const wW85RenderHelp = renderHelp;
 renderHelp = function () {
   wW85RenderHelp();
   const d = $('wHelpCourtNet'); if (!d || $('wHelpCourtFeel')) return;
-  d.insertAdjacentHTML('afterend', `<p class="hint" id="wHelpCourtFeel"><b>On the court</b> you hear the rim, the blocks and steals, the crowd for your baskets (loudest for a dunk), the whistle for free throws and timeouts, the buzzer at each break and the walled yard's roar; sounds follow your Sound effects setting, and the realm's music plays on. Basketball games won and Charter Nets have medals in the record book.</p>`);
+  d.insertAdjacentHTML('afterend', `<p class="hint" id="wHelpCourtFeel"><b>On the court</b> you hear the rim, the blocks and steals, the crowd for your baskets (loudest for a dunk), the whistle for free throws and timeouts, the buzzer at each break and the walled yard's roar; sounds follow your Sound effects setting, and the ground's own tune plays. Basketball games won and Charter Nets have medals in the record book.</p>`);
 };
