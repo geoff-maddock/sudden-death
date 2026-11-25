@@ -4,8 +4,11 @@
    Kept between courses: jtSnapshot() is the match as it stands, plain JSON ({ G, mode, mgrAuto }); jtResume(sn) puts it
    back on the lists in the mode it was left in, and it plays on from there. A course being ridden when the match is
    left is ridden out first (jtFinishCourse: your charge and your balance moment handed to your side's own hands, as
-   Watch would), so leaving never takes back a course. A snapshot taken while a course is being ridden keeps the plans
-   committed (riding), and jtResume rides that course out on them first, so a reload never rides a course twice. The
+   Watch would), so leaving never takes back a course. A snapshot taken while a course is being ridden keeps it
+   (riding: the plans committed, the CPU's rides drawn as it set off, and once the lances have met the impact, P), and
+   jtResume rides that course out first (jtRideOut): from the impact when it was made, else from the CPU's rides with
+   your rider's own hands for yours, every random number from a stream of its own seeded by the snapshot, so a reload
+   never rides a course twice nor changes its result (phase 6's review). The
    CPU's plan for a course is drawn once and kept in G (G.cpuPlan, 07-play.js), so it survives a save too (phase 5's
    review).
    Manage (07-play.js): jtManage({ auto }) leaves the calls to your squires (your squire's word and your corner's word,
@@ -28,19 +31,33 @@ const JT_W5 = { start: jtStart, playNext: jtPlayNext, charge0: jtCharge0, impact
 function jtSnapshot() {
   if (!G || !G.teams || G.yard) return null;
   const sn = { G, mode: GP ? GP.mode : 'watch', mgrAuto: !!(GP && GP.mgrAuto) };
-  if (GP && ['charge', 'seat'].includes(GP.ph) && Array.isArray(GP.plans)) sn.riding = GP.plans.map(p => p && { aim: p.aim, guard: p.guard, pace: p.pace, why: p.why || '' });
+  if (GP && ['charge', 'seat'].includes(GP.ph) && Array.isArray(GP.plans)) sn.riding = { plans: GP.plans.map(p => p && { aim: p.aim, guard: p.guard, pace: p.pace, why: p.why || '' }),
+    cpuRides: Array.isArray(GP.cpuRides) ? GP.cpuRides : null, P: GP.ph === 'seat' && GP.P ? GP.P : null };
   return JSON.parse(JSON.stringify(sn));
 }
 function jtResume(sn) {
   if (!sn || !sn.G || !sn.G.teams) return null;
   G = JSON.parse(JSON.stringify(sn.G)); GB = null;
   // a course left being ridden: ridden out now, on the plans committed, by each side's own hands
-  const ev = Array.isArray(sn.riding) && !G.over && jtRiders() ? jtRideCourse([0, 1].map(s => sn.riding[s] || jtPlan(s))) : null;
+  const ev = sn.riding && !G.over && jtRiders() ? jtRideOut(sn.riding) : null;
   jtPlayStart({ mode: sn.mode, mgrAuto: sn.mgrAuto });
   if (ev) { GP.call = jtHerald(ev); GP.msg = `Back at the Lists. The course you were riding was ridden out: ${GP.call}`; }
   if (!GP.msg) GP.msg = `Back at the Lists: ${jtMatchText(0).toLowerCase()}.`;
   if (ev && G.over && JT_HOOK.onOver) try { JT_HOOK.onOver(jtSummary()); } catch (e) { console.error(e); }
   return G;
+}
+// a short hash of a string (FNV-1a), to seed a course's own stream
+function jtHash(t) { let h = 2166136261; for (let i = 0; i < t.length; i++) { h ^= t.charCodeAt(i); h = Math.imul(h, 16777619); } return h >>> 0; }
+/* a course kept in a snapshot mid-ride, ridden out: from its impact (P) when the lances had met, else from the CPU's rides
+   as it set off (yours by your rider's own hands); every random number from a stream seeded by what was kept, so the
+   same snapshot always rides out the same (an older snapshot's riding is the plans alone) */
+function jtRideOut(K) {
+  const plans = Array.isArray(K) ? K : K.plans || [], rr = engRng(jtHash(JSON.stringify([K, G.n])));
+  const lean = s => clamp(jtHands(s).lean + .2 * jtGauss(rr), 0, 1);
+  if (K.P && K.P.n === G.n) return jtCourseClose(K.P, [0, 1].map(s => K.P.lean[s] != null ? null : lean(s)), rr);
+  const pl = [0, 1].map(s => plans[s] || jtPlanKept(s)), rides = [0, 1].map(s => (K.cpuRides && K.cpuRides[s]) || jtCharge(jtRideOpts(s, pl[s]), rr));
+  const P = jtCourseOpen(pl, rides, [lean(0), lean(1)], null, rr);
+  return P ? jtCourseClose(P, null, rr) : null;
 }
 // a course being ridden, ridden out now (your charge and balance moment by your side's own hands); true when nothing is
 // left mid-course

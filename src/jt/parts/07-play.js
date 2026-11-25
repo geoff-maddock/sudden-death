@@ -263,7 +263,7 @@ function jtPlayNext() {
   const vs = `${jtName(0, riders[0])} (${jtSide(0)}) against ${jtName(1, riders[1])} (${jtSide(1)})`;
   if (yours) {
     GP.sel = jtSuggest(GP.you);
-    const sq = GP.jobs ? ` Your corner: ${GP.jobs.map((j, i) => `${jtSqName(GP.you, i)} ${JT_JOB[j].v}`).join(', ')}.` : '';
+    const sq = GP.jobs ? ` Your corner: ${GP.jobs.map((j, i) => `${jtSqName(GP.you, i)} ${jtJobOf(j).v}`).join(', ')}.` : '';
     const go = jtYours(GP.you) ? 'Change the plan if you like, then Ride.' : 'Change the plan or the jobs if you like, then Send them: they ride on their ratings.';
     jtGo('plan', 0, `${jtWhere()}: ${vs}.${sq} Your squire says: ${GP.sel.aim === 'helm' ? 'the helm' : JT_PLAN.aim[GP.sel.aim].n}, ${GP.sel.guard}, at ${JT_PLAN.pace[GP.sel.pace].n} (${GP.sel.why}). ${go}`); return;
   }

@@ -58,18 +58,19 @@ function jtRideCourse(plans, given, leans) { const P = jtCourseOpen(plans, given
    (and each lean not given, unless wait[s] holds it back for the close), and strikes both lances; jtCourseClose(P,
    leans) takes the held leans, decides both seats, scores the course and keeps the box score. The random numbers
    come in the same order as jtImpact's: the rides, the leans, the two strikes, the two seats. P is plain data. */
-function jtCourseOpen(plans, given, leans, wait) {
+// (rnd: a stream of its own for the strikes, as a course ridden out on a resume uses: phase 6's review)
+function jtCourseOpen(plans, given, leans, wait, rnd) {
   const riders = jtRiders(); if (!riders) return null;
   jtCornersDue();
   const rides = [0, 1].map(s => (given && given[s]) || jtCharge(jtRideOpts(s, plans[s]), R));
   const lean = [0, 1].map(s => leans && leans[s] != null ? leans[s] : wait && wait[s] ? null : jtLean(s));
-  const st = [jtStrike(rides[0], rides[1], R), jtStrike(rides[1], rides[0], R)];
+  const rr = rnd || R, st = [jtStrike(rides[0], rides[1], rr), jtStrike(rides[1], rides[0], rr)];
   return { heat: G.heat, course: G.course, tilt: jtInTilt(), riders, plans, rides, lean, st, n: G.n };
 }
-function jtCourseClose(P, leans) {
+function jtCourseClose(P, leans, rnd) {
   if (!P || P.n !== G.n || G.over) return null;
   const { heat, course, tilt, riders, plans, rides, st } = P, lean = [0, 1].map(s => leans && leans[s] != null ? clamp(+leans[s] || 0, 0, 1) : P.lean[s] != null ? P.lean[s] : .5);
-  const seat = [jtSeat(st[1], rides[0], lean[0], R, st[0]), jtSeat(st[0], rides[1], lean[1], R, st[1])];
+  const rr = rnd || R, seat = [jtSeat(st[1], rides[0], lean[0], rr, st[0]), jtSeat(st[0], rides[1], lean[1], rr, st[1])];
   const imp = { res: [0, 1].map(s => ({ at: st[s].at, unhorse: seat[1 - s].unhorse })), st, seat };
   const lead = [0, 1].map(s => jtTotal(s) - jtTotal(1 - s)), rule = jtCourse(imp.res);
   // the mounts: the course's wind spent, a little back before the next; fresh mounts for a new heat

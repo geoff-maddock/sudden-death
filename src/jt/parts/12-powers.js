@@ -17,7 +17,9 @@
    - The gallery's cheer (G.cheer, by side, 0 to JT_CHEER.max): a lance broken fills it, a helm break more, an
      unhorsing most, and a rider who stays on after a rocking hit. It pays for the ultimate (JT_CHEER.ult).
    - The ultimate: one per kind (JT_ULT), once a match a side, cast before a course for the cheer. It marks the course
-     (G.mark): one set of effects on its side's rider (own), another on the other's (rival), for that course.
+     (G.marks, a side each): one set of effects on its side's rider (own), another on the other's (rival), for that
+     course. Both sides' ultimates may mark the same course, so whoever casts first never shuts the other out (phase 6's
+     review).
    - Situation powers (JT_SIT), the side's, once a match each, for mana, when the moment fits: The Last Course (behind
      in the match, a heat's last course), Back in the Saddle (the course after keeping your seat from a rocking hit) and
      For the Crown (the tilt for the crown). One a course.
@@ -180,7 +182,7 @@ function jtPowersStart(o) {
   const on = !o.yard && (Array.isArray(o.powers) ? o.powers.some(Boolean) : !!o.powers);
   if (!on) return;
   Object.assign(G, { powers: true, powSides: Array.isArray(o.powers) ? [0, 1].map(s => !!o.powers[s]) : [true, true], mana: [JT_MANA.start, JT_MANA.start], cheer: [0, 0],
-    pfx: [null, null], ofx: [null, null], curse: [null, null], mark: null, ultUsed: [false, false], sitUsed: [{}, {}], sitOn: [null, null], powCourse: [-1, -1], saddle: [false, false], casts: [],
+    pfx: [null, null], ofx: [null, null], curse: [null, null], marks: [null, null], ultUsed: [false, false], sitUsed: [{}, {}], sitOn: [null, null], powCourse: [-1, -1], saddle: [false, false], casts: [],
     powOnly: Array.isArray(o.powOnly) ? [0, 1].map(s => typeof o.powOnly[s] === 'string' ? o.powOnly[s] : null) : null });
 }
 jtStart = function (opts) { const g = JT_W6.start(opts); jtPowersStart(opts || {}); return g; };
@@ -190,7 +192,7 @@ function jtFxFor(s) {
   if (!G || !G.powers) return f;
   const add = x => { if (!x) return; for (const k in x) { if (!jtOwn(JT_FX0, k)) continue; if (JT_FX_MUL.has(k)) f[k] *= x[k]; else if (JT_FX_ADD.has(k)) f[k] += x[k]; else f[k] = Math.max(f[k], x[k]); } };
   add(G.pfx[s]); add(G.ofx[s]); add(G.curse[s] && G.curse[s].fx);
-  const M = G.mark; if (M && M.at === G.n) add(M.side === s ? M.own : M.rival);
+  for (const M of G.marks || []) if (M && M.at === G.n) add(M.side === s ? M.own : M.rival);
   if (G.sitOn[s] && jtOwn(JT_SIT, G.sitOn[s])) add(JT_SIT[G.sitOn[s]].fx);
   return f;
 }
@@ -218,7 +220,7 @@ function jtPowWhy(s, k) {
     if (P.curse && G.curse[1 - s]) return 'They are cursed already.';
     return G.mana[s] < P.cost ? `It costs ${P.cost} mana.` : '';
   }
-  if (k === 'ult') { if (G.ultUsed[s]) return 'Once a match.'; if (G.mark && G.mark.at === G.n) return 'This course already bears a mark.'; return G.cheer[s] < JT_CHEER.ult ? `It takes ${JT_CHEER.ult} cheer.` : ''; }
+  if (k === 'ult') { if (G.ultUsed[s]) return 'Once a match.'; return G.cheer[s] < JT_CHEER.ult ? `It takes ${JT_CHEER.ult} cheer.` : ''; }
   if (!jtOwn(JT_SIT, k)) return 'No such power.';
   if (G.sitUsed[s][k]) return 'Once a match.';
   if (G.sitOn[s]) return 'One a course.';
@@ -239,7 +241,7 @@ function jtCast(s, k, why) {
   }
   if (k === 'ult') {
     const U = jtUltOf(s); G.cheer[s] -= JT_CHEER.ult; G.ultUsed[s] = true;
-    G.mark = { side: s, at: G.n, id: U.id, n: U.n, own: U.own, rival: U.rival, by: name };
+    G.marks = G.marks || [null, null]; G.marks[s] = { side: s, at: G.n, id: U.id, n: U.n, own: U.own, rival: U.rival, by: name };
     rec(U.id, U.n); return '';
   }
   const S = JT_SIT[k]; G.mana[s] -= S.cost; G.sitUsed[s][k] = true; G.sitOn[s] = k;
@@ -260,7 +262,7 @@ function jtPowersAfter(rides, imp, rule) {
     G.saddle[s] = !ends && se.rocked && !se.unhorse;
   }
   G.pfx = [null, null]; G.ofx = [null, null]; G.sitOn = [null, null];
-  if (G.mark && G.mark.at <= G.n) G.mark = null;
+  G.marks = (G.marks || [null, null]).map(M => M && M.at > G.n ? M : null);
   if (ends) G.curse = [null, null];
 }
 // a situation power's moment, in words, for the log
@@ -361,9 +363,9 @@ jtCard = function (s) {
 function jtPowersDraw(c) {
   if (!G || !G.powers || G.yard) return;
   const L = GP && GP.last, after = GP && (GP.ph === 'after' || GP.ph === 'over');
-  const M = G.mark && G.mark.at === G.n ? G.mark : null, lines = [];
-  if (M) lines.push({ t: `✦ ${M.n} marks this course (${G.teams[M.side].short || G.teams[M.side].name})`, col: '#ffe08a' });
-  else if (after && L && Array.isArray(G.casts)) { const u = G.casts.find(x => x.k === 'ult' && x.at === G.n - 1); if (u) lines.push({ t: `✦ ${u.n} marked that course`, col: '#ffe08a' }); }
+  const Ms = (G.marks || []).filter(M => M && M.at === G.n), lines = [];
+  for (const M of Ms) lines.push({ t: `✦ ${M.n} marks this course (${G.teams[M.side].short || G.teams[M.side].name})`, col: '#ffe08a' });
+  if (Ms.length) { /* the marks above */ } else if (after && L && Array.isArray(G.casts)) { const u = G.casts.find(x => x.k === 'ult' && x.at === G.n - 1); if (u) lines.push({ t: `✦ ${u.n} marked that course`, col: '#ffe08a' }); }
   for (const s of [0, 1]) if (G.curse[s]) lines.push({ t: `☾ ${G.curse[s].n} on ${G.teams[s].short || G.teams[s].name}'s rider (to the end of the heat)`, col: '#d4b8ff' });
   if (!lines.length) return;
   c.save(); c.font = '700 12px "Alegreya Sans", sans-serif';

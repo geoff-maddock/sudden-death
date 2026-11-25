@@ -33,6 +33,8 @@ HELP = r"""
 window.__T = (ks, pw) => ({ name: ks.join(''), short: ks[0].slice(0, 3), roster: ks.map((k, i) => Object.assign({ n: k + i, kind: k }, pw ? { pw } : {})) });
 window.__to = (f, max) => { let n = 0; while (!f() && n++ < (max || 20000)) wJT.tick(0.05); return !!f(); };
 window.__rng = n => { let a = n >>> 0; return () => { a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; };
+window.__go = () => { wJT.press(); let m = 0; while (wJT.phase === 'charge' && m++ < 800) { const C = wJT.view.charge; if (C && C.mine && C.p >= wJT.playRules.couch.ideal && !C.down) wJT.couch(true); wJT.tick(.01); }
+  m = 0; while (wJT.phase === 'seat' && m++ < 400) wJT.tick(.02); };
 window.__ride = (fx, o) => Object.assign({ aim: 'shield', guard: 'square', pace: 'gallop', mount: 'destrier', rs: wJT.rs(''), speed: 12, couch: 0, tip: { x: -4, y: 4 } }, o || {}, fx ? { fx: Object.assign({}, wJT.fx0, fx) } : {});
 0"""
 A = "['goblin', 'harpy', 'gorgon', 'spider']"
@@ -127,8 +129,8 @@ async def main():
 
         # ---------- the ultimate, the cheer, situations ----------
         u = await pg.evaluate(f"""(() => {{ wJT.start({{ seed: 8, teams: [__T(['ogre', 'ogre', 'ogre', 'ogre']), __T({B})], powers: true }}); wJT.pause(true); const G = wJT.G, out = {{}};
-          out.poor = wJT.powWhy(0, 'ult'); G.cheer[0] = 60; out.r = wJT.cast(0, 'ult'); out.mark = G.mark && G.mark.id; out.own = wJT.fxFor(0).splinter; out.riv = wJT.fxFor(1).splinter; out.cheer = G.cheer[0];
-          const ev = wJT.turn(); out.after = [G.mark, wJT.fxFor(0).splinter]; G.cheer[0] = 100; out.again = wJT.powWhy(0, 'ult');
+          out.poor = wJT.powWhy(0, 'ult'); G.cheer[0] = 60; out.r = wJT.cast(0, 'ult'); out.mark = G.marks[0] && G.marks[0].id; out.own = wJT.fxFor(0).splinter; out.riv = wJT.fxFor(1).splinter; out.cheer = G.cheer[0];
+          const ev = wJT.turn(); out.after = [G.marks[0], wJT.fxFor(0).splinter]; G.cheer[0] = 100; out.again = wJT.powWhy(0, 'ult');
           return out; }})()""")
         check(u['poor'] != '' and u['r'] == '' and u['mark'] == 'splinterlance' and u['own'] == 1 and u['riv'] == 0 and u['cheer'] == 10, 'the ultimate takes the cheer and marks the course for its side', u)
         check(u['after'] == [None, 0] and u['again'] != '', 'the mark ends with its course; the ultimate is once a match', u)
@@ -168,6 +170,39 @@ async def main():
           wJT.start({{ seed: 1, teams: [__T({A}), __T({B})] }}); wJT.resume(j); wJT.pause(true);
           return [wJT.G.powers, wJT.G.mana[0], wJT.G.cheer[1], wJT.G.casts.length, wJT.autoPow, !!sn.autoPow]; }})()""")
         check(sn == [True, 5, 33, 1, True, True], 'a snapshot keeps the powers (mana, cheer, casts) and Auto powers', sn)
+
+        # ---------- phase 6's review ----------
+        # a cursed rider's corner may lift the curse, and the match goes on (it froze at 'next'); in Play and Manage, and
+        # after a resume with the curse on
+        fz = await pg.evaluate("""(() => { const out = { after: 0, stuck: [], errors: [], resumed: null };
+          const G4 = () => __T(['gorgon', 'gorgon', 'gorgon', 'gorgon'], { lance: 0, shield: 0 });
+          for (let sd = 0; sd < 8; sd++) { const mgr = sd % 2 === 1;
+            try { wJT.start({ seed: 1000 + sd, mode: mgr ? 'manage' : 'play', skill: [1, 1], courses: 5, teams: [__T(['elf', 'golem', 'spider', 'kobold']), G4()], powers: true }); wJT.pause(true);
+              let k = 0; while (!wJT.G.over && k++ < 8) { if (!__to(() => wJT.phase === 'plan' || !!wJT.G.over, 4000)) { out.stuck.push([sd, wJT.phase, wJT.G.n]); break; } if (wJT.G.over) break;
+                if (wJT.G.curse[0]) out.after++;
+                if (!out.resumed && wJT.G.curse[0] && wJT.view.jobs) { const S = JSON.parse(JSON.stringify(wJT.snapshot())); wJT.resume(S); wJT.pause(true); out.resumed = __to(() => wJT.phase === 'plan', 4000); }
+                wJT.G.mana[1] = 6; wJT.cast(1, 'lance', 'a test'); if (mgr) { wJT.press(); __to(() => !['charge', 'seat'].includes(wJT.phase)); } else __go(); } }
+            catch (e) { out.errors.push(String(e).slice(0, 160)); } }
+          return out; })()""")
+        check(fz['after'] >= 6 and not fz['stuck'] and not fz['errors'] and fz['resumed'] is True, 'with a curse on your rider, Play and Manage go on to the next plan beat (your corner may lift it), and so does a resume', fz)
+        # a reload during a course never changes its result: resumed from a snapshot taken in the charge, or in the
+        # balance moment after the impact, it comes out the same every time
+        rr = await pg.evaluate("""(() => { const out = { charge: null, seat: null };
+          const res = () => { const L = wJT.G.log[wJT.G.log.length - 1]; return JSON.stringify([L.at, L.unhorse, wJT.G.n]); };
+          for (let sd = 0; sd < 60 && !(out.charge && out.seat); sd++) {
+            wJT.start({ seed: 2000 + sd, mode: 'play', skill: [1, 1], teams: [__T(['elf', 'golem', 'spider', 'kobold']), __T(['ogre', 'ogre', 'ogre', 'ogre'])], powers: true }); wJT.pause(true);
+            __to(() => wJT.phase === 'plan'); wJT.press(); for (let i = 0; i < 20; i++) wJT.tick(.05); const S1 = JSON.parse(JSON.stringify(wJT.snapshot()));
+            let m = 0; while (wJT.phase === 'charge' && m++ < 800) { const C = wJT.view.charge; if (C && C.mine && C.p >= wJT.playRules.couch.ideal && !C.down) wJT.couch(true); wJT.tick(.01); }
+            const S2 = wJT.phase === 'seat' ? JSON.parse(JSON.stringify(wJT.snapshot())) : null;
+            if (!out.charge) { const r = new Set(); for (let i = 0; i < 12; i++) { wJT.resume(JSON.parse(JSON.stringify(S1))); wJT.pause(true); r.add(res()); } out.charge = r.size; }
+            if (S2 && !out.seat) { const r = new Set(); for (let i = 0; i < 12; i++) { wJT.resume(JSON.parse(JSON.stringify(S2))); wJT.pause(true); r.add(res()); } out.seat = r.size; out.st = S2.riding && !!S2.riding.P; } }
+          return out; })()""")
+        check(rr['charge'] == 1 and rr['seat'] == 1, 'a reload during a course never changes its result (in the charge, or in the balance moment after the impact)', rr)
+        # both sides may cast their ultimate before the same course: the first to cast doesn't shut the other out
+        ul = await pg.evaluate("""(() => { wJT.start({ seed: 3, teams: [__T(['ogre', 'ogre', 'ogre', 'ogre']), __T(['gorgon', 'gorgon', 'gorgon', 'gorgon'])], powers: true }); wJT.pause(true); const G = wJT.G;
+          G.cheer = [60, 60]; const a = wJT.cast(0, 'ult'), b = wJT.cast(1, 'ult'), f0 = wJT.fxFor(0), f1 = wJT.fxFor(1);
+          return { a, b, own0: f0.splinter, riv0: f0.late, own1: f1.splinter, cheer: G.cheer.slice() }; })()""")
+        check(ul['a'] == '' and ul['b'] == '' and ul['own0'] == 1 and ul['riv0'] > .4 and ul['own1'] == 0 and ul['cheer'] == [10, 10], 'both sides can mark the same course with their ultimates: whoever casts first doesn\'t shut the other out', ul)
 
         # ---------- the Realm ----------
         await pg.click('#bNew'); await pg.wait_for_function("!!document.getElementById('cfYes') || !!document.getElementById('wGo')")
@@ -225,6 +260,12 @@ async def main():
             T(() => wJT.G.powers === true && wJT.G.sitUsed.length === 2), T(() => { const b = document.querySelector('[data-jtauto]'); return !!b && !$('wListsPowRow').hidden; })];
           W_LISTS_MODE = 'play'; return r; })()""")
         check(pf == [False] * 5, 'with powers off, the parity row\'s live checks fail (resource, meter, ultimate, situations, auto)', pf)
+        # (phase 6's review) through the Realm too: a curse on your rider, and the match goes on
+        rc = await pg.evaluate("""(() => { wJtg().met = {}; W_LISTS_MODE = 'play'; const why = wStartLists({ club: 'local', how: 'play' }); wJT.pause(true); __to(() => wJT.phase === 'plan');
+          wJT.G.curse[0] = { id: 'stare', n: 'Stare', fx: { late: .28 }, by: 'them', side: 1, heat: 0 }; let ok = true;
+          try { for (let i = 0; i < 3 && !wJT.G.over; i++) { __go(); ok = __to(() => wJT.phase === 'plan' || !!wJT.G.over, 4000) && ok; } } catch (e) { ok = String(e); }
+          const r = { why, ok, n: wJT.G.n }; if (wListsLive()) { const s = wJT.summary() || {}; s.win = 1; s.text = 'conceded'; wListsSettle(s); WJT = null; wListsModeBack(); wW150LeaveLists(); } W_LISTS_MODE = 'play'; return r; })()""")
+        check(rc['why'] == '' and rc['ok'] is True and rc['n'] >= 2, 'through the Realm: a curse on your rider, and the match goes on', rc)
         await pg.evaluate("wJT.pause(true); showPage('help')")
         hp = await pg.evaluate("({ help: !!$('wHelpListsPowers') && /pick/.test($('wHelpListsPowers').textContent), how: ['Powers.', 'Curses.', 'cheer', 'ultimate', 'Situation powers', 'Auto powers', 'lift'].every(w => ($('wListsHowPow') || {}).textContent.includes(w)) })")
         check(hp == {'help': True, 'how': True}, 'How to play explains powers', hp)

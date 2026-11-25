@@ -172,9 +172,9 @@ function wListsScore(sn) {
 const wW150OnPhase = wJT.onPhase;
 wJT.onPhase = ph => {
   wW150OnPhase(ph);
-  if (!['next', 'charge', 'after'].includes(ph) || !wListsWorld() || !wJT.G || wJT.G.over) return;
+  if (!['next', 'charge', 'seat', 'after'].includes(ph) || !wListsWorld() || !wJT.G || wJT.G.over) return;
   const L = WG.jtg.live, first = !L.snap; L.snap = wJT.snapshot();
-  // (a course set off, or closed, is saved at once: a reload never brings an earlier course back, nor rides one twice,
+  // (a course set off, its lances met (the balance moment: phase 6's review), or closed, is saved at once: a reload never brings an earlier course back, nor rides one twice,
   // nor calls off a match that has begun; the course being ridden is kept with the plans committed: phase 5's review)
   const now = Date.now(); if (first || ph !== 'next' || now - WJTG.saved > W_JTG.saveMs) { WJTG.saved = now; wSave(); }
 };
