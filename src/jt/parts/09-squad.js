@@ -187,7 +187,8 @@ function jtCornerPlan(s, sk, allow) {
   if (sk == null) { const lab = (G.lab || {}).cornerBy; sk = lab && typeof lab[s] === 'number' ? lab[s] : G.skill[s]; }
   const jobs = allow || jtJobsFor(s);
   if (sk <= 0) {
-    const a = jobs[Math.floor(R() * jobs.length)], rest = jobs.filter(j => j !== a), b = rest[Math.floor(R() * rest.length)];
+    // (from the course's own stream: a resume picks the same whims, jtKeyRnd; phase 7's review)
+    const rr = jtKeyRnd(s, 'corner'), a = jobs[Math.floor(rr() * jobs.length)], rest = jobs.filter(j => j !== a), b = rest[Math.floor(rr() * rest.length)];
     return { jobs: [a, b], why: 'two jobs picked on a whim' };
   }
   // each way to share two of the jobs between the two squires: the next course in the state it leaves, and what lasts

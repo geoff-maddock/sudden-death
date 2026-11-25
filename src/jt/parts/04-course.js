@@ -76,12 +76,13 @@ function jtStrike(a, d, rnd) {
   const high = a.up ? !!a.lowered && (a.reachY ?? (JT_PLAN.aim[jtPick('aim', a.aim, 'shield')].y)) >= JT_SEAT.high : a.tip.y >= JT_SEAT.high;
   if (!JT_RULES.fair.includes(zone)) return { zone, at: zone, broke: false, force, rock: 0, pb: 0, high };
   // (phase 6: a power's fx on the striker, fa, and the defender, fd: pierce breaks an angled shield as a square one,
-  // brk and turn the chance, splinter any fair touch, rock and soak the rock, helmUn a helm break that unhorses)
+  // brk and turn the chance (a Kite Shield's kite only on an angled shield the lance doesn't pass through: phase 7's
+  // review), splinter any fair touch, rock and soak the rock, helmUn a helm break that unhorses)
   const fa = a.fx || null, fd = d.fx || null, gb = fa && fa.pierce && zone === 'shield' ? 'square' : g;
   const base = JT_BREAK[zone][gb], edge = jtEdge(zone, a.tip.x, a.tip.y, g);
   const shieldK = zone === 'shield' ? 1 + JT_BREAK.shieldR * (.5 - ((d.rs || {}).shield ?? .5)) * 2 : 1;
   let pb = clamp(base * (1 - JT_BREAK.force + JT_BREAK.force * Math.min(1.2, force)) * (1 - JT_BREAK.edge * edge) * shieldK * (fa ? fa.brk : 1) * (fd ? fd.turn : 1)
-    * (fd && zone === 'shield' && g === 'angled' ? fd.kite ?? 1 : 1) * (fd && zone === 'helm' ? fd.helmTurn ?? 1 : 1), 0, .98);
+    * (fd && zone === 'shield' && gb === 'angled' ? fd.kite ?? 1 : 1) * (fd && zone === 'helm' ? fd.helmTurn ?? 1 : 1), 0, .98);
   if (fa && fa.splinter) pb = .98;
   const broke = rnd() < pb;
   const rock = force * (broke ? (zone === 'shield' ? JT_ROCK.shield[g] : JT_ROCK[zone]) : JT_ROCK.glance) * (fa ? fa.rock : 1) * (fd ? fd.soak : 1);

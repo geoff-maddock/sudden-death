@@ -93,6 +93,20 @@ async def main():
             const P = wJT.G.pots; out.theirs += P.filter(x => x.side === 1).length; out.mine += P.filter(x => x.side === 0).length; out.why = out.why && P.every(x => x.why); out.bagLeft = wJT.G.bags[1]; }
           return out; })()""")
         check(cpu['theirs'] >= 4 and cpu['mine'] == 0 and cpu['why'], 'a CPU with a bag gives potions at its skill, with a reason; a side without one never does', cpu)
+        # (phase 7's review) a Squire's whims between courses (its potion, its corner) are the match's and the course's:
+        # resumed from the same snapshot, again and again, it decides the same
+        wh = await pg.evaluate("""(() => { const out = { sizes: [], gave: 0, n: 0 };
+          for (let sd = 0; sd < 6; sd++) { wJT.start({ seed: 60 + sd, mode: 'play', skill: [1, 0], teams: [__A(), __B()], bags: [null, { draught: 3, jtliniment: 3 }] }); wJT.pause(true);
+            __to(() => wJT.phase === 'plan'); wJT.press(); __to(() => wJT.phase === 'after'); if (wJT.G.heat !== 0) continue; wJT.G.wind[1] = .2; wJT.G.arm[1] = .3; const S = JSON.parse(JSON.stringify(wJT.snapshot()));
+            const seen = new Set(); for (let i = 0; i < 8; i++) { wJT.resume(JSON.parse(JSON.stringify(S))); wJT.pause(true); __to(() => wJT.phase === 'plan'); const G = wJT.G, C = G.corners[1];
+              const k = JSON.stringify([G.pots.filter(x => x.side === 1).map(x => x.id), C.length ? C[C.length - 1].jobs : null]); seen.add(k); if (G.pots.some(x => x.side === 1)) out.gave++; out.n++; }
+            out.sizes.push(seen.size); }
+          return out; })()""")
+        check(len(wh['sizes']) >= 4 and all(x == 1 for x in wh['sizes']), 'a Squire\'s potion and corner between courses are decided once a course: a resume decides the same', wh)
+        # a Piercing lance breaks on an angled Kite Shield as on a square one: Pierce wins
+        kp = await pg.evaluate("""(() => { const pb = (a, d) => wJT.strike(a, d, () => .5).pb;
+          return [pb(__ride(null, { pierce: 1 }), __ride({ guard: 'angled' }, { kite: .85 })), pb(__ride(null, { pierce: 1 }), __ride({ guard: 'angled' }))]; })()""")
+        check(abs(kp[0] - kp[1]) < 1e-12, 'a Piercing lance breaks on an angled Kite Shield as on a square one (the kite doesn\'t turn it)', kp)
 
         # ---------- the Realm ----------
         await pg.click('#bNew'); await pg.wait_for_function("!!document.getElementById('cfYes') || !!document.getElementById('wGo')")
@@ -110,16 +124,19 @@ async def main():
         check(rg['kit'] == ['lists', 'shop', True], 'Sir Ruddock\'s KIT opens his rack', rg['kit'])
         check(rg['put'] == '' and rg['tag'] == 'jt_saddle' and rg['plain'] and rg['jt'], 'a piece worn reaches the engine\'s copy of the rider, never p.jt', rg)
         mt = await pg.evaluate("""(() => { wAddItem('jttonic', 2); wAddItem('jtliniment', 1); wJtg().met = {}; W_LISTS_MODE = 'play'; wStartLists({ club: 'local', how: 'play' }); wJT.pause(true); __to(() => wJT.phase === 'plan');
+          const st0 = JSON.parse(localStorage.getItem(wSaveKey())), sn0 = st0.WG.jtg.live && st0.WG.jtg.live.snap;
+          const planSaved = !!sn0 && sn0.G.n === wJT.G.n && !!sn0.G.cpuPlan && sn0.G.cpuPlan.n === wJT.G.n && !!sn0.G.cpuPlan.p[1];
           const G = wJT.G, bags = [G.bags[0], G.bags[1]], off = wGearTakeOff(wRoster()[0].id, 'lists'); wListsRows(); const row = $('wListsBagRow'), n0 = WG.items.jtliniment || 0, nt = WG.items.jttonic || 0;
           row.querySelector('[data-jtkuse="jttonic"]').click(); const refused = W_LISTS_KITMSG, keptT = (WG.items.jttonic || 0) === nt;
           G.arm[0] = .5; wListsRows(); row.querySelector('[data-jtkuse="jtliniment"]').click();
           const st = JSON.parse(localStorage.getItem(wSaveKey()));
-          return { tierBag: W_LISTS_KIT.opp[wBallTier('local')], mine: bags[0], theirs: bags[1], shown: !row.hidden, used: n0 - (WG.items.jtliniment || 0), pots: G.pots.filter(x => x.side === 0).length, refused, keptT, off,
+          return { planSaved, tierBag: W_LISTS_KIT.opp[wBallTier('local')], mine: bags[0], theirs: bags[1], shown: !row.hidden, used: n0 - (WG.items.jtliniment || 0), pots: G.pots.filter(x => x.side === 0).length, refused, keptT, off,
             saved: { items: st.WG.items.jtliniment || 0, itemsNow: WG.items.jtliniment || 0, pots: st.WG.jtg.live.snap.G.pots.filter(x => x.side === 0).length, arm: st.WG.jtg.live.snap.G.arm[0] }, arm: G.arm[0] }; })()""")
         check(mt['mine'] is None and mt['theirs'] == mt['tierBag'] and mt['theirs'], 'in a real match their bag goes in by tier, and yours stays your own', mt)
         check(mt['off'] != '', 'gear can\'t be changed while a jousting match is on', mt)
         check(mt['shown'] and mt['used'] == 1 and mt['pots'] == 1, 'the Bag row gives a potion from your bag, and it comes out', mt)
         check(mt['refused'] == 'Nothing weighs on them this course.' and mt['keptT'], 'a potion that can do nothing now is refused, and stays in the bag', mt)
+        check(mt['planSaved'], 'your plan beat is saved as it opens: what was decided before it (their plan, corner and potion) comes back on a reload', mt)
         check(mt['saved']['items'] == mt['saved']['itemsNow'] and mt['saved']['pots'] == 1 and abs(mt['saved']['arm'] - mt['arm']) < 1e-9, 'the bag and the match are saved with the potion at once', mt['saved'])
         # a potion given, then a reload: the saved bag and the saved match agree
         await pg.reload(); await pg.wait_for_function("typeof W_ENGINES !== 'undefined' && typeof wJT !== 'undefined'")

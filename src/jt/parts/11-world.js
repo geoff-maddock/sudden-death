@@ -48,6 +48,10 @@ function jtResume(sn) {
 }
 // a short hash of a string (FNV-1a), to seed a course's own stream
 function jtHash(t) { let h = 2166136261; for (let i = 0; i < t.length; i++) { h ^= t.charCodeAt(i); h = Math.imul(h, 16777619); } return h >>> 0; }
+/* a stream of its own for side s's decision (tag) before the course now, keyed on the match (G.key: its seed, or a
+   number drawn when it starts; a match kept before keys, its clubs' names) and the course, so a match resumed from a
+   snapshot taken before the decision decides the same again (phase 7's review: a Squire's corner and potion) */
+function jtKeyRnd(s, tag) { const k = G.key != null ? G.key : G.teams.map(T => T.name).join('|'); return engRng(jtHash(JSON.stringify([k, G.n, s, tag]))); }
 /* a course kept in a snapshot mid-ride, ridden out: from its impact (P) when the lances had met, else from the CPU's rides
    as it set off (yours by your rider's own hands); every random number from a stream seeded by what was kept, so the
    same snapshot always rides out the same (an older snapshot's riding is the plans alone) */

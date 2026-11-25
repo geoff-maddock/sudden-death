@@ -29,6 +29,8 @@ function jtGx(fx) { if (!fx || typeof fx !== 'object') return null; const o = JS
 jtRosterOne = function (p) { const m = JT_W7.rosterOne(p); const gx = p && p.gear ? jtGx(p.gear.fx) : null; if (gx) m.gx = gx; else delete m.gx; return m; };
 jtStart = function (opts) {
   const g = JT_W7.start(opts), o = opts || {};
+  // the match's key, for the streams of its own a decision before a course draws from (jtKeyRnd, 11-world.js)
+  G.key = (o.seed != null && Number.isFinite(+o.seed) ? +o.seed : Math.floor(Math.random() * 4294967296)) >>> 0;
   if (Array.isArray(o.bags) && !G.yard) Object.assign(G, { bags: [0, 1].map(s => o.bags[s] && typeof o.bags[s] === 'object' ? Object.assign({}, o.bags[s]) : null), pots: [], potCourse: [-1, -1], potAsk: [-1, -1], tonic: [-1, -1], oil: [-1, -1] });
   return g;
 };
@@ -95,7 +97,8 @@ function jtCpuPotion(s) {
   G.potAsk[s] = G.n;
   const vals = jtPotionValues(s, bag); if (!vals.length) return '';
   const sk = clamp(G.skill[s] | 0, 0, 2);
-  if (!sk) return R() < JT_KIT.squire ? jtPotionGive(s, vals[0].id, vals[0].why) : '';
+  // (a Squire's whim from the course's own stream: a resume decides the same, jtKeyRnd; phase 7's review)
+  if (!sk) return jtKeyRnd(s, 'potion')() < JT_KIT.squire ? jtPotionGive(s, vals[0].id, vals[0].why) : '';
   return vals[0].v >= JT_KIT.take[sk] ? jtPotionGive(s, vals[0].id, vals[0].why) : '';
 }
 // after the corner, before every course: the CPU's potions

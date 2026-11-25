@@ -26,7 +26,7 @@ W_GEAR_CFG.sports.lists = 'jousting';
 W_GEAR_STATN.lists = { lance: 'lance', couch: 'couch', seat: 'seat', shield: 'shield', ride: 'ride', nerve: 'nerve', care: 'care' };
 const W_LISTS_GEAR = {
   jt_ironwood: { sport: 'lists', name: 'Ironwood Lance', price: 55, desc: 'Ironwood, stiff and true: the tip sways a twentieth less.', fx: { sway: .95 } },
-  jt_kite: { sport: 'lists', name: 'Kite Shield', price: 50, desc: 'Long and tapered: angled, it turns a lance more (a lance on it breaks a sixth less often).', fx: { kite: .85 } },
+  jt_kite: { sport: 'lists', name: 'Kite Shield', price: 50, desc: 'Long and tapered: angled, it turns a lance more (a lance on it breaks a sixth less often; not one that passes through an angled shield, as a wraith\'s does).', fx: { kite: .85 } },
   jt_saddle: { sport: 'lists', name: 'War Saddle', price: 60, desc: 'A high cantle at your back: a firmer seat.', fx: { hold: .05 } },
   jt_spurs: { sport: 'lists', name: 'Rowelled Spurs', price: 45, desc: 'A sharper word to the mount: a touch faster, and each course costs it a tenth less wind.', fx: { speed: 1.01, wind: .9 } },
   jt_helm: { sport: 'lists', name: 'Crested Helm', price: 50, desc: 'A rounded crest: a lance on your helm breaks a fifth less often.', fx: { helmTurn: .8 } },
