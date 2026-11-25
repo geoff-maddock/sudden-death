@@ -25,7 +25,7 @@ const JT_MODES = ['watch', 'play'];
 let GP = null;
 
 function jtPlayStart(o) {
-  GP = { mode: JT_MODES.includes(o && o.mode) ? o.mode : 'watch', you: 0, ph: 'next', t: 0, wait: 0, msg: '', sel: null, plans: null, cpuRides: null, ch: null, seatM: null, P: null, last: null, call: '', fx: [] };
+  GP = { mode: JT_MODES.includes(o && o.mode) ? o.mode : 'watch', you: 0, ph: 'next', t: 0, wait: 0, msg: '', sel: null, jobs: null, plans: null, cpuRides: null, ch: null, seatM: null, P: null, last: null, call: '', fx: [] };
   jtGo('next');
   return GP;
 }
@@ -50,6 +50,15 @@ function jtSelect(o) {
   if (!GP || GP.ph !== 'plan' || !GP.sel) return 'Not now.';
   o = o || {};
   if (o.suggest) { GP.sel = jtSuggest(GP.you); jtPicked(); return ''; }
+  // (phase 3: your squires' jobs between courses: jobs [two], or job [which squire, the job]; corner: your corner's word again)
+  if (o.corner || o.jobs || o.job) {
+    if (!GP.jobs) return 'Your squires have nothing to do before the first course of a heat.';
+    if (o.corner) { GP.jobs = jtCornerPlan(GP.you, 1).jobs; jtPicked(); return ''; }
+    let J = o.jobs;
+    if (o.job) { const [i, j] = o.job; if (!(i === 0 || i === 1) || !jtOwn(JT_JOB, j)) return 'No such job.'; J = GP.jobs.slice(); if (J[1 - i] === j) J[1 - i] = J[i]; J[i] = j; }
+    if (!jtJobsOk(J)) return 'Two squires, two different jobs.';
+    GP.jobs = J.slice(); jtPicked(); return '';
+  }
   const S = Object.assign({}, GP.sel);
   for (const k of ['aim', 'guard', 'pace']) if (o[k] != null) { if (!jtOwn(JT_PLAN[k], o[k])) return `No such ${k}.`; S[k] = o[k]; }
   GP.sel = S; jtPicked(); return '';
@@ -88,9 +97,12 @@ function jtNudge(vx, vy) { if (GP) GP.keyV = { x: clamp(vx || 0, -1, 1), y: clam
 function jtLeanTo(v) { const M = GP && GP.seatM; if (!M) return false; M.lean = clamp(+v || 0, -1.5, 1.5); return true; }
 function jtCharge0() {
   const riders = jtRiders(); if (!riders) return;
+  // (phase 3: your squires do the jobs you gave them before you set off)
+  if (jtYours(GP.you) && GP.jobs && G.cornerDue && G.cornerDue[GP.you]) jtCornerDo(GP.you, GP.jobs, 'your call');
+  GP.jobs = null;
   const plans = [0, 1].map(s => jtYours(s) ? Object.assign({}, GP.sel) : GP.plans[s]);
   // the CPU's rides are drawn as it sets off (the page draws its lance from them); yours is built as you ride
-  const cpuRides = [0, 1].map(s => jtYours(s) ? null : jtCharge({ plan: plans[s], rs: jtRsOf(s, riders[s]), mount: jtMountOf(s), wind: G.wind[s], hands: jtHands(s) }, R));
+  const cpuRides = [0, 1].map(s => jtYours(s) ? null : jtCharge(jtRideOpts(s, plans[s]), R));
   const mine = jtYours(0) || jtYours(1), s = GP.you;
   GP.plans = plans; GP.cpuRides = cpuRides; GP.keyV = { x: 0, y: 0 };
   GP.ch = { p: 0, mine, pace: mine ? plans[s].pace : plans[0].pace, hit: [], taps: [], bad: 0, down: false, downAt: null, hand: { x: 0, y: 0 }, tipNow: null, riders };
@@ -108,7 +120,8 @@ function jtEight(t, amp, pace) { const w = Math.PI / jtBeat(pace); return { x: a
 // your sway now: sway() for your plan, your rider and mount, and the couch as it stands (late if still up)
 function jtYourSway(C) {
   const s = GP.you, ri = C.riders[s], e = jtCouchErr(C);
-  return jtSway({ pace: GP.plans[s].pace, mount: jtMountOf(s), rs: jtRsOf(s, ri), wind: G.wind[s], couch: e == null ? 0 : e, hands: 1 });
+  const X = jtRideX(s);
+  return jtSway({ pace: GP.plans[s].pace, mount: jtMountOf(s), rs: jtRsOf(s, ri), wind: G.wind[s], couch: e == null ? 0 : e, hands: 1, arm: X.arm, shaken: X.shaken, press: X.press });
 }
 // where your tip is now (inches, on their target), once couched; null while the lance is up
 function jtTipNow(C) {
@@ -120,10 +133,10 @@ function jtTipNow(C) {
 function jtYourRide(C) {
   const s = GP.you, ri = C.riders[s], plan = GP.plans[s], rs = jtRsOf(s, ri), mount = jtMountOf(s), q = jtSpurQ(C), e = jtCouchErr(C);
   const speed = jtSpeed({ pace: plan.pace, mount, rs, wind: G.wind[s] }) * (JT_PLAY.spur.min + (1 - JT_PLAY.spur.min) * q);
-  const A = JT_PLAN.aim[plan.aim];
-  if (e == null) return { aim: plan.aim, guard: plan.guard, pace: plan.pace, mount, rs, speed, couch: 1, tip: { x: A.x, y: A.y + JT_PLAY.couch.high }, spurQ: q, up: true };
+  const A = JT_PLAN.aim[plan.aim], X = jtRideX(s), sq = { girth: X.girth, shaken: X.shaken };
+  if (e == null) return Object.assign({ aim: plan.aim, guard: plan.guard, pace: plan.pace, mount, rs, speed, couch: 1, tip: { x: A.x, y: A.y + JT_PLAY.couch.high }, spurQ: q, up: true }, sq);
   const sw = jtYourSway(C), t = jtTipNow(C);
-  return { aim: plan.aim, guard: plan.guard, pace: plan.pace, mount, rs, speed, couch: e, tip: { x: t.x + gauss() * sw.sigma * JT_PLAY.aim.noise, y: t.y + gauss() * sw.sigma * JT_PLAY.aim.noise }, spurQ: q };
+  return Object.assign({ aim: plan.aim, guard: plan.guard, pace: plan.pace, mount, rs, speed, couch: e, tip: { x: t.x + gauss() * sw.sigma * JT_PLAY.aim.noise, y: t.y + gauss() * sw.sigma * JT_PLAY.aim.noise }, spurQ: q }, sq);
 }
 function jtChargeTick(dt) {
   const C = GP.ch; if (!C) return;
@@ -219,9 +232,17 @@ function jtTick(dt) {
 function jtWhere() { return jtInTilt() ? `The tilt for the crown, course ${G.course + 1}` : `Heat ${G.heat + 1}, course ${G.course + 1} of ${G.courses}`; }
 function jtPlayNext() {
   const riders = jtRiders(); if (!riders) { jtGo('over'); return; }
+  // (phase 3: the CPU's corners first, so its plan reads its rider and mount as they set off; yours waits for your call)
+  const yours = jtYours(GP.you), due = !!(G.cornerDue && G.cornerDue[GP.you]);
+  jtCornersDue(yours && due ? GP.you : null);
+  GP.jobs = yours && due ? jtCornerPlan(GP.you, 1).jobs : null;
   GP.plans = [0, 1].map(s => jtYours(s) ? null : jtPlan(s));
   const vs = `${jtName(0, riders[0])} (${jtSide(0)}) against ${jtName(1, riders[1])} (${jtSide(1)})`;
-  if (jtYours(GP.you)) { GP.sel = jtSuggest(GP.you); jtGo('plan', 0, `${jtWhere()}: ${vs}. Your squire says: ${GP.sel.aim === 'helm' ? 'the helm' : JT_PLAN.aim[GP.sel.aim].n}, ${GP.sel.guard}, at ${JT_PLAN.pace[GP.sel.pace].n} (${GP.sel.why}). Change the plan if you like, then Ride.`); return; }
+  if (jtYours(GP.you)) {
+    GP.sel = jtSuggest(GP.you);
+    const sq = GP.jobs ? ` Your corner: ${GP.jobs.map((j, i) => `${jtSqName(GP.you, i)} ${JT_JOB[j].v}`).join(', ')}.` : '';
+    jtGo('plan', 0, `${jtWhere()}: ${vs}.${sq} Your squire says: ${GP.sel.aim === 'helm' ? 'the helm' : JT_PLAN.aim[GP.sel.aim].n}, ${GP.sel.guard}, at ${JT_PLAN.pace[GP.sel.pace].n} (${GP.sel.why}). Change the plan if you like, then Ride.`); return;
+  }
   jtGo('herald', 0, `${jtWhere()}: ${vs}.`);
 }
 function jtSetMode(m) {
@@ -236,6 +257,7 @@ function jtView() {
   const C = GP.ch, M = GP.seatM, r = jtRiders();
   return { mode: GP.mode, you: GP.you, ph: GP.ph, msg: GP.msg, call: GP.call, riders: r, heat: G.heat, course: G.course, inTilt: jtInTilt(),
     sel: GP.sel ? Object.assign({}, GP.sel) : null, plans: GP.plans ? JSON.parse(JSON.stringify(GP.plans)) : null,
+    jobs: GP.jobs ? GP.jobs.slice() : null, squad: jtSquadView(),
     charge: C ? { p: C.p, mine: C.mine, pace: C.pace, hits: C.hit.length, bad: C.bad, spurQ: jtSpurQ(C), down: C.down, downAt: C.downAt, couch: jtCouchErr(C), hand: Object.assign({}, C.hand), tip: C.tipNow ? Object.assign({}, C.tipNow) : null } : null,
     seat: M ? { t: M.t, w: M.w, lean: M.lean, q: jtLeanQ(M) } : null, wind: G.wind.slice() };
 }

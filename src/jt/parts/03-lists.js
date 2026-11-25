@@ -14,17 +14,26 @@
    to the left, the barrier (a foul, 'barrier'); anywhere else, a miss.
    The plan (JT_PLAN): an aim (shield, body or helm, each with its aim point), a guard (angled or square) and a pace
    (canter or gallop). A gallop hits harder and spends more of the mount's wind, but the tip sways more.
-   The mounts (JT_MOUNT): Charger (fast, hits hard, sways more), Destrier (steady, easy to aim, hits softer), Courser
-   (quick to get its wind back, light in the hit). The mount is picked per rider in phase 3; until then every rider
-   rides JT_MOUNT_DEF.
-   The ratings (JT_STATS, 1 to 12, worked on as 0 to 1): lance (the sway), couch (the couch window, the arm), seat (the
-   balance after a hit), shield (a strike on the shield breaks less), ride (pace and the mount's wind), nerve (the
-   pressure, phase 3), care (a squire's jobs, phase 3). Provisional until phase 3's ratings by kind: JT_KIND holds
-   them, a row of seven by kind (none yet), and every rider without a row is JT_KIND._ . A roster member may carry its
-   own (rs, 0 to 1), as the Realm will send. */
+   The mounts (JT_MOUNT): Charger (fast, hits hard, sways more), Destrier (steady, easy to aim, sits a hit better, hits
+   softer), Courser (light in the hit, but quick to get its wind back, and easy on it at a gallop). Each rider rides one
+   (opts.mounts, picked on the Lists tab in the Realm); left out, JT_MOUNT_DEF.
+   The ratings (JT_STATS, 1 to 12, worked on as 0 to 1): lance (the sway), couch (the couch window, and how long the
+   arm holds it), seat (the balance after a hit), shield (a strike on the shield breaks less), ride (pace and the
+   mount's wind), nerve (the pressure: the last course of a heat when behind, the tilt for the crown), care (a squire's
+   jobs between courses). A row of seven by kind (JT_KIND, phase 3); a rider of no kind is JT_KIND._ . A roster
+   member may carry its own (r, 1 to 12, the rest from its kind; or rs, 0 to 1), as the Realm sends. */
 const JT_LISTS = { yards: 60, speed: 12 };
 const JT_STATS = ['lance', 'couch', 'seat', 'shield', 'ride', 'nerve', 'care'];
-const JT_KIND = { _: [6.5, 6.5, 6.5, 6.5, 6.5, 6.5, 6.5] };
+// by kind: lance, couch, seat, shield, ride, nerve, care. An elf's lance barely sways; a golem sits like a rock and
+// rides like one; a minotaur charges hard and has no patience for a horse's hooves; a harpy is light in the saddle; a
+// gorgon reads where a lance is going; a spider squires with eight hands, a kobold fusses over every buckle and a
+// witch has a salve for everything; a lich and a zombie feel nothing when it matters
+const JT_KIND = { _: [6.5, 6.5, 6.5, 6.5, 6.5, 6.5, 6.5],
+  goblin: [6, 6, 5, 6, 8, 5, 8], kobold: [6, 7, 5, 6, 6, 5, 10], werewolf: [6, 6, 8, 6, 10, 7, 5], dwarf: [7, 7, 9, 9, 4, 8, 7],
+  ogre: [4, 5, 10, 5, 6, 7, 4], minotaur: [5, 6, 8, 5, 12, 7, 3], troll: [4, 5, 10, 6, 6, 7, 6], golem: [6, 5, 12, 9, 3, 10, 3],
+  harpy: [8, 8, 3, 7, 9, 5, 6], elf: [11, 9, 5, 7, 8, 7, 6], wraith: [8, 9, 6, 8, 6, 9, 5], vampire: [8, 8, 7, 7, 7, 8, 6],
+  lich: [8, 8, 6, 8, 5, 11, 6], zombie: [5, 4, 9, 5, 5, 10, 5], gorgon: [7, 8, 7, 10, 6, 8, 6], spider: [7, 6, 8, 6, 6, 6, 12],
+  skeleton: [7, 7, 4, 7, 6, 9, 7], witch: [7, 7, 5, 7, 6, 7, 10] };
 const JT_RCAP = 12;
 const jtScale = v => clamp((v - 1) / (JT_RCAP - 1), 0, 1.2);
 // a kind's ratings, 1 to 12, and as the model reads them (0 to 1)
@@ -37,9 +46,9 @@ const JT_PLAN = {
   pace: { canter: { n: 'a canter', speed: .68, sway: 1, wind: .12 }, gallop: { n: 'a gallop', speed: 1, sway: 1.35, wind: .3 } }
 };
 const JT_MOUNT = {
-  charger: { n: 'Charger', speed: 1.08, hit: 1.1, sway: 1.18, steady: 0, rec: .12 },
-  destrier: { n: 'Destrier', speed: .95, hit: .95, sway: .85, steady: .06, rec: .12 },
-  courser: { n: 'Courser', speed: 1, hit: .9, sway: 1, steady: 0, rec: .3 }
+  charger: { n: 'Charger', speed: 1.06, hit: 1.08, sway: 1.24, steady: 0, rec: .12, wind: 1.3 },
+  destrier: { n: 'Destrier', speed: .95, hit: .95, sway: .82, steady: .07, rec: .12, wind: 1 },
+  courser: { n: 'Courser', speed: 1.02, hit: .93, sway: .97, steady: 0, rec: .3, wind: .65 }
 };
 const JT_MOUNT_DEF = 'destrier';
 const jtMount = id => JT_MOUNT[jtOwn(JT_MOUNT, id) ? id : JT_MOUNT_DEF];

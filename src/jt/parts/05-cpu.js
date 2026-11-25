@@ -97,7 +97,7 @@ function jtPlan(s) {
   // an Archmage's pace looks ahead: the courses left in the heat ride on what wind this one leaves
   const ahead = (pace) => {
     if (sk < 2 || !Q.after) return 0;
-    const M = jtMount(mount), w1 = clamp(W0 - jtWindCost(pace, rs) + M.rec * (.6 + .4 * (rs.ride ?? .5)), 0, 1), O1 = jtOdds(rs, mount, hk, w1, { aim: habit.aim, gallop: habit.gallop });
+    const M = jtMount(mount), w1 = clamp(W0 - jtWindCost(pace, rs, mount) + M.rec * (.6 + .4 * (rs.ride ?? .5)), 0, 1), O1 = jtOdds(rs, mount, hk, w1, { aim: habit.aim, gallop: habit.gallop });
     let best = -9; for (const a of JT_AIMS) for (const p of JT_PACES) best = Math.max(best, jtWorth(O1, a, p, 'angled', habit.angled, W));
     return Q.after * best;
   };

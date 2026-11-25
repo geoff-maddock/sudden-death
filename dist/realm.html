@@ -46765,17 +46765,26 @@ const jtAtText = st => !st || !jtOwn(JT_AT, st.at) ? '' : st.unhorse && jtFair(s
    to the left, the barrier (a foul, 'barrier'); anywhere else, a miss.
    The plan (JT_PLAN): an aim (shield, body or helm, each with its aim point), a guard (angled or square) and a pace
    (canter or gallop). A gallop hits harder and spends more of the mount's wind, but the tip sways more.
-   The mounts (JT_MOUNT): Charger (fast, hits hard, sways more), Destrier (steady, easy to aim, hits softer), Courser
-   (quick to get its wind back, light in the hit). The mount is picked per rider in phase 3; until then every rider
-   rides JT_MOUNT_DEF.
-   The ratings (JT_STATS, 1 to 12, worked on as 0 to 1): lance (the sway), couch (the couch window, the arm), seat (the
-   balance after a hit), shield (a strike on the shield breaks less), ride (pace and the mount's wind), nerve (the
-   pressure, phase 3), care (a squire's jobs, phase 3). Provisional until phase 3's ratings by kind: JT_KIND holds
-   them, a row of seven by kind (none yet), and every rider without a row is JT_KIND._ . A roster member may carry its
-   own (rs, 0 to 1), as the Realm will send. */
+   The mounts (JT_MOUNT): Charger (fast, hits hard, sways more), Destrier (steady, easy to aim, sits a hit better, hits
+   softer), Courser (light in the hit, but quick to get its wind back, and easy on it at a gallop). Each rider rides one
+   (opts.mounts, picked on the Lists tab in the Realm); left out, JT_MOUNT_DEF.
+   The ratings (JT_STATS, 1 to 12, worked on as 0 to 1): lance (the sway), couch (the couch window, and how long the
+   arm holds it), seat (the balance after a hit), shield (a strike on the shield breaks less), ride (pace and the
+   mount's wind), nerve (the pressure: the last course of a heat when behind, the tilt for the crown), care (a squire's
+   jobs between courses). A row of seven by kind (JT_KIND, phase 3); a rider of no kind is JT_KIND._ . A roster
+   member may carry its own (r, 1 to 12, the rest from its kind; or rs, 0 to 1), as the Realm sends. */
 const JT_LISTS = { yards: 60, speed: 12 };
 const JT_STATS = ['lance', 'couch', 'seat', 'shield', 'ride', 'nerve', 'care'];
-const JT_KIND = { _: [6.5, 6.5, 6.5, 6.5, 6.5, 6.5, 6.5] };
+// by kind: lance, couch, seat, shield, ride, nerve, care. An elf's lance barely sways; a golem sits like a rock and
+// rides like one; a minotaur charges hard and has no patience for a horse's hooves; a harpy is light in the saddle; a
+// gorgon reads where a lance is going; a spider squires with eight hands, a kobold fusses over every buckle and a
+// witch has a salve for everything; a lich and a zombie feel nothing when it matters
+const JT_KIND = { _: [6.5, 6.5, 6.5, 6.5, 6.5, 6.5, 6.5],
+  goblin: [6, 6, 5, 6, 8, 5, 8], kobold: [6, 7, 5, 6, 6, 5, 10], werewolf: [6, 6, 8, 6, 10, 7, 5], dwarf: [7, 7, 9, 9, 4, 8, 7],
+  ogre: [4, 5, 10, 5, 6, 7, 4], minotaur: [5, 6, 8, 5, 12, 7, 3], troll: [4, 5, 10, 6, 6, 7, 6], golem: [6, 5, 12, 9, 3, 10, 3],
+  harpy: [8, 8, 3, 7, 9, 5, 6], elf: [11, 9, 5, 7, 8, 7, 6], wraith: [8, 9, 6, 8, 6, 9, 5], vampire: [8, 8, 7, 7, 7, 8, 6],
+  lich: [8, 8, 6, 8, 5, 11, 6], zombie: [5, 4, 9, 5, 5, 10, 5], gorgon: [7, 8, 7, 10, 6, 8, 6], spider: [7, 6, 8, 6, 6, 6, 12],
+  skeleton: [7, 7, 4, 7, 6, 9, 7], witch: [7, 7, 5, 7, 6, 7, 10] };
 const JT_RCAP = 12;
 const jtScale = v => clamp((v - 1) / (JT_RCAP - 1), 0, 1.2);
 // a kind's ratings, 1 to 12, and as the model reads them (0 to 1)
@@ -46788,9 +46797,9 @@ const JT_PLAN = {
   pace: { canter: { n: 'a canter', speed: .68, sway: 1, wind: .12 }, gallop: { n: 'a gallop', speed: 1, sway: 1.35, wind: .3 } }
 };
 const JT_MOUNT = {
-  charger: { n: 'Charger', speed: 1.08, hit: 1.1, sway: 1.18, steady: 0, rec: .12 },
-  destrier: { n: 'Destrier', speed: .95, hit: .95, sway: .85, steady: .06, rec: .12 },
-  courser: { n: 'Courser', speed: 1, hit: .9, sway: 1, steady: 0, rec: .3 }
+  charger: { n: 'Charger', speed: 1.06, hit: 1.08, sway: 1.24, steady: 0, rec: .12, wind: 1.3 },
+  destrier: { n: 'Destrier', speed: .95, hit: .95, sway: .82, steady: .07, rec: .12, wind: 1 },
+  courser: { n: 'Courser', speed: 1.02, hit: .93, sway: .97, steady: 0, rec: .3, wind: .65 }
 };
 const JT_MOUNT_DEF = 'destrier';
 const jtMount = id => JT_MOUNT[jtOwn(JT_MOUNT, id) ? id : JT_MOUNT_DEF];
@@ -46849,19 +46858,22 @@ function jtEdge(zone, x, y, guard) {
    unhorsed. A rider who went for the helm and didn't break it has reached past the head, and sits the other lance
    worse (JT_SEAT.reach off the hold): a helm aim scores big but its misses cost. On Play the lean is your balance moment (0 to 1); the CPU's comes from its skill (05-cpu.js). Only a
    broken lance can unhorse: a glance rocks, no more. */
-const JT_SWAY = { base: 3.6, lance: .55, wind: .5, late: .9, early: .35, droop: 7 };
+const JT_SWAY = { base: 3.6, lance: .35, wind: .5, late: .9, early: .35, droop: 7 };
 const JT_BREAK = { shield: { square: .9, angled: .45 }, body: { square: .95, angled: .95 }, helm: { square: .7, angled: .8 }, edge: .25, shieldR: .2, force: .3 };
 const JT_ROCK = { shield: { square: .8, angled: .6 }, body: 1, helm: 1.15, glance: .3 };
-const JT_SEAT = { reach: .3, base: .68, seat: .45, square: .1, lean: .3, shake: .22, rocked: .7 };
+const JT_SEAT = { reach: .3, base: .72, seat: .45, square: .1, lean: .3, shake: .22, rocked: .7 };
 const jtGauss = rnd => { let u = 0, v = 0; while (!u) u = rnd(); while (!v) v = rnd(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); };
 
 // the tip's spread at impact (inches, one sigma) and its droop (inches down), from the pace, the mount and its wind,
 // the lance and couch ratings and the couch's moment; hands scales the spread (a skill's, or 1 on Play)
+// (phase 3: a tired arm (o.arm, 0 to 1) sways more and sags; a rider still shaken by a rocking hit (o.shaken, 0 to 1)
+// sways more; pressure (o.press) sways them more by how little nerve they have: JT_ARM, JT_SHAKE and jtNerveK, 09-squad.js)
 function jtSway(o) {
   const P = jtPace(o.pace), M = jtMount(o.mount), r = o.rs || {}, w = clamp(o.wind ?? 1, 0, 1), c = clamp(o.couch || 0, -1, 1);
-  const lance = 1 + JT_SWAY.lance * (.5 - (r.lance ?? .5)) * 2, arm = 1.2 - .6 * (r.couch ?? .5);
-  const sigma = JT_SWAY.base * P.sway * M.sway * lance * (1 + JT_SWAY.wind * (1 - w)) * (1 + JT_SWAY.late * Math.max(0, c) + JT_SWAY.early * Math.max(0, -c)) * (o.hands ?? 1);
-  return { sigma, droop: JT_SWAY.droop * Math.max(0, -c) * arm };
+  const lance = 1 + JT_SWAY.lance * (.5 - (r.lance ?? .5)) * 2, arm = 1.2 - .6 * (r.couch ?? .5), tired = 1 - clamp(o.arm ?? 1, 0, 1);
+  const sigma = JT_SWAY.base * P.sway * M.sway * lance * (1 + JT_SWAY.wind * (1 - w)) * (1 + JT_SWAY.late * Math.max(0, c) + JT_SWAY.early * Math.max(0, -c)) * (o.hands ?? 1)
+    * (1 + JT_ARM.sway * tired) * (1 + JT_SHAKE.sway * clamp(o.shaken || 0, 0, 1)) * jtNerveK(o.press || 0, r.nerve);
+  return { sigma, droop: JT_SWAY.droop * Math.max(0, -c) * arm * (1 + JT_ARM.droop * tired) + JT_ARM.sag * tired };
 }
 // the speed at impact: the pace, the mount, its wind (a blown mount slows) and the ride rating
 function jtSpeed(o) {
@@ -46869,16 +46881,19 @@ function jtSpeed(o) {
   return JT_LISTS.speed * P.speed * M.speed * (.8 + .2 * w) * (1 + .08 * ((r.ride ?? .5) - .5));
 }
 // the mount's wind a course spends at this pace (a good rider spends less)
-const jtWindCost = (pace, rs) => jtPace(pace).wind * (1.15 - .3 * ((rs || {}).ride ?? .5));
+// (and the mount: a heavy Charger blows sooner, a Courser runs on less; phase 3)
+const jtWindCost = (pace, rs, mount) => jtPace(pace).wind * (1.15 - .3 * ((rs || {}).ride ?? .5)) * (mount == null ? 1 : jtMount(mount).wind ?? 1);
 
-/* a CPU or sim rider's ride: o = { plan: { aim, guard, pace }, rs, mount, wind, hands: { aim, couch } (the skill's) } */
+/* a CPU or sim rider's ride: o = { plan: { aim, guard, pace }, rs, mount, wind, hands: { aim, couch } (the skill's);
+   phase 3: arm, shaken, press (the sway and, under pressure, the couch's timing), girth (the seat) } */
 function jtCharge(o, rnd) {
   const p = o.plan || {}, plan = { aim: jtPick('aim', p.aim, 'shield'), guard: jtPick('guard', p.guard, 'square'), pace: jtPick('pace', p.pace, 'canter') };
-  const H = o.hands || { aim: 1, couch: .3 }, rs = o.rs || {}, mount = jtOwn(JT_MOUNT, o.mount) ? o.mount : JT_MOUNT_DEF;
+  const H = o.hands || { aim: 1, couch: .3 }, rs = o.rs || {}, mount = jtOwn(JT_MOUNT, o.mount) ? o.mount : JT_MOUNT_DEF, x = { arm: o.arm, shaken: o.shaken, press: o.press };
   const speed = jtSpeed({ pace: plan.pace, mount, rs, wind: o.wind }) * (1 + .03 * jtGauss(rnd));
-  const couch = clamp(jtGauss(rnd) * H.couch * (1.3 - .6 * (rs.couch ?? .5)), -1, 1);
-  const sw = jtSway({ pace: plan.pace, mount, rs, wind: o.wind, couch, hands: H.aim }), A = JT_PLAN.aim[plan.aim];
-  return { aim: plan.aim, guard: plan.guard, pace: plan.pace, mount, rs, speed, couch, tip: { x: A.x + jtGauss(rnd) * sw.sigma, y: A.y + jtGauss(rnd) * sw.sigma - sw.droop } };
+  const couch = clamp(jtGauss(rnd) * H.couch * (1.3 - .6 * (rs.couch ?? .5)) * jtNerveK(o.press || 0, rs.nerve), -1, 1);
+  const sw = jtSway(Object.assign({ pace: plan.pace, mount, rs, wind: o.wind, couch, hands: H.aim }, x)), A = JT_PLAN.aim[plan.aim];
+  return { aim: plan.aim, guard: plan.guard, pace: plan.pace, mount, rs, speed, couch, tip: { x: A.x + jtGauss(rnd) * sw.sigma, y: A.y + jtGauss(rnd) * sw.sigma - sw.droop },
+    girth: +o.girth || 0, shaken: clamp(+o.shaken || 0, 0, 1) };
 }
 // the force of a ride's strike: its speed against a gallop's, the mount's weight, and a clean couch (0.5 to 1.3 or so)
 const jtForce = a => (a.speed / JT_LISTS.speed) * jtMount(a.mount).hit * (1 - .25 * Math.abs(a.couch || 0));
@@ -46898,7 +46913,9 @@ function jtStrike(a, d, rnd) {
    { unhorse, rocked, hold, margin, reach } */
 function jtSeat(st, d, lean, rnd, own) {
   const r = d.rs || {}, M = jtMount(d.mount), reach = d.aim === 'helm' && !!own && !own.broke;
-  const hold = JT_SEAT.base + JT_SEAT.seat * (r.seat ?? .5) + (d.guard === 'angled' ? 0 : JT_SEAT.square) + M.steady + JT_SEAT.lean * clamp(lean ?? .5, 0, 1) - (reach ? JT_SEAT.reach : 0);
+  // (phase 3: a girth tightened between courses holds them on; a rider still shaken from a rocking hit sits worse)
+  const hold = JT_SEAT.base + JT_SEAT.seat * (r.seat ?? .5) + (d.guard === 'angled' ? 0 : JT_SEAT.square) + M.steady + JT_SEAT.lean * clamp(lean ?? .5, 0, 1) - (reach ? JT_SEAT.reach : 0)
+    + clamp(+d.girth || 0, 0, .2) - JT_SHAKE.seat * clamp(+d.shaken || 0, 0, 1);
   const hit = st.rock * (1 + JT_SEAT.shake * jtGauss(rnd)), margin = hold - hit;
   return { unhorse: !!st.broke && margin < 0, rocked: !!st.broke && st.rock >= JT_SEAT.rocked, hold, margin, reach };
 }
@@ -47008,7 +47025,7 @@ function jtPlan(s) {
   // an Archmage's pace looks ahead: the courses left in the heat ride on what wind this one leaves
   const ahead = (pace) => {
     if (sk < 2 || !Q.after) return 0;
-    const M = jtMount(mount), w1 = clamp(W0 - jtWindCost(pace, rs) + M.rec * (.6 + .4 * (rs.ride ?? .5)), 0, 1), O1 = jtOdds(rs, mount, hk, w1, { aim: habit.aim, gallop: habit.gallop });
+    const M = jtMount(mount), w1 = clamp(W0 - jtWindCost(pace, rs, mount) + M.rec * (.6 + .4 * (rs.ride ?? .5)), 0, 1), O1 = jtOdds(rs, mount, hk, w1, { aim: habit.aim, gallop: habit.gallop });
     let best = -9; for (const a of JT_AIMS) for (const p of JT_PACES) best = Math.max(best, jtWorth(O1, a, p, 'angled', habit.angled, W));
     return Q.after * best;
   };
@@ -47052,7 +47069,9 @@ const jtLean = s => clamp(jtHands(s).lean + .2 * gauss(), 0, 1);
    most, jtWindCost) and the mount gets a little back before the next (its rec). The tilt for the crown starts the
    best riders' mounts at JT_TILT_WIND.
    The box score (G.st by side, G.pst by rider): courses, lances broken, helm breaks, unhorsings (dealt), unhorsed,
-   glances, misses, fouls, rocked by a broken lance, seats kept after one. G.plans keeps each side's plans (the
+   glances, misses, fouls, rocked by a broken lance, seats kept after one (by rider too from phase 3, and a squire's
+   jobs done). Phase 3 (09-squad.js): each side's squires (G.squires), the rider's arm, a rocking hit's shake, the
+   girth, and the corner between courses (jtCornersDue before a course, jtSquadAfter after one). G.plans keeps each side's plans (the
    herald's card and the Archmage's read, phase 4). G.last is the last course, for the page. */
 const JT_TILT_WIND = .8;
 let GB = null;   // the course between jtTurn() and the page's drawing (phase 2): not saved
@@ -47061,9 +47080,13 @@ function jtStart(opts) {
   if (o.seed != null) engSeed(o.seed);
   const teams = [0, 1].map(s => { const T = (o.teams && o.teams[s]) || { name: s ? 'Saltmere' : 'Mossgate', short: s ? 'SAL' : 'MOS', color: s ? '#2f7898' : '#3a5a9a' };
     const roster = (T.roster && T.roster.length >= JT_RULES.side ? T.roster : [0, 1, 2, 3].map(i => ({ n: `${T.short || 'P'} ${i + 1}`, kind: '' })))
-      .map(p => Object.assign({}, p, { rs: p.rs || jtRs(p.kind) }));
+      .map(p => jtRosterOne(p));
     return Object.assign({}, T, { roster }); });
-  jtNewMatch({ courses: o.courses, riders: o.riders || teams.map(T => T.riders), roster: teams.map(T => T.roster.length), best: o.best });
+  // (phase 3: riders left out are picked by the ratings when the roster brings its own (r); the best rider for the tilt,
+  // left out, by nerve and lance, 09-squad.js)
+  const riders0 = [0, 1].map(s => (o.riders || [])[s] || teams[s].riders || (teams[s].roster.some(m => m.r) ? jtAutoSquad(teams[s].roster).riders : null));
+  jtNewMatch({ courses: o.courses, riders: riders0, roster: teams.map(T => T.roster.length), best: o.best });
+  if (o.best == null) G.best = [0, 1].map(s => jtBestOf(teams[s].roster, G.riders[s]));
   const mounts = [0, 1].map(s => [0, 1].map(i => { const m = ((o.mounts || [])[s] || [])[i]; return jtOwn(JT_MOUNT, m) ? m : JT_MOUNT_DEF; }));
   // (lab only: a side planned by another skill's logic, ridden with another skill's hands, or held to one plan)
   const labSide = (L, ok) => Array.isArray(L) ? [0, 1].map(s => ok(L[s]) ? L[s] : null) : null, sk3 = v => v === 0 || v === 1 || v === 2;
@@ -47071,7 +47094,8 @@ function jtStart(opts) {
   const lab = { planBy: labSide(o.planBy, sk3), handsBy: labSide(o.handsBy, sk3), fix: labSide(o.fix, fixOk) };
   if (lab.fix) lab.fix = lab.fix.map(p => p && { aim: p.aim, guard: p.guard, pace: p.pace });
   Object.assign(G, { teams, skill: [0, 1].map(s => clamp(((o.skill || [])[s] ?? 1) | 0, 0, 2)), mounts, wind: [1, 1], n: 0, lab,
-    st: [jtBox(), jtBox()], pst: teams.map(T => T.roster.map(() => ({ courses: 0, breaks: 0, helms: 0, unhorse: 0 }))), plans: [[], []], last: null });
+    st: [jtBox(), jtBox()], pst: teams.map(T => T.roster.map(() => ({ courses: 0, breaks: 0, helms: 0, unhorse: 0, unhorsed: 0, rocked: 0, kept: 0, fouls: 0, jobs: 0 }))), plans: [[], []], last: null });
+  jtSquadStart(o, teams);
   GB = null;
   return G;
 }
@@ -47082,6 +47106,7 @@ const jtRsOf = (s, ri) => G.teams[s].roster[ri].rs;
 // the next course, CPU against CPU: { heat, course, tilt, riders, plans, rides, imp, rule } or null when the match is over
 function jtTurn() {
   if (!G || G.over) return null;
+  jtCornersDue();
   return jtRideCourse([jtPlan(0), jtPlan(1)]);
 }
 function jtRideCourse(plans, given, leans) { const P = jtCourseOpen(plans, given, leans); return P ? jtCourseClose(P) : null; }
@@ -47091,7 +47116,8 @@ function jtRideCourse(plans, given, leans) { const P = jtCourseOpen(plans, given
    come in the same order as jtImpact's: the rides, the leans, the two strikes, the two seats. P is plain data. */
 function jtCourseOpen(plans, given, leans, wait) {
   const riders = jtRiders(); if (!riders) return null;
-  const rides = [0, 1].map(s => (given && given[s]) || jtCharge({ plan: plans[s], rs: jtRsOf(s, riders[s]), mount: jtMountOf(s), wind: G.wind[s], hands: jtHands(s) }, R));
+  jtCornersDue();
+  const rides = [0, 1].map(s => (given && given[s]) || jtCharge(jtRideOpts(s, plans[s]), R));
   const lean = [0, 1].map(s => leans && leans[s] != null ? leans[s] : wait && wait[s] ? null : jtLean(s));
   const st = [jtStrike(rides[0], rides[1], R), jtStrike(rides[1], rides[0], R)];
   return { heat: G.heat, course: G.course, tilt: jtInTilt(), riders, plans, rides, lean, st, n: G.n };
@@ -47103,16 +47129,18 @@ function jtCourseClose(P, leans) {
   const imp = { res: [0, 1].map(s => ({ at: st[s].at, unhorse: seat[1 - s].unhorse })), st, seat };
   const lead = [0, 1].map(s => jtTotal(s) - jtTotal(1 - s)), rule = jtCourse(imp.res);
   // the mounts: the course's wind spent, a little back before the next; fresh mounts for a new heat
-  [0, 1].forEach(s => { const M = jtMount(rides[s].mount); G.wind[s] = clamp(G.wind[s] - jtWindCost(rides[s].pace, rides[s].rs) + M.rec * (.6 + .4 * (rides[s].rs.ride ?? .5)), 0, 1); });
+  [0, 1].forEach(s => { const M = jtMount(rides[s].mount); G.wind[s] = clamp(G.wind[s] - jtWindCost(rides[s].pace, rides[s].rs, rides[s].mount) + M.rec * (.6 + .4 * (rides[s].rs.ride ?? .5)), 0, 1); });
   if (rule.tiltNow) G.wind = [JT_TILT_WIND, JT_TILT_WIND]; else if (rule.heatOver) G.wind = [1, 1];
+  // the rider's arm, a rocking hit's shake, the girth, and the squires' corner before the next course (09-squad.js)
+  jtSquadAfter(rides, imp, rule);
   // the box score
   [0, 1].forEach(s => {
     const B = G.st[s], Pp = G.pst[s][riders[s]], sk = imp.st[s], se = imp.seat[s];
     B.courses++; Pp.courses++;
     if (sk.broke) { B.breaks++; Pp.breaks++; if (sk.zone === 'helm') { B.helms++; Pp.helms++; } }
-    else if (sk.at === 'glance') B.glances++; else if (sk.at === 'miss') B.misses++; else B.fouls++;
-    if (imp.res[s].unhorse) { B.unhorse++; Pp.unhorse++; G.st[1 - s].unhorsed++; }
-    if (se.rocked) { B.rocked++; if (!se.unhorse) B.kept++; }
+    else if (sk.at === 'glance') B.glances++; else if (sk.at === 'miss') B.misses++; else { B.fouls++; Pp.fouls = (Pp.fouls || 0) + 1; }
+    if (imp.res[s].unhorse) { B.unhorse++; Pp.unhorse++; G.st[1 - s].unhorsed++; const Q = G.pst[1 - s][riders[1 - s]]; Q.unhorsed = (Q.unhorsed || 0) + 1; }
+    if (se.rocked) { B.rocked++; Pp.rocked = (Pp.rocked || 0) + 1; if (!se.unhorse) { B.kept++; Pp.kept = (Pp.kept || 0) + 1; } }
     G.plans[s].push({ aim: plans[s].aim, guard: plans[s].guard, pace: plans[s].pace, why: plans[s].why || '', heat, course, at: sk.at, lead: lead[s] });
   });
   G.n++;
@@ -47163,7 +47191,7 @@ const JT_MODES = ['watch', 'play'];
 let GP = null;
 
 function jtPlayStart(o) {
-  GP = { mode: JT_MODES.includes(o && o.mode) ? o.mode : 'watch', you: 0, ph: 'next', t: 0, wait: 0, msg: '', sel: null, plans: null, cpuRides: null, ch: null, seatM: null, P: null, last: null, call: '', fx: [] };
+  GP = { mode: JT_MODES.includes(o && o.mode) ? o.mode : 'watch', you: 0, ph: 'next', t: 0, wait: 0, msg: '', sel: null, jobs: null, plans: null, cpuRides: null, ch: null, seatM: null, P: null, last: null, call: '', fx: [] };
   jtGo('next');
   return GP;
 }
@@ -47188,6 +47216,15 @@ function jtSelect(o) {
   if (!GP || GP.ph !== 'plan' || !GP.sel) return 'Not now.';
   o = o || {};
   if (o.suggest) { GP.sel = jtSuggest(GP.you); jtPicked(); return ''; }
+  // (phase 3: your squires' jobs between courses: jobs [two], or job [which squire, the job]; corner: your corner's word again)
+  if (o.corner || o.jobs || o.job) {
+    if (!GP.jobs) return 'Your squires have nothing to do before the first course of a heat.';
+    if (o.corner) { GP.jobs = jtCornerPlan(GP.you, 1).jobs; jtPicked(); return ''; }
+    let J = o.jobs;
+    if (o.job) { const [i, j] = o.job; if (!(i === 0 || i === 1) || !jtOwn(JT_JOB, j)) return 'No such job.'; J = GP.jobs.slice(); if (J[1 - i] === j) J[1 - i] = J[i]; J[i] = j; }
+    if (!jtJobsOk(J)) return 'Two squires, two different jobs.';
+    GP.jobs = J.slice(); jtPicked(); return '';
+  }
   const S = Object.assign({}, GP.sel);
   for (const k of ['aim', 'guard', 'pace']) if (o[k] != null) { if (!jtOwn(JT_PLAN[k], o[k])) return `No such ${k}.`; S[k] = o[k]; }
   GP.sel = S; jtPicked(); return '';
@@ -47226,9 +47263,12 @@ function jtNudge(vx, vy) { if (GP) GP.keyV = { x: clamp(vx || 0, -1, 1), y: clam
 function jtLeanTo(v) { const M = GP && GP.seatM; if (!M) return false; M.lean = clamp(+v || 0, -1.5, 1.5); return true; }
 function jtCharge0() {
   const riders = jtRiders(); if (!riders) return;
+  // (phase 3: your squires do the jobs you gave them before you set off)
+  if (jtYours(GP.you) && GP.jobs && G.cornerDue && G.cornerDue[GP.you]) jtCornerDo(GP.you, GP.jobs, 'your call');
+  GP.jobs = null;
   const plans = [0, 1].map(s => jtYours(s) ? Object.assign({}, GP.sel) : GP.plans[s]);
   // the CPU's rides are drawn as it sets off (the page draws its lance from them); yours is built as you ride
-  const cpuRides = [0, 1].map(s => jtYours(s) ? null : jtCharge({ plan: plans[s], rs: jtRsOf(s, riders[s]), mount: jtMountOf(s), wind: G.wind[s], hands: jtHands(s) }, R));
+  const cpuRides = [0, 1].map(s => jtYours(s) ? null : jtCharge(jtRideOpts(s, plans[s]), R));
   const mine = jtYours(0) || jtYours(1), s = GP.you;
   GP.plans = plans; GP.cpuRides = cpuRides; GP.keyV = { x: 0, y: 0 };
   GP.ch = { p: 0, mine, pace: mine ? plans[s].pace : plans[0].pace, hit: [], taps: [], bad: 0, down: false, downAt: null, hand: { x: 0, y: 0 }, tipNow: null, riders };
@@ -47246,7 +47286,8 @@ function jtEight(t, amp, pace) { const w = Math.PI / jtBeat(pace); return { x: a
 // your sway now: sway() for your plan, your rider and mount, and the couch as it stands (late if still up)
 function jtYourSway(C) {
   const s = GP.you, ri = C.riders[s], e = jtCouchErr(C);
-  return jtSway({ pace: GP.plans[s].pace, mount: jtMountOf(s), rs: jtRsOf(s, ri), wind: G.wind[s], couch: e == null ? 0 : e, hands: 1 });
+  const X = jtRideX(s);
+  return jtSway({ pace: GP.plans[s].pace, mount: jtMountOf(s), rs: jtRsOf(s, ri), wind: G.wind[s], couch: e == null ? 0 : e, hands: 1, arm: X.arm, shaken: X.shaken, press: X.press });
 }
 // where your tip is now (inches, on their target), once couched; null while the lance is up
 function jtTipNow(C) {
@@ -47258,10 +47299,10 @@ function jtTipNow(C) {
 function jtYourRide(C) {
   const s = GP.you, ri = C.riders[s], plan = GP.plans[s], rs = jtRsOf(s, ri), mount = jtMountOf(s), q = jtSpurQ(C), e = jtCouchErr(C);
   const speed = jtSpeed({ pace: plan.pace, mount, rs, wind: G.wind[s] }) * (JT_PLAY.spur.min + (1 - JT_PLAY.spur.min) * q);
-  const A = JT_PLAN.aim[plan.aim];
-  if (e == null) return { aim: plan.aim, guard: plan.guard, pace: plan.pace, mount, rs, speed, couch: 1, tip: { x: A.x, y: A.y + JT_PLAY.couch.high }, spurQ: q, up: true };
+  const A = JT_PLAN.aim[plan.aim], X = jtRideX(s), sq = { girth: X.girth, shaken: X.shaken };
+  if (e == null) return Object.assign({ aim: plan.aim, guard: plan.guard, pace: plan.pace, mount, rs, speed, couch: 1, tip: { x: A.x, y: A.y + JT_PLAY.couch.high }, spurQ: q, up: true }, sq);
   const sw = jtYourSway(C), t = jtTipNow(C);
-  return { aim: plan.aim, guard: plan.guard, pace: plan.pace, mount, rs, speed, couch: e, tip: { x: t.x + gauss() * sw.sigma * JT_PLAY.aim.noise, y: t.y + gauss() * sw.sigma * JT_PLAY.aim.noise }, spurQ: q };
+  return Object.assign({ aim: plan.aim, guard: plan.guard, pace: plan.pace, mount, rs, speed, couch: e, tip: { x: t.x + gauss() * sw.sigma * JT_PLAY.aim.noise, y: t.y + gauss() * sw.sigma * JT_PLAY.aim.noise }, spurQ: q }, sq);
 }
 function jtChargeTick(dt) {
   const C = GP.ch; if (!C) return;
@@ -47357,9 +47398,17 @@ function jtTick(dt) {
 function jtWhere() { return jtInTilt() ? `The tilt for the crown, course ${G.course + 1}` : `Heat ${G.heat + 1}, course ${G.course + 1} of ${G.courses}`; }
 function jtPlayNext() {
   const riders = jtRiders(); if (!riders) { jtGo('over'); return; }
+  // (phase 3: the CPU's corners first, so its plan reads its rider and mount as they set off; yours waits for your call)
+  const yours = jtYours(GP.you), due = !!(G.cornerDue && G.cornerDue[GP.you]);
+  jtCornersDue(yours && due ? GP.you : null);
+  GP.jobs = yours && due ? jtCornerPlan(GP.you, 1).jobs : null;
   GP.plans = [0, 1].map(s => jtYours(s) ? null : jtPlan(s));
   const vs = `${jtName(0, riders[0])} (${jtSide(0)}) against ${jtName(1, riders[1])} (${jtSide(1)})`;
-  if (jtYours(GP.you)) { GP.sel = jtSuggest(GP.you); jtGo('plan', 0, `${jtWhere()}: ${vs}. Your squire says: ${GP.sel.aim === 'helm' ? 'the helm' : JT_PLAN.aim[GP.sel.aim].n}, ${GP.sel.guard}, at ${JT_PLAN.pace[GP.sel.pace].n} (${GP.sel.why}). Change the plan if you like, then Ride.`); return; }
+  if (jtYours(GP.you)) {
+    GP.sel = jtSuggest(GP.you);
+    const sq = GP.jobs ? ` Your corner: ${GP.jobs.map((j, i) => `${jtSqName(GP.you, i)} ${JT_JOB[j].v}`).join(', ')}.` : '';
+    jtGo('plan', 0, `${jtWhere()}: ${vs}.${sq} Your squire says: ${GP.sel.aim === 'helm' ? 'the helm' : JT_PLAN.aim[GP.sel.aim].n}, ${GP.sel.guard}, at ${JT_PLAN.pace[GP.sel.pace].n} (${GP.sel.why}). Change the plan if you like, then Ride.`); return;
+  }
   jtGo('herald', 0, `${jtWhere()}: ${vs}.`);
 }
 function jtSetMode(m) {
@@ -47374,6 +47423,7 @@ function jtView() {
   const C = GP.ch, M = GP.seatM, r = jtRiders();
   return { mode: GP.mode, you: GP.you, ph: GP.ph, msg: GP.msg, call: GP.call, riders: r, heat: G.heat, course: G.course, inTilt: jtInTilt(),
     sel: GP.sel ? Object.assign({}, GP.sel) : null, plans: GP.plans ? JSON.parse(JSON.stringify(GP.plans)) : null,
+    jobs: GP.jobs ? GP.jobs.slice() : null, squad: jtSquadView(),
     charge: C ? { p: C.p, mine: C.mine, pace: C.pace, hits: C.hit.length, bad: C.bad, spurQ: jtSpurQ(C), down: C.down, downAt: C.downAt, couch: jtCouchErr(C), hand: Object.assign({}, C.hand), tip: C.tipNow ? Object.assign({}, C.tipNow) : null } : null,
     seat: M ? { t: M.t, w: M.w, lean: M.lean, q: jtLeanQ(M) } : null, wind: G.wind.slice() };
 }
@@ -47673,6 +47723,249 @@ function jtDraw(c, dt) {
   if (!G || !G.teams) { c.fillStyle = '#c9a46c'; c.fillRect(0, 0, JT_VIEW.w, JT_VIEW.h); return; }
   jtListsDraw(c); jtRidersDraw(c); jtBoardDraw(c); jtCallDraw(c); jtBeatsDraw(c);
 }
+/* The Tilting Lists: the four and their roles, the rider's arm, a rocking hit's shake, the squires' corner, pressure and
+   nerve (issue #117, phase 3).
+
+   The four (JT_RULES.side): two ride (G.riders, the first side's first rider in the first heat) and two squire
+   (G.squires). How well ratings suit each role (jtFit, 0 to 1): a rider's lance most, then the seat, the couch, the
+   shield and the ride, a little nerve; a squire's care, and the ride (they know a horse). jtAutoSquad picks: the two
+   best riders (the steadier nerve of the two rides the second heat, when the match hangs on it), then the two best
+   squires of the rest. The best rider for the tilt for the crown (jtBestOf): nerve and lance, as phase 0's best.
+   Over a heat (G.wind, G.arm, G.shaken and G.girth, a side each; the next heat's rider starts fresh):
+   - the mount's wind (06-game.js): a course spends some, a gallop most; a little comes back between courses;
+   - the rider's arm (JT_ARM): every couch tires it, an early one (a long hold) most; a rider with a good couch rating
+     tires less. A tired arm sways more, and the tip droops and sags;
+   - the shake (JT_SHAKE): a rider rocked by a broken lance who keeps the seat is shaken for the next course (more
+     sway, a worse seat); left alone, most of it wears off by the course after;
+   - the girth (a squire's job): a better seat for the next course only.
+   The corner (G.cornerDue): between two courses with the same riders (in a heat, and in the tilt), each side's two
+   squires do one job each, two of the three (JT_JOB): tend the mount (a share of its lost wind back), steady the rider
+   (a share of the shake gone and of the arm's strength back) or tighten the girth (the seat next course). A squire's
+   care sets how much (jtJobAmt), so a fresh mount needs no tending and an unshaken rider little steadying. The
+   corner is chosen by the side: on Play by you, your corner suggesting; the CPU by its skill (jtCornerPlan):
+   - a Squire's corner picks two jobs at random;
+   - a Knight's works out each way of sharing two jobs between its two squires on the model (jtCornerM: the next
+     course ridden from the state the jobs leave, against the plan a Knight would ride, and what lasts, the wind and
+     the arm, for one more course), and takes the best;
+   - an Archmage's does the same against the plan the other side will really ride (its own skill's).
+   Every corner is logged with its reason (G.corners).
+   Pressure (jtPressure, 0 or 1): the last course of a heat when the side is behind in the match, and every course of
+   the tilt for the crown. Nerve takes it off (jtNerveK): the tip sways more and the couch's timing scatters, less for
+   a steady nerve; a perfect nerve feels nothing.
+   Lab only: G.lab.cornerBy (a skill a side, or 'none': no corner at all; or a job to leave out: 'no-tend' and so on). */
+const JT_ROLE = {
+  rider: { lance: .3, couch: .14, seat: .22, shield: .12, ride: .14, nerve: .08 },
+  squire: { care: .75, ride: .25 }
+};
+const JT_ARM = { cost: .07, early: .35, couchR: .5, back: .03, sway: .3, droop: .6, sag: 3, tilt: .85 };
+const JT_SHAKE = { sway: .5, seat: .2, fade: .4 };
+const JT_NERVE = { k: .6 };
+const JT_JOB = {
+  tend: { n: 'Tend the mount', v: 'tends the mount', a: .35, b: .35 },
+  steady: { n: 'Steady the rider', v: 'steadies the rider', a: .5, b: .5, arm: [.3, .3] },
+  girth: { n: 'Tighten the girth', v: 'tightens the girth', a: .03, b: .07 }
+};
+const JT_JOBS = Object.keys(JT_JOB);
+// the CPU's corner works out each job on the model (jtCornerM): n courses on a stream of its own (seed); what lasts (the
+// wind, the arm) counts last for the course after; an unhorsing costs heat for each course left; plain is the plan
+// it reckons for a rider whose plan is anything
+const JT_CORNER = { n: 240, seed: 1171, last: .8, heat: .6, plain: { aim: 'shield', guard: 'square', pace: 'canter' } };
+
+/* ---------- the four and their roles ---------- */
+// a roster member as the engine takes one: r (1 to 12, the rest from the kind) when brought, else rs (0 to 1), else the kind's
+function jtRosterOne(p) {
+  const m = Object.assign({}, p);
+  if (p.r && typeof p.r === 'object') {
+    const r = jtRate(p.kind); for (const k of JT_STATS) if (jtOwn(p.r, k) && Number.isFinite(+p.r[k])) r[k] = +p.r[k];
+    m.r = r; m.rs = Object.fromEntries(JT_STATS.map(k => [k, jtScale(r[k])]));
+  } else m.rs = p.rs && typeof p.rs === 'object' ? Object.assign(jtRs(p.kind), p.rs) : jtRs(p.kind);
+  return m;
+}
+// how well ratings (0 to 1) suit a role ('rider' or 'squire'), 0 to 1
+function jtFit(rs, role) { const W = JT_ROLE[role === 'squire' ? 'squire' : 'rider'], r = rs || {}; let v = 0; for (const k in W) v += W[k] * (r[k] ?? .5); return v; }
+// the captain's pick for a roster (each with rs): { riders: [heat 1's, heat 2's], squires: [two] }, roster indexes
+function jtAutoSquad(roster) {
+  const ix = roster.map((_, i) => i), rs = i => roster[i].rs || jtRs(roster[i].kind);
+  const by = role => (a, b) => jtFit(rs(b), role) - jtFit(rs(a), role) || a - b;
+  const two = ix.slice().sort(by('rider')).slice(0, 2);
+  // the steadier nerve rides the second heat
+  if ((rs(two[0]).nerve ?? .5) > (rs(two[1]).nerve ?? .5) + 1e-9) two.reverse();
+  const squires = ix.filter(i => !two.includes(i)).sort(by('squire')).slice(0, 2);
+  return { riders: two, squires };
+}
+// the slot (0 or 1) of the best rider for the tilt: nerve and lance; null when the two are alike
+function jtBestOf(roster, riders) {
+  if (!Array.isArray(riders) || riders.length !== 2) return null;
+  const v = riders.map(i => { const r = (roster[i] || {}).rs || {}; return .55 * (r.nerve ?? .5) + .45 * (r.lance ?? .5); });
+  return Math.abs(v[0] - v[1]) < 1e-9 ? null : v[1] > v[0] ? 1 : 0;
+}
+
+/* ---------- a match's squad state ---------- */
+function jtSquiresOk(q, s) { const n = G.teams[s].roster.length; return Array.isArray(q) && q.length === 2 && new Set(q).size === 2 && q.every(i => Number.isInteger(i) && i >= 0 && i < n && !G.riders[s].includes(i)); }
+function jtSquadStart(o, teams) {
+  G.squires = [0, 1].map(s => {
+    const q = (o.squires || [])[s] || teams[s].squires;
+    if (jtSquiresOk(q, s)) return q.slice();
+    const rest = teams[s].roster.map((_, i) => i).filter(i => !G.riders[s].includes(i));
+    return rest.sort((a, b) => jtFit(teams[s].roster[b].rs, 'squire') - jtFit(teams[s].roster[a].rs, 'squire') || a - b).slice(0, 2);
+  });
+  G.arm = [1, 1]; G.shaken = [0, 0]; G.girth = [0, 0]; G.cornerDue = [false, false]; G.corners = [[], []];
+  const cb = o.cornerBy, okC = v => v === 0 || v === 1 || v === 2 || v === 'none' || (typeof v === 'string' && /^no-(tend|steady|girth)$/.test(v));
+  if (Array.isArray(cb)) G.lab.cornerBy = [0, 1].map(s => okC(cb[s]) ? cb[s] : null);
+}
+const jtSq = (k, s, d) => G && Array.isArray(G[k]) && Number.isFinite(G[k][s]) ? G[k][s] : d;
+// how big the moment is for side s: the last course of a heat when behind in the match, and the tilt for the crown
+function jtPressure(s) {
+  if (!G || G.over || !G.teams) return 0;
+  if (jtInTilt()) return 1;
+  return G.course === G.courses - 1 && jtTotal(s) < jtTotal(1 - s) ? 1 : 0;
+}
+const jtNerveK = (p, nerve) => 1 + JT_NERVE.k * clamp(p || 0, 0, 2) * (1 - clamp(nerve ?? .5, 0, 1));
+// side s's rider as they set off now: { arm, shaken, girth, press }
+function jtRideX(s) { return { arm: jtSq('arm', s, 1), shaken: jtSq('shaken', s, 0), girth: jtSq('girth', s, 0), press: jtPressure(s) }; }
+// everything jtCharge needs for side s's rider on plan
+function jtRideOpts(s, plan) {
+  const ri = (jtRiders() || [])[s];
+  return Object.assign({ plan, rs: jtRsOf(s, ri), mount: jtMountOf(s), wind: G.wind[s], hands: jtHands(s) }, jtRideX(s));
+}
+// after a course (06-game.js, once the wind is done): the arm spent, the shake taken or wearing off, the girth used,
+// and the corner due when the same riders go again
+function jtSquadAfter(rides, imp, rule) {
+  if (!G.arm) { G.arm = [1, 1]; G.shaken = [0, 0]; G.girth = [0, 0]; G.cornerDue = [false, false]; G.corners = [[], []]; }
+  for (const s of [0, 1]) {
+    const r = rides[s].rs || {}, early = Math.max(0, -(rides[s].couch || 0));
+    G.arm[s] = clamp(G.arm[s] - (JT_ARM.cost + JT_ARM.early * early) * (1.25 - JT_ARM.couchR * (r.couch ?? .5)) + JT_ARM.back, 0, 1);
+    const se = imp.seat[s];
+    G.shaken[s] = se.rocked && !se.unhorse ? Math.max(G.shaken[s] * JT_SHAKE.fade, clamp(imp.st[1 - s].rock, 0, 1)) : G.shaken[s] * JT_SHAKE.fade;
+    if (G.shaken[s] < .02) G.shaken[s] = 0;
+    G.girth[s] = 0;
+  }
+  if (rule.over) { G.cornerDue = [false, false]; return; }
+  if (rule.tiltNow) { G.arm = [JT_ARM.tilt, JT_ARM.tilt]; G.shaken = [0, 0]; G.cornerDue = [false, false]; return; }
+  if (rule.heatOver) { G.arm = [1, 1]; G.shaken = [0, 0]; G.cornerDue = [false, false]; return; }
+  G.cornerDue = [true, true];
+}
+
+/* ---------- the corner ---------- */
+const jtCare = (s, i) => { const m = G.teams[s].roster[G.squires[s][i]]; return clamp((m && m.rs && m.rs.care) ?? .5, 0, 1.2); };
+const jtSqName = (s, i) => (G.teams[s].roster[G.squires[s][i]] || {}).n || 'A squire';
+// what a squire of this care does at a job: tend, the share of the mount's lost wind it gets back; steady, the share of
+// the shake gone (and of the arm's strength back); girth, the seat next course
+const jtJobAmt = (job, care) => { const J = JT_JOB[job]; return J ? J.a + J.b * clamp(care, 0, 1.2) : 0; };
+// the courses side s's rider still has in this heat after the next one (the wind and the arm last that long)
+const jtAfterNext = () => jtInTilt() ? 0 : Math.max(0, G.courses - G.course - 1);
+// the state side s's rider would set off in after jobs [a, b]: { wind, arm, shaken, girth }
+function jtAfterJobs(s, jobs) {
+  const X = { wind: jtSq('wind', s, 1), arm: jtSq('arm', s, 1), shaken: jtSq('shaken', s, 0), girth: 0 }, A = JT_JOB.steady.arm;
+  jobs.forEach((job, i) => { const care = jtCare(s, i), amt = Math.min(1, jtJobAmt(job, care));
+    if (job === 'tend') X.wind = clamp(X.wind + (1 - X.wind) * amt, 0, 1);
+    else if (job === 'steady') { X.shaken = clamp(X.shaken * (1 - amt), 0, 1); X.arm = clamp(X.arm + (1 - X.arm) * Math.min(1, A[0] + A[1] * care), 0, 1); }
+    else X.girth = jtJobAmt(job, care); });
+  return X;
+}
+/* what one course is worth to side s (its points less the other side's, on average) with its rider in state X, riding
+   the plan it would ride then, against the other rider on plan op: played out JT_CORNER.n times on a stream of its own
+   (the same numbers for every state, so the states are compared fairly; the match's random numbers are never touched) */
+function jtCornerM(s, X, op) {
+  const keep = ['wind', 'arm', 'shaken', 'girth'].map(k => G[k][s]), o = 1 - s, lab = G.lab || {};
+  let mine;
+  try {
+    G.wind[s] = X.wind; G.arm[s] = X.arm; G.shaken[s] = X.shaken; G.girth[s] = X.girth;
+    const psk = lab.planBy && lab.planBy[s] != null ? lab.planBy[s] : G.skill[s];
+    mine = jtRideOpts(s, psk <= 0 && !(lab.fix && lab.fix[s]) ? JT_CORNER.plain : jtPlan(s));
+  } finally { ['wind', 'arm', 'shaken', 'girth'].forEach((k, i) => { G[k][s] = keep[i]; }); }
+  const theirs = jtRideOpts(o, op), rnd = engRng(JT_CORNER.seed), ln = [0, 1].map(x => JT_SKILL[jtHandsK(x)].lean);
+  const pts = (I, x) => I.res[x].unhorse ? JT_RULES.unhorse : JT_RULES.pts[I.res[x].at] || 0;
+  let m = 0;
+  for (let i = 0; i < JT_CORNER.n; i++) {
+    const a = jtCharge(mine, rnd), b = jtCharge(theirs, rnd), I = jtImpact(s ? [b, a] : [a, b], ln, rnd);
+    m += pts(I, s) - pts(I, o) - (I.res[o].unhorse ? JT_CORNER.heat * jtAfterNext() : 0) + (I.res[s].unhorse ? JT_CORNER.heat * jtAfterNext() : 0);
+  }
+  return m / JT_CORNER.n;
+}
+// the plan the other side's rider is reckoned to ride next: a Knight's corner reckons a Knight's plan; an Archmage's
+// reads the other side's own (a Squire's anything: its plain plan)
+function jtCornerOpp(s, sk) {
+  const o = 1 - s, keep = G.skill[o];
+  if (sk >= 2 && keep <= 0) return JT_CORNER.plain;
+  if (sk < 2) G.skill[o] = 1;
+  try { return jtPlan(o); } finally { G.skill[o] = keep; }
+}
+/* side s's corner, by a skill: { jobs: [squire 0's job, squire 1's], why } */
+function jtCornerPlan(s, sk, allow) {
+  if (sk == null) { const lab = (G.lab || {}).cornerBy; sk = lab && typeof lab[s] === 'number' ? lab[s] : G.skill[s]; }
+  const jobs = allow || JT_JOBS;
+  if (sk <= 0) {
+    const a = jobs[Math.floor(R() * jobs.length)], rest = jobs.filter(j => j !== a), b = rest[Math.floor(R() * rest.length)];
+    return { jobs: [a, b], why: 'two jobs picked on a whim' };
+  }
+  // each way to share two of the jobs between the two squires: the next course in the state it leaves, and what lasts
+  // (the wind and the arm) for one more course when the heat has one (counting every course left did worse: measured)
+  const op = jtCornerOpp(s, sk), after = Math.min(1, jtAfterNext()), base = jtCornerM(s, Object.assign(jtAfterJobs(s, []), { shaken: 0 }), op);
+  let best = null;
+  for (const a of jobs) for (const b of jobs) {
+    if (a === b) continue;
+    const X = jtAfterJobs(s, [a, b]), v = jtCornerM(s, X, op) + (after ? after * JT_CORNER.last * (jtCornerM(s, { wind: X.wind, arm: X.arm, shaken: 0, girth: 0 }, op) - base) : 0);
+    if (!best || v > best.v + 1e-9) best = { jobs: [a, b], v };
+  }
+  return { jobs: best.jobs, why: jtCornerWhy(s, best.jobs) };
+}
+// the reason: what each squire does, and why that job
+function jtCornerWhy(s, jobs) {
+  const w = Math.round(100 * jtSq('wind', s, 1)), arm = Math.round(100 * jtSq('arm', s, 1)), sh = jtSq('shaken', s, 0);
+  const why = { tend: w < 80 ? `the mount's wind is down to ${w}%` : 'a breath for the mount', steady: sh > .05 ? 'the rider is still shaken from that hit' : arm < 85 ? `the lance arm is tiring (${arm}%)` : 'a word in the rider\'s ear',
+    girth: 'a tighter girth to sit the next hit' };
+  const left = JT_JOBS.find(j => !jobs.includes(j));
+  return `${jtSqName(s, 0)} ${JT_JOB[jobs[0]].v} (${why[jobs[0]]}); ${jtSqName(s, 1)} ${JT_JOB[jobs[1]].v} (${why[jobs[1]]}); nobody spare to ${JT_JOB[left].n.toLowerCase()}`;
+}
+// a corner's jobs, if they are two of the three and not the same: [a, b], or null
+function jtJobsOk(jobs) { return Array.isArray(jobs) && jobs.length === 2 && jobs.every(j => jtOwn(JT_JOB, j)) && jobs[0] !== jobs[1] ? jobs.slice() : null; }
+/* side s's squires do their jobs (jobs: [squire 0's, squire 1's]); returns '' or why not */
+function jtCornerDo(s, jobs, why) {
+  if (!G || !G.teams || G.over) return 'No match.';
+  if (!G.cornerDue || !G.cornerDue[s]) return 'Not between courses.';
+  const J = jtJobsOk(jobs); if (!J) return 'Two squires, two different jobs: tend the mount, steady the rider or tighten the girth.';
+  const X = jtAfterJobs(s, J), did = {};
+  if (J.includes('tend')) did.tend = +(X.wind - G.wind[s]).toFixed(3);
+  if (J.includes('steady')) did.steady = { shake: +(G.shaken[s] - X.shaken).toFixed(3), arm: +(X.arm - G.arm[s]).toFixed(3) };
+  if (J.includes('girth')) did.girth = +X.girth.toFixed(3);
+  G.wind[s] = X.wind; G.arm[s] = X.arm; G.shaken[s] = X.shaken; G.girth[s] = X.girth;
+  J.forEach((job, i) => { const P = G.pst[s][G.squires[s][i]]; if (P) P.jobs = (P.jobs || 0) + 1; });
+  G.cornerDue[s] = false;
+  G.corners[s].push({ heat: G.heat, course: G.course, jobs: J, why: why || '', did });
+  return '';
+}
+// before a course: every side whose corner is due and not done has its corner choose (the CPU's way, by skill); skip:
+// a side to leave alone (yours on Play, until you ride)
+function jtCornersDue(skip) {
+  if (!G || !G.teams || !G.cornerDue) return;
+  for (const s of [0, 1]) {
+    if (!G.cornerDue[s] || s === skip) continue;
+    const lab = (G.lab || {}).cornerBy, L = lab ? lab[s] : null;
+    if (L === 'none') { G.cornerDue[s] = false; continue; }
+    const P = typeof L === 'string' ? jtCornerPlan(s, 1, JT_JOBS.filter(j => j !== L.slice(3))) : jtCornerPlan(s);
+    jtCornerDo(s, P.jobs, P.why);
+  }
+}
+
+/* ---------- the mounts ---------- */
+// the mount a rider of these ratings rides best, with the reason (the Realm's captain; your choice on the Lists tab). By
+// the lab (seeded matches, a Knight a side, against Destriers): a steady lance does best on a Charger in a short heat
+// (an elf), a rider who keeps a gallop up on a Courser (a harpy), the rest on a Destrier, a long heat most of all
+function jtMountFor(rs, courses) {
+  const r = rs || {}, long = (courses || JT_RULES.courses) >= 5;
+  if ((r.lance ?? .5) >= .8 && !long) return { m: 'charger', why: 'a lance that steady can take its sway for the harder hit' };
+  if ((r.ride ?? .5) >= .7) return { m: 'courser', why: 'it keeps up a gallop all heat and gets its wind back quickly' };
+  return { m: 'destrier', why: long ? 'steady to aim from and to sit a hit on, over a long heat' : 'steady to aim from and to sit a hit on' };
+}
+
+// what the page shows of each side's squad now (a copy)
+function jtSquadView() {
+  if (!G || !G.teams || !G.squires) return null;
+  return { squires: [0, 1].map(s => [0, 1].map(i => ({ ri: G.squires[s][i], n: jtSqName(s, i), care: +jtCare(s, i).toFixed(3) }))), wind: G.wind.slice(), arm: (G.arm || [1, 1]).slice(),
+    shaken: (G.shaken || [0, 0]).slice(), girth: (G.girth || [0, 0]).slice(), press: [jtPressure(0), jtPressure(1)], due: (G.cornerDue || [false, false]).slice(),
+    corner: [0, 1].map(s => { const c = (G.corners || [[], []])[s]; return c.length ? JSON.parse(JSON.stringify(c[c.length - 1])) : null; }), mounts: JSON.parse(JSON.stringify(G.mounts)) };
+}
 /* The Lists' page in the Realm (issue #117, phase 2). A canvas in #v-lists, after the Shed's, and a frame loop that
    runs only while it is on screen (show/hide): it moves the match on (jtTick) and draws it (jtDraw), at the screen's
    density. The engine's parts don't touch the page; this file is the only one that does.
@@ -47794,7 +48087,15 @@ for (const ev of ['pointerup', 'pointercancel', 'lostpointercapture']) JTP.cv.ad
    y) (your hand on the lance, inches), nudge(vx, vy) (the arrows), lean(v) (the balance moment, -1 to 1), setMode;
    playRules (the beats' numbers); aimScr and aimUn map the target to its panel and back. courseOpen(plans, rides,
    leans, wait) and courseClose(P, leans) are rideCourse in two halves (the seat held for your balance moment).
-   onPhase, onPick and onOver hear a new beat, a change to your plan and the end. */
+   onPhase, onPick and onOver hear a new beat, a change to your plan and the end.
+   Phase 3 is the four, their roles and the squires: cap (12), kinds (a copy of the ratings by kind), fit(rs, role) (0
+   to 1, 'rider' or 'squire'), autoSquad(roster) ({ riders, squires }, roster indexes; each member { kind, r? }),
+   bestOf(roster, riders) (the slot of the best rider for the tilt), rosterOne(p) (a member as the engine takes it);
+   start(opts) also takes squires ([two roster indexes a side], the rest by care when left out) and mounts; pressure(s),
+   nerveK(p, nerve); jobs (the squires' three jobs), cornerPlan(s, skill) (a corner's { jobs, why }), cornerDo(s, jobs)
+   ('' or why not), squad (each side's squires, wind, arm, shake, girth, pressure, corner due and the last corner),
+   mountFor(rs, courses) (the captain's mount for a rider: { m, why }); squadRules (the numbers). select({ jobs, job:
+   [squire, job], corner }) sets your squires' jobs on Play, before you ride. */
 return {
   rules: JSON.parse(JSON.stringify(JT_RULES)), at: JSON.parse(JSON.stringify(JT_AT)), get G() { return G; },
   newMatch: o => jtNewMatch(o), riders: () => jtRiders(), inTilt: () => jtInTilt(), left: () => jtLeft(),
@@ -47817,7 +48118,13 @@ return {
   aim: (x, y) => jtAim(x, y), nudge: (vx, vy) => jtNudge(vx, vy), lean: v => jtLeanTo(v), aimScr: (x, y) => jtAimScr(x, y), aimUn: (sx, sy) => jtAimUn(sx, sy), eight: (t, amp, pace) => jtEight(t, amp, pace),
   set onPhase(f) { JT_HOOK.onPhase = f; }, set onPick(f) { JT_HOOK.onPick = f; }, set onOver(f) { JT_HOOK.onOver = f; }, get onPhase() { return JT_HOOK.onPhase; }, get onPick() { return JT_HOOK.onPick; }, get onOver() { return JT_HOOK.onOver; },
   show: () => jtShow(), hide: () => jtHide(), get on() { return JTP.on; }, render: dt => jtRender(dt || 0),
-  pause: on => { JTP.paused = !!on; }, get paused() { return JTP.paused; }, get speed() { return JTP.speed; }, set speed(n) { JTP.speed = clamp(Math.round(n) || 1, 1, 8); }
+  pause: on => { JTP.paused = !!on; }, get paused() { return JTP.paused; }, get speed() { return JTP.speed; }, set speed(n) { JTP.speed = clamp(Math.round(n) || 1, 1, 8); },
+  // the four, their roles and the squires (phase 3)
+  cap: JT_RCAP, kinds: JSON.parse(JSON.stringify(JT_KIND)), fit: (rs, role) => jtFit(rs, role), rosterOne: p => jtRosterOne(p || {}),
+  autoSquad: ro => jtAutoSquad((ro || []).map(m => jtRosterOne(m || {}))), bestOf: (ro, riders) => jtBestOf((ro || []).map(m => jtRosterOne(m || {})), riders),
+  pressure: s => jtPressure(s), nerveK: (p, n) => jtNerveK(p, n), jobs: JSON.parse(JSON.stringify(JT_JOB)),
+  cornerPlan: (s, sk) => G && G.teams && !G.over ? jtCornerPlan(s, sk) : null, cornerDo: (s, jobs) => jtCornerDo(s, jobs, 'by hand'), get squad() { return jtSquadView(); },
+  mountFor: (rs, n) => jtMountFor(rs, n), squadRules: JSON.parse(JSON.stringify({ role: JT_ROLE, arm: JT_ARM, shake: JT_SHAKE, nerve: JT_NERVE, corner: JT_CORNER }))
 };
 
 })();
@@ -67784,6 +68091,300 @@ renderHelp = function () {
   const after = $('wHelpShed') || $('wHelpLanes') || $('wHelpLinks') || [...h.querySelectorAll('[id^="wHelpG"]')].pop();
   h.insertAdjacentHTML('beforeend', `<section id="wListsHow" class="wghelp"><h3>Jousting: how it works</h3>${wListsHowHTML()}</section>`);
   after.insertAdjacentHTML('afterend', `<p class="hint" id="wHelpLists"><b>Real jousting.</b> The Tilting Lists runs jousting on the sand itself now, two riders a side. Ask Sir Ruddock to JOUST: two heats of ${wJT.rules.courses} courses. Pick your plan, spur with the hoofbeats, couch the lance and hold the tip on your mark, then keep your seat; or watch the two sides ride it out, with the tourney board under the lists (see Jousting: how it works). It is an exhibition: nothing is won or lost.</p>`);
+};
+/* w148: jousting ratings, the four and their roles, the mounts and the squires (issue #117, phase 3), as w123 is
+   curling's. Every Realm player has Tilting Lists ratings, p.jt: lance, couch, seat, shield, ride, nerve and care, 1 to
+   12. They are seeded from the kind's (wJT.rate), each moved by up to 1, and every level above 1 adds a point to one of
+   them, weighted by what the kind is good at; an older save's players get theirs when it loads.
+   The four: a jousting side is four (W_GRD_SQUAD.jousting), two to ride and two to squire. The Lists tab on the Team
+   screen sets who rides the first heat, who rides the second, and the two squires; the rest of your roster are
+   reserves. Each rider rides a mount from Sir Ruddock's stable (Charger, Destrier or Courser), picked there and kept on
+   the player (p.jtMount); left unpicked, the captain's choice by the ratings and the heat's length (wJT.mountFor).
+   Called-up players at your level fill the four when your roster is short. Left alone, the captain sets the four from
+   the ratings (wJT.autoSquad: the two best riders, the steadier nerve in the second heat, then the two best squires).
+   Practice match plays your four against the Lists' own riders; nothing is won or lost. The Stats tab's Jousting view
+   shows the ratings, the roles and the box lines; a player's card has a Jousting block.
+   On the Lists, in You ride, your course's rows gain your rider (the mount, its wind, the arm, a shake, the pressure)
+   and, between courses, your squires' jobs (your corner suggests; pick another job for either squire).
+
+   p.jt       { lance, couch, seat, shield, ride, nerve, care, lv, got: { stat: points from levels } }
+   p.jtMount  'charger' | 'destrier' | 'courser', or unset (the captain's)
+   WG.lists   { four: [4 keys: heat 1's rider, heat 2's rider, the two squires], cu: [call-ups], seq, mine?: true once
+              you've changed something }; a key is a roster id, or a call-up's cid ('j1', 'j2', ...)
+   WG.jtstats { pid: { m, c, brk, helm, unh, unhd, kept, jobs } }: matches, courses ridden, lances broken, helm breaks,
+              unhorsings, times unhorsed, seats kept after a rocking hit, squire's jobs done, this journey, from matches
+              from the world (wJtRecord: Sir Ruddock's matches call it from phase 5; exhibitions and practice don't count)
+   wJtOf(p)            p's ratings, made or caught up first
+   wListsSync()        makes the four, or brings it up to date with the roster; returns WG.lists
+   wListsMine()        your four as the Tilting Lists takes a side (roster, riders, squires, mounts, best)
+   wListsSetRole(key, role), wListsSetMount(key, mount), wListsAuto()   changes; each returns a message, or '' when it
+                       worked (role 0 or 1: a heat's rider; 2 or 3: a squire; 'reserve': the best reserve for it steps in)
+   Wrapped: wMakePlayer (wW148MakePlayer), wGiveXp (wW148GiveXp), wStart (wW148Start), wStatsCard (wW148StatsCard: a
+   Jousting block), wCampStats (wW148CampStats: the Jousting view), wOpenCamp (wW148OpenCamp: the Lists tab),
+   wRenderCamp (wW148RenderCamp), wListsRows (wW148ListsRows: your rider and your squires), wListsHowHTML
+   (wW148ListsHow: ratings, roles, mounts, the corner, pressure), renderHelp (wW148RenderHelp: #wHelpListsTab). */
+
+const W_JTR = {
+  cuKinds: ['spider', 'elf', 'golem', 'kobold', 'werewolf', 'witch'],
+  stat: { lance: ['Lan', 'Lance: how little the tip sways'], couch: ['Cou', 'Couch: the moment to lower the lance, and how long the arm holds it'],
+    seat: ['Sea', 'Seat: staying on after a hit'], shield: ['Shi', 'Shield: a lance on the shield breaks less'],
+    ride: ['Rid', 'Ride: pace, and the mount\'s wind'], nerve: ['Ner', 'Nerve: steady in the last course when behind, and in the tilt for the crown'],
+    care: ['Car', 'Care: how much a squire does between courses'] },
+  role: ['the first heat\'s rider', 'the second heat\'s rider', 'a squire', 'a squire'],
+  short: ['1st', '2nd', 'Sq', 'Sq'],
+  roleN: ['Heat 1', 'Heat 2', 'Squire', 'Squire'],
+  pick: [['0', 'Rides heat 1'], ['1', 'Rides heat 2'], ['2', 'Squire'], ['3', 'Squire']],
+};
+const wJtCap = () => wJT.cap;
+const wJtMountOk = m => typeof m === 'string' && Object.prototype.hasOwnProperty.call(wJT.mounts, m);
+
+/* ---------- ratings ---------- */
+function wJtOf(p) {
+  if (!p || !p.kind) return null;
+  if (!p.jt) { const r = wJT.rate(p.kind); p.jt = { lv: 1, got: {} }; for (const s of wJT.stats) p.jt[s] = Math.max(1, Math.min(wJtCap(), Math.round(r[s]) + Math.floor(Math.random() * 3) - 1)); }
+  const b = p.jt, lvl = p.lvl || 1;
+  while (b.lv < lvl) { b.lv++; const s = wJtGrowStat(p); if (s) { b[s]++; b.got[s] = (b.got[s] || 0) + 1; } }
+  return b;
+}
+function wJtGrowStat(p) {
+  const K = wJT.rate(p.kind), open = wJT.stats.filter(s => p.jt[s] < wJtCap());
+  if (!open.length) return null;
+  let r = Math.random() * open.reduce((a, s) => a + K[s], 0);
+  for (const s of open) { r -= K[s]; if (r < 0) return s; }
+  return open[open.length - 1];
+}
+function wJtAll() { if (!WG) return; for (const p of WG.roster || []) wJtOf(p); for (const p of WG.wwait || []) wJtOf(p); for (const c of (WG.lists && WG.lists.cu) || []) wJtOf(c); }
+// p's ratings as the engine reads them (0 to 1)
+const wJtRs = p => Object.fromEntries(wJT.stats.map(s => [s, (wJtOf(p)[s] - 1) / (wJtCap() - 1)]));
+// how well a player suits a role ('rider' or 'squire'), 0 to 1
+const wJtFit = (p, role) => wJT.fit(wJtRs(p), role);
+// the mount p rides: their own pick, or the captain's by their ratings and the heat's length
+const wJtMountOf = p => wJtMountOk(p && p.jtMount) ? p.jtMount : wJT.mountFor(wJtRs(p), wListsCourses()).m;
+
+const wW148MakePlayer = wMakePlayer;
+wMakePlayer = function (spec, from) { const p = wW148MakePlayer.apply(this, arguments); wJtOf(p); return p; };
+const wW148GiveXp = wGiveXp;
+wGiveXp = function (p, n) { const r = wW148GiveXp(p, n); wJtOf(p); return r; };
+const wW148Start = wStart;
+wStart = function (save, opts) { const r = wW148Start(save, opts); wJtAll(); if (WG) wListsSync(); if (save) wSave(); return r; };
+
+/* ---------- the four ---------- */
+const wListsCu = k => typeof k === 'string';
+function wListsWho(k) { if (wListsCu(k)) return ((WG.lists && WG.lists.cu) || []).find(c => c.cid === k) || null; return wPlayer(k); }
+function wListsCallUp(C) {
+  const used = new Set(C.four.filter(k => k != null).map(k => (wListsWho(k) || {}).kind));
+  const kind = W_JTR.cuKinds.find(k => !used.has(k)) || pick(W_JTR.cuKinds);
+  const c = Object.assign(wMakeCallUp(kind, new Set(wRoster().map(p => p.n).concat(C.cu.map(c => c.n)))), { cid: 'j' + (C.seq++) });
+  wJtOf(c); C.cu.push(c);
+  return c;
+}
+// the captain's pick from your roster: the engine's (the two best riders, the steadier nerve second, the two best squires)
+function wListsAutoPick(C) {
+  const ids = wRoster().map(p => p.id), A = wJT.autoSquad(ids.map(id => wListsPlayer(wPlayer(id))));
+  const four = [A.riders[0], A.riders[1], A.squires[0], A.squires[1]].map(i => i == null ? null : ids[i]);
+  C.four = four;
+  C.cu = C.cu.filter(c => four.includes(c.cid));
+}
+function wListsSync() {
+  if (!WG) return null;
+  let fresh = false;
+  if (!WG.lists || !Array.isArray(WG.lists.four)) { WG.lists = { four: [null, null, null, null], cu: [], seq: 1 }; fresh = true; }
+  const C = WG.lists, before = JSON.stringify(C.four);
+  C.four = C.four.map(k => k != null && wListsWho(k) ? k : null);
+  C.cu = C.cu.filter(c => C.four.includes(c.cid));
+  const tier = wNineTier();
+  for (const c of C.cu) if (c.lvl < tier) { c.lvl = tier; wJtOf(c); }
+  // a roster player not in the four takes a call-up's place
+  for (const p of wRoster()) {
+    if (C.four.includes(p.id)) continue;
+    const at = C.four.findIndex(k => wListsCu(k)); if (at < 0) break;
+    const old = C.four[at]; C.four[at] = p.id; C.cu = C.cu.filter(c => c.cid !== old);
+  }
+  // a gap: the best reserve for the role, or a call-up
+  for (let i = 0; i < 4; i++) if (C.four[i] == null) {
+    const role = i < 2 ? 'rider' : 'squire', res = wRoster().map(p => p.id).filter(id => !C.four.includes(id)).sort((a, b) => wJtFit(wPlayer(b), role) - wJtFit(wPlayer(a), role))[0];
+    C.four[i] = res != null ? res : wListsCallUp(C).cid;
+  }
+  if (fresh || (!C.mine && JSON.stringify(C.four) !== before)) wListsAutoPick(C);
+  for (let i = 0; i < 4; i++) if (C.four[i] == null) C.four[i] = wListsCallUp(C).cid;
+  return C;
+}
+// a player as the Tilting Lists takes one (ratings 1 to 12)
+function wListsPlayer(p) { const b = wJtOf(p); return { n: p.n, kind: p.kind, r: Object.fromEntries(wJT.stats.map(s => [s, b[s]])) }; }
+function wListsMine() {
+  const C = wListsSync(), t = wPartyTeam(), who = C.four.map(k => wListsWho(k)), roster = who.map(wListsPlayer);
+  return { name: t.name, short: t.short, color: t.color, roster, riders: [0, 1], squires: [2, 3], mounts: [wJtMountOf(who[0]), wJtMountOf(who[1])], best: wJT.bestOf(roster, [0, 1]) };
+}
+const wListsRoleOf = (k, C) => { const i = (C || wListsSync()).four.indexOf(k); return i < 0 ? null : i; };
+const wListsReserves = C => wRoster().map(p => p.id).filter(id => !C.four.includes(id));
+
+/* ---------- changes ---------- */
+function wListsDone() { WG.lists.mine = true; wSave(); return ''; }
+function wListsSetRole(k, role) {
+  const C = wListsSync(), at = wListsRoleOf(k, C);
+  if (role === 'reserve') {
+    if (at == null) return '';
+    const want = at < 2 ? 'rider' : 'squire', res = wListsReserves(C).sort((a, b) => wJtFit(wPlayer(b), want) - wJtFit(wPlayer(a), want))[0];
+    if (res == null) return 'No reserve to take their place.';
+    C.four[at] = res; if (wListsCu(k)) C.cu = C.cu.filter(c => c.cid !== k);
+    return wListsDone();
+  }
+  role = +role; if (!(role >= 0 && role < 4) || at === role) return '';
+  const other = C.four[role];
+  C.four[role] = k;
+  if (at != null) C.four[at] = other; else if (wListsCu(other)) C.cu = C.cu.filter(c => c.cid !== other);
+  return wListsDone();
+}
+// a rider's mount ('' or 'auto': the captain's again)
+function wListsSetMount(k, m) {
+  const p = wListsWho(k); if (!p) return 'Nobody by that name.';
+  if (m === '' || m === 'auto') { delete p.jtMount; wSave(); return ''; }
+  if (!wJtMountOk(m)) return 'Sir Ruddock\'s stable has a Charger, a Destrier and a Courser.';
+  p.jtMount = m; wSave(); return '';
+}
+function wListsAuto() { WG.lists = null; wListsSync(); wSave(); return ''; }
+function wListsPractice() {
+  if (WCAMP.close) WCAMP.close();
+  const mine = wListsMine(), home = wListsTeams(mine.roster.map(m => m.n))[0];
+  wListsGame({ teams: [mine, home], mounts: [mine.mounts, null], best: [mine.best, null], title: 'A practice match at the Tilting Lists' });
+}
+
+/* ---------- the box lines (phase 5's matches call wJtRecord) ---------- */
+// a match's summary (wJT.summary()) for your side s, keys: the roster keys in the engine's order (a call-up's is skipped)
+function wJtRecord(sum, s, keys) {
+  if (!WG || !sum || !sum.pst) return;
+  const T = WG.jtstats || (WG.jtstats = {}), P = sum.pst[s] || [];
+  (keys || []).forEach((k, i) => {
+    if (typeof k !== 'number' || !wPlayer(k)) return;
+    const x = P[i] || {}, L = T[k] || (T[k] = { m: 0, c: 0, brk: 0, helm: 0, unh: 0, unhd: 0, kept: 0, jobs: 0 });
+    L.m++; L.c += x.courses || 0; L.brk += x.breaks || 0; L.helm += x.helms || 0; L.unh += x.unhorse || 0; L.unhd += x.unhorsed || 0; L.kept += x.kept || 0; L.jobs += x.jobs || 0;
+  });
+}
+const wJtLine = pid => (WG.jtstats || {})[pid] || null;
+const W_JT_LCOLS = [['m', 'M', 'Jousting matches'], ['c', 'Crs', 'Courses ridden'], ['brk', 'Brk', 'Lances broken'], ['helm', 'Helm', 'Helm breaks'], ['unh', 'Unh', 'Unhorsings'], ['kept', 'Kept', 'Seats kept after a rocking hit']];
+
+/* ---------- the Jousting block on a player's stats ---------- */
+function wJtCard(p) {
+  const b = wJtOf(p); if (!b) return '';
+  if (WG && WG.lists) { const before = JSON.stringify(WG.lists); wListsSync(); if (JSON.stringify(WG.lists) !== before) wSave(); }
+  const bars = wJT.stats.map(s => { const [ab, what] = W_JTR.stat[s], got = b.got[s] || 0;
+    return `<div class="wbdr" title="${esc(what)}"><span>${ab}</span><i><em style="width:${Math.round(100 * b[s] / wJtCap())}%"></em></i><b>${b[s]}</b><small>${got ? `+${got}` : ''}</small></div>`; }).join('');
+  const key = p.cid || p.id, role = WG && WG.lists ? wListsRoleOf(key, WG.lists) : null, other = p.cid && !(WG && WG.lists && WG.lists.cu.some(c => c.cid === p.cid));
+  const where = role != null ? `In your four, ${esc(W_JTR.role[role])}${role < 2 ? `, on a ${esc(wJT.mounts[wJtMountOf(p)].n)}` : ''}.` : WG && WG.lists && !other ? 'A reserve for your four.' : 'Not in your squad.';
+  const L = wJtLine(p.id), line = L && L.m ? `<p class="wbdbox">${L.m} jousting match${L.m === 1 ? '' : 'es'}: ${L.c} course${L.c === 1 ? '' : 's'}, ${L.brk} lance${L.brk === 1 ? '' : 's'} broken, ${L.helm} on the helm, ${L.unh} unhorsing${L.unh === 1 ? '' : 's'}, ${L.kept} seat${L.kept === 1 ? '' : 's'} kept.</p>` : '';
+  return `<div class="wbd wbkc wjtc"><h5>Jousting</h5>${line}<p class="wbdpos">${where}</p>
+    <div class="wbdbars">${bars}</div><p class="hint">As a rider ${Math.round(100 * wJtFit(p, 'rider'))}, as a squire ${Math.round(100 * wJtFit(p, 'squire'))}. Each level adds a point to one rating (shown as +), mostly to what their kind is good at. Ratings run from 1 to ${wJtCap()}.</p></div>`;
+}
+const wW148StatsCard = wStatsCard;
+wStatsCard = function (p) { return wW148StatsCard(p).replace(/<\/section>\s*$/, wJtCard(p) + '</section>'); };
+
+/* ---------- the Lists tab ---------- */
+function wListsRow(k, C) {
+  const p = wListsWho(k), b = wJtOf(p), cu = wListsCu(k), at = wListsRoleOf(k, C), key = esc(String(k));
+  const opts = W_JTR.pick.map(([v, n]) => `<option value="${v}"${at === +v ? ' selected' : ''}>${esc(n)}</option>`).join('') + `<option value="reserve"${at == null ? ' selected' : ''}>Reserve</option>`;
+  const mine = wJtMountOk(p.jtMount), mount = wJtMountOf(p), cap = wJT.mountFor(wJtRs(p), wListsCourses());
+  const mopts = `<option value="auto"${mine ? '' : ' selected'}>The captain's (${esc(wJT.mounts[cap.m].n)})</option>` + Object.entries(wJT.mounts).map(([m, M]) => `<option value="${m}"${mine && p.jtMount === m ? ' selected' : ''}>${esc(M.n)}</option>`).join('');
+  return `<li class="wpr wnr wjtt${cu ? ' wcu' : ''}" data-cid="${key}">
+    <span class="wno"${at != null ? ` title="${esc(W_JTR.roleN[at])}"` : ''}>${at != null ? esc(W_JTR.short[at]) : '&ndash;'}</span><img src="${wPlayerPort(p, 64)}" alt="">
+    <div class="wpi"><div class="wpn"><b>${esc(p.n)}</b><span class="k">${esc(wKindName(p.kind))}, level ${p.lvl}</span>${cu ? '<span class="wtag wb">Call-up</span>' : ''}</div>
+      <small class="wnst" title="How well they suit each role: rider ${Math.round(100 * wJtFit(p, 'rider'))}, squire ${Math.round(100 * wJtFit(p, 'squire'))}">${wJT.stats.map(s => `<span title="${esc(W_JTR.stat[s][1])}">${W_JTR.stat[s][0]} <b>${b[s]}</b></span>`).join(' ')} <span>Rider <b>${Math.round(100 * wJtFit(p, 'rider'))}</b></span> <span>Squire <b>${Math.round(100 * wJtFit(p, 'squire'))}</b></span></small></div>
+    <div class="wpa"><label class="wsvl">Role <select data-jrole aria-label="${esc(p.n)}'s role">${opts}</select></label>${at != null && at < 2 ? `<label class="wsvl" title="${esc(`${wJT.mounts[mount].n}. The captain would pick the ${wJT.mounts[cap.m].n}: ${cap.why}.`)}">Mount <select data-jmount aria-label="${esc(p.n)}'s mount">${mopts}</select></label>` : ''}</div>
+  </li>`;
+}
+function wCampLists(C) {
+  const res = wListsReserves(C), M = wJT.mounts;
+  return `<p class="hint">Your four at the Tilting Lists: two ride, one a heat (the first rider meets their first, then the second meets their second), and two squire. A rider wants a steady <b>lance</b>, a good <b>seat</b>, the <b>couch</b>, the <b>shield</b> and the <b>ride</b>; the second heat and the tilt for the crown want <b>nerve</b>. A squire wants <b>care</b>: between courses each squire does one job (tend the mount, steady the rider or tighten the girth), and care sets how much.</p>
+    <p class="hint">Each rider rides a mount from Sir Ruddock's stable: the <b>${M.charger.n}</b> is fast and hits hard but sways more (for a steady lance), the <b>${M.destrier.n}</b> is easy to aim from and to sit a hit on but hits softer, the <b>${M.courser.n}</b> is light in the hit but gets its wind back quickly (for a long heat, or a rider who gallops).</p>
+    <h4>The four</h4><ol class="wroster wnine wcourt wlistsfour">${C.four.map(k => wListsRow(k, C)).join('')}</ol>
+    <h4>Reserves</h4>${res.length ? `<ol class="wroster wnine wcourtb wlistsres">${res.map(k => wListsRow(k, C)).join('')}</ol>` : '<p class="hint">Nobody: every player you have is in the four.</p>'}
+    <div class="row wnbtn"><button class="ghost" data-jauto>The captain's pick</button><button class="btn" data-jpractice>Practice match</button></div>`;
+}
+const wW148OpenCamp = wOpenCamp;
+wOpenCamp = function (tab) {
+  const want = tab || WCAMP.tab;
+  wW148OpenCamp(want === 'lists' ? 'team' : tab);
+  const tabs = document.querySelector('#modalBox .wctabs');
+  if (!tabs || tabs.querySelector('[data-ctab="lists"]')) return;
+  tabs.lastElementChild.insertAdjacentHTML('afterend', '<button role="tab" data-ctab="lists">Lists</button>');
+  tabs.querySelector('[data-ctab="lists"]').onclick = () => { WCAMP.tab = 'lists'; WCAMP.swap = null; WCAMP.msg = ''; wRenderCamp(); };
+  if (want === 'lists') { WCAMP.tab = 'lists'; wRenderCamp(); }
+};
+const wW148RenderCamp = wRenderCamp;
+wRenderCamp = function () {
+  if (WCAMP.tab !== 'lists') return wW148RenderCamp();
+  const body = $('wCampBody'); if (!body) return;
+  if (!$('modalBox').querySelector('[data-ctab="lists"]')) { WCAMP.tab = 'team'; return wRenderCamp(); }
+  $('modalBox').querySelectorAll('[data-ctab]').forEach(b => { const on = b.dataset.ctab === 'lists'; b.setAttribute('aria-pressed', on); b.setAttribute('aria-selected', on); });
+  const before = JSON.stringify(WG.lists), C = wListsSync(); if (JSON.stringify(C) !== before) wSave();
+  body.innerHTML = `<div class="wcsum"><span>Players <b>${wRoster().length}/${W_PARTY.max}</b></span><span>Call-ups <b>${C.cu.length}</b> at level ${wNineTier()}</span></div>
+    ${WCAMP.msg ? `<p class="wbad wcmsg" role="alert">${esc(WCAMP.msg)}</p>` : ''}` + wCampLists(C);
+  const keyOf = el => { const k = el.closest('[data-cid]').dataset.cid; return /^\d+$/.test(k) ? +k : k; };
+  body.querySelectorAll('[data-jrole]').forEach(s => s.onchange = () => wCampSay(wListsSetRole(keyOf(s), s.value)));
+  body.querySelectorAll('[data-jmount]').forEach(s => s.onchange = () => wCampSay(wListsSetMount(keyOf(s), s.value)));
+  const auto = body.querySelector('[data-jauto]'); if (auto) auto.onclick = () => wCampSay(wListsAuto());
+  const pr = body.querySelector('[data-jpractice]'); if (pr) pr.onclick = () => wListsPractice();
+};
+
+/* ---------- the Jousting view on the Stats tab ---------- */
+const W_JT_COLS = () => wJT.stats.map(s => [s, W_JTR.stat[s][0], W_JTR.stat[s][1]]);
+const wW148CampStats = wCampStats;
+wCampStats = function () {
+  const btn = `<button data-wsview="jousting" aria-pressed="${WSTAT.view === 'jousting'}">Jousting</button>`;
+  let html = wW148CampStats();
+  html = /data-wsview="curling"[^>]*>Curling<\/button>/.test(html) ? html.replace(/(<button data-wsview="curling"[^>]*>Curling<\/button>)/, `$1${btn}`) : html.replace(/(<button data-wsview="career"[^>]*>Career<\/button>)/, `$1${btn}`);
+  if (WSTAT.view !== 'jousting') return html;
+  const cols = W_JT_COLS(), lc = W_JT_LCOLS, k = WSTAT.sort && cols.some(c => c[0] === WSTAT.sort) ? WSTAT.sort : null;
+  const C = wListsSync(), rows = wRoster().map((p, i) => ({ p, i, b: wJtOf(p), role: wListsRoleOf(p.id, C), L: wJtLine(p.id) }));
+  if (k) rows.sort((a, b) => (b.b[k] - a.b[k]) || a.i - b.i);
+  const head = `<th scope="col"><button class="wsth" data-wsort="" aria-pressed="${!k}">Player</button></th><th scope="col">Role</th>` + cols.map(([c, s, l]) => `<th scope="col"><button class="wsth" data-wsort="${c}" title="${esc(l)}" aria-pressed="${k === c}">${s}</button></th>`).join('')
+    + lc.map(([c, s, l]) => `<th scope="col" title="${esc(l)}">${s}</th>`).join('');
+  const body = rows.map(({ p, b, role, L }) => `<tr data-wsp="${p.id}"${WSTAT.pid === p.id ? ' class="wsel"' : ''}><th scope="row"><button class="wsname" data-wsp-open aria-expanded="${WSTAT.pid === p.id}"><img src="${wPlayerPort(p, 40)}" alt=""><span><b>${esc(p.n)}</b><small>${esc(wKindName(p.kind))}</small></span></button></th>
+    <td>${role != null ? esc(W_JTR.roleN[role]) + (role < 2 ? ` <small>${esc(wJT.mounts[wJtMountOf(p)].n)}</small>` : '') : 'Reserve'}</td>${cols.map(([c]) => `<td>${b[c]}</td>`).join('')}${lc.map(([c]) => `<td>${L && L.m ? L[c] || 0 : '<span class="dim">&ndash;</span>'}</td>`).join('')}</tr>`).join('');
+  const sel = WSTAT.pid != null && wPlayer(WSTAT.pid);
+  return html.replace(/<small class="hint">[\s\S]*?<\/small>/, '<small class="hint">Every player\'s jousting ratings, their role in your four (set on the Lists tab), and their box lines from jousting matches from the world on this journey (exhibitions and practice are not counted). Pick a heading to sort, a player to see more.</small>')
+    .replace(/<div class="tablewrap">[\s\S]*$/, `<div class="tablewrap"><table class="wstats"><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table></div>${sel ? wStatsCard(sel) : ''}`);
+};
+
+/* ---------- on the Lists: your rider and your squires ---------- */
+$('wListsRows').insertAdjacentHTML('afterbegin', '<div class="wccrow" id="wListsRowUp"><span class="wccl">Rider</span><span id="wListsUp"></span></div>');
+$('wListsGo').closest('.wccrow').insertAdjacentHTML('beforebegin', '<div class="wccrow" id="wListsRowSq" hidden><span class="wccl">Squires</span><span id="wListsSq"></span></div>');
+$('wListsRows').addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b || b.disabled) return;
+  let why = '';
+  if (b.dataset.jjob) why = wJT.select({ job: [+b.dataset.jsq, b.dataset.jjob] });
+  else if (b.dataset.jcorner) why = wJT.select({ corner: true });
+  else return;
+  if (why) $('wListsNote').textContent = why;
+});
+const wW148ListsRows = wListsRows;
+wListsRows = function () {
+  wW148ListsRows();
+  const V = WJT && !WJT.over && wJT.G && wJT.G.teams ? wJT.view : null; if (!V || V.mode !== 'play' || V.ph !== 'plan' || !V.sel || !V.squad || !V.riders) return;
+  const s = V.you, Q = V.squad, G = wJT.G, m = G.teams[s].roster[V.riders[s]], slot = G.riders[s].indexOf(V.riders[s]), mount = wJT.mounts[Q.mounts[s][slot < 0 ? 0 : slot]] || {};
+  const pct = v => Math.round(100 * v);
+  $('wListsUp').innerHTML = `<b>${esc(m.n)}</b> <small>${esc(wKindName(m.kind) || '')}, on a ${esc(mount.n || '')}</small> · <span title="The mount's wind: a course spends some, a gallop most. A blown mount is slower and the tip sways more. A squire who tends the mount gets some back.">Wind <b>${pct(Q.wind[s])}%</b></span> · <span title="The lance arm: every couch tires it, an early one most. A tired arm sways and droops. A squire who steadies the rider gives some back.">Arm <b>${pct(Q.arm[s])}%</b></span>${Q.shaken[s] > .05 ? ' · <b class="wbad" title="Rocked by that hit: the tip sways more and the seat is worse. A squire can steady them.">Shaken</b>' : ''}${Q.girth[s] > 0 ? ' · <span title="The girth tightened: a better seat this course.">Girth tight</span>' : ''}${Q.press[s] ? ` · <b class="wbad" title="${esc(V.inTilt ? 'The tilt for the crown' : 'The last course of the heat, and behind')}: the tip sways more, less for a steady nerve.">${V.inTilt ? 'For the crown' : 'Behind, the last course'}</b>` : ''}`;
+  const row = $('wListsRowSq'); row.hidden = !V.jobs;
+  if (!V.jobs) return;
+  const J = wJT.jobs;
+  $('wListsSq').innerHTML = Q.squires[s].map((q, i) => `<span class="wjtsq"><b>${esc(q.n)}</b> ${Object.entries(J).map(([k, j]) => `<button class="ghost${V.jobs[i] === k ? ' on' : ''}" data-jsq="${i}" data-jjob="${k}" title="${esc(j.n)}">${esc(j.n.split(' ')[0])}</button>`).join(' ')}</span>`).join(' ')
+    + ` <button class="ghost" data-jcorner="1" title="What your corner would do">Corner's word</button> <small class="hint">Two squires, two jobs: tend the mount (wind), steady the rider (a shake, the arm) or tighten the girth (the seat). They do them when you ride.</small>`;
+};
+
+/* ---------- How to play ---------- */
+const wW148ListsHow = wListsHowHTML;
+wListsHowHTML = function () {
+  return wW148ListsHow() + `<p class="hint"><b>Ratings.</b> Each player has seven: <b>lance</b> (how little the tip sways), <b>couch</b> (the moment to lower it, and how long the arm holds it), <b>seat</b> (staying on after a hit), <b>shield</b> (a lance on the shield breaks less), <b>ride</b> (pace, and the mount's wind), <b>nerve</b> and <b>care</b> (a squire's). Each level adds a point, mostly to what their kind is good at.</p>
+  <p class="hint"><b>Riders and squires.</b> The Lists tab on the Team screen sets your four: the first heat's rider, the second's, and two squires. Left alone, the captain picks the two best riders (the steadier nerve rides the second heat) and the two best squires. In the tilt for the crown your best rider by nerve and lance rides.</p>
+  <p class="hint"><b>Mounts.</b> Each rider rides one of Sir Ruddock's: the <b>Charger</b> (fast, hits hard, sways more), the <b>Destrier</b> (easy to aim from and to sit a hit on, hits softer) or the <b>Courser</b> (light in the hit, gets its wind back quickly). A course spends the mount's wind, a gallop most; a blown mount is slower and the tip sways more. Each heat's rider starts on a fresh mount.</p>
+  <p class="hint"><b>The arm and the shake.</b> Every couch tires the lance arm, an early one most: a tired arm sways and the tip droops. A rider rocked by a broken lance who stays on is shaken for the next course: more sway and a worse seat.</p>
+  <p class="hint"><b>Your squires.</b> Between courses each squire does one job, two of the three: <b>tend the mount</b> (some of its lost wind back), <b>steady the rider</b> (the shake gone, some of the arm back) or <b>tighten the girth</b> (a better seat next course). Their care sets how much. In You ride you pick the jobs before you ride (your corner suggests); the CPU's corner picks by its skill.</p>
+  <p class="hint"><b>Nerve.</b> The last course of a heat when you're behind, and every course of the tilt for the crown, weigh on a rider: the tip sways more and the couch is harder to time, less for a steady nerve. The CPU's riders feel it too.</p>`;
+};
+const wW148RenderHelp = renderHelp;
+renderHelp = function () {
+  wW148RenderHelp();
+  const after = $('wHelpLists'); if (!after || $('wHelpListsTab')) return;
+  after.insertAdjacentHTML('afterend', `<p class="hint" id="wHelpListsTab"><b>Jousting ratings, riders and squires.</b> Every player also has jousting ratings: lance, couch, seat, shield, ride, nerve and care (1 to ${wJtCap()}). Each level adds a point, mostly to what their kind is good at; pick a player on the Stats tab to see them, or use its Jousting view. The Lists tab on the Team screen sets your four (two riders, a heat each, and two squires) and each rider's mount (Charger, Destrier or Courser). Between courses your squires tend the mount, steady the rider or tighten the girth. The last course when behind, and the tilt for the crown, weigh on a rider's nerve. Practice match there plays your four against the Lists' own riders; nothing is won or lost.</p>`);
 };
 /* w132: owning pets (issue #104, phase 2). Pets are small monsters at your side in the card battles (the rules and the
    pets are Sudden Death's: engine/pets.js, data/pets.js); the Realm is where you own them.

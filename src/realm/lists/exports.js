@@ -21,7 +21,15 @@
    y) (your hand on the lance, inches), nudge(vx, vy) (the arrows), lean(v) (the balance moment, -1 to 1), setMode;
    playRules (the beats' numbers); aimScr and aimUn map the target to its panel and back. courseOpen(plans, rides,
    leans, wait) and courseClose(P, leans) are rideCourse in two halves (the seat held for your balance moment).
-   onPhase, onPick and onOver hear a new beat, a change to your plan and the end. */
+   onPhase, onPick and onOver hear a new beat, a change to your plan and the end.
+   Phase 3 is the four, their roles and the squires: cap (12), kinds (a copy of the ratings by kind), fit(rs, role) (0
+   to 1, 'rider' or 'squire'), autoSquad(roster) ({ riders, squires }, roster indexes; each member { kind, r? }),
+   bestOf(roster, riders) (the slot of the best rider for the tilt), rosterOne(p) (a member as the engine takes it);
+   start(opts) also takes squires ([two roster indexes a side], the rest by care when left out) and mounts; pressure(s),
+   nerveK(p, nerve); jobs (the squires' three jobs), cornerPlan(s, skill) (a corner's { jobs, why }), cornerDo(s, jobs)
+   ('' or why not), squad (each side's squires, wind, arm, shake, girth, pressure, corner due and the last corner),
+   mountFor(rs, courses) (the captain's mount for a rider: { m, why }); squadRules (the numbers). select({ jobs, job:
+   [squire, job], corner }) sets your squires' jobs on Play, before you ride. */
 return {
   rules: JSON.parse(JSON.stringify(JT_RULES)), at: JSON.parse(JSON.stringify(JT_AT)), get G() { return G; },
   newMatch: o => jtNewMatch(o), riders: () => jtRiders(), inTilt: () => jtInTilt(), left: () => jtLeft(),
@@ -44,5 +52,11 @@ return {
   aim: (x, y) => jtAim(x, y), nudge: (vx, vy) => jtNudge(vx, vy), lean: v => jtLeanTo(v), aimScr: (x, y) => jtAimScr(x, y), aimUn: (sx, sy) => jtAimUn(sx, sy), eight: (t, amp, pace) => jtEight(t, amp, pace),
   set onPhase(f) { JT_HOOK.onPhase = f; }, set onPick(f) { JT_HOOK.onPick = f; }, set onOver(f) { JT_HOOK.onOver = f; }, get onPhase() { return JT_HOOK.onPhase; }, get onPick() { return JT_HOOK.onPick; }, get onOver() { return JT_HOOK.onOver; },
   show: () => jtShow(), hide: () => jtHide(), get on() { return JTP.on; }, render: dt => jtRender(dt || 0),
-  pause: on => { JTP.paused = !!on; }, get paused() { return JTP.paused; }, get speed() { return JTP.speed; }, set speed(n) { JTP.speed = clamp(Math.round(n) || 1, 1, 8); }
+  pause: on => { JTP.paused = !!on; }, get paused() { return JTP.paused; }, get speed() { return JTP.speed; }, set speed(n) { JTP.speed = clamp(Math.round(n) || 1, 1, 8); },
+  // the four, their roles and the squires (phase 3)
+  cap: JT_RCAP, kinds: JSON.parse(JSON.stringify(JT_KIND)), fit: (rs, role) => jtFit(rs, role), rosterOne: p => jtRosterOne(p || {}),
+  autoSquad: ro => jtAutoSquad((ro || []).map(m => jtRosterOne(m || {}))), bestOf: (ro, riders) => jtBestOf((ro || []).map(m => jtRosterOne(m || {})), riders),
+  pressure: s => jtPressure(s), nerveK: (p, n) => jtNerveK(p, n), jobs: JSON.parse(JSON.stringify(JT_JOB)),
+  cornerPlan: (s, sk) => G && G.teams && !G.over ? jtCornerPlan(s, sk) : null, cornerDo: (s, jobs) => jtCornerDo(s, jobs, 'by hand'), get squad() { return jtSquadView(); },
+  mountFor: (rs, n) => jtMountFor(rs, n), squadRules: JSON.parse(JSON.stringify({ role: JT_ROLE, arm: JT_ARM, shake: JT_SHAKE, nerve: JT_NERVE, corner: JT_CORNER }))
 };

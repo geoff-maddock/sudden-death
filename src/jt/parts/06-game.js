@@ -10,7 +10,9 @@
    most, jtWindCost) and the mount gets a little back before the next (its rec). The tilt for the crown starts the
    best riders' mounts at JT_TILT_WIND.
    The box score (G.st by side, G.pst by rider): courses, lances broken, helm breaks, unhorsings (dealt), unhorsed,
-   glances, misses, fouls, rocked by a broken lance, seats kept after one. G.plans keeps each side's plans (the
+   glances, misses, fouls, rocked by a broken lance, seats kept after one (by rider too from phase 3, and a squire's
+   jobs done). Phase 3 (09-squad.js): each side's squires (G.squires), the rider's arm, a rocking hit's shake, the
+   girth, and the corner between courses (jtCornersDue before a course, jtSquadAfter after one). G.plans keeps each side's plans (the
    herald's card and the Archmage's read, phase 4). G.last is the last course, for the page. */
 const JT_TILT_WIND = .8;
 let GB = null;   // the course between jtTurn() and the page's drawing (phase 2): not saved
@@ -19,9 +21,13 @@ function jtStart(opts) {
   if (o.seed != null) engSeed(o.seed);
   const teams = [0, 1].map(s => { const T = (o.teams && o.teams[s]) || { name: s ? 'Saltmere' : 'Mossgate', short: s ? 'SAL' : 'MOS', color: s ? '#2f7898' : '#3a5a9a' };
     const roster = (T.roster && T.roster.length >= JT_RULES.side ? T.roster : [0, 1, 2, 3].map(i => ({ n: `${T.short || 'P'} ${i + 1}`, kind: '' })))
-      .map(p => Object.assign({}, p, { rs: p.rs || jtRs(p.kind) }));
+      .map(p => jtRosterOne(p));
     return Object.assign({}, T, { roster }); });
-  jtNewMatch({ courses: o.courses, riders: o.riders || teams.map(T => T.riders), roster: teams.map(T => T.roster.length), best: o.best });
+  // (phase 3: riders left out are picked by the ratings when the roster brings its own (r); the best rider for the tilt,
+  // left out, by nerve and lance, 09-squad.js)
+  const riders0 = [0, 1].map(s => (o.riders || [])[s] || teams[s].riders || (teams[s].roster.some(m => m.r) ? jtAutoSquad(teams[s].roster).riders : null));
+  jtNewMatch({ courses: o.courses, riders: riders0, roster: teams.map(T => T.roster.length), best: o.best });
+  if (o.best == null) G.best = [0, 1].map(s => jtBestOf(teams[s].roster, G.riders[s]));
   const mounts = [0, 1].map(s => [0, 1].map(i => { const m = ((o.mounts || [])[s] || [])[i]; return jtOwn(JT_MOUNT, m) ? m : JT_MOUNT_DEF; }));
   // (lab only: a side planned by another skill's logic, ridden with another skill's hands, or held to one plan)
   const labSide = (L, ok) => Array.isArray(L) ? [0, 1].map(s => ok(L[s]) ? L[s] : null) : null, sk3 = v => v === 0 || v === 1 || v === 2;
@@ -29,7 +35,8 @@ function jtStart(opts) {
   const lab = { planBy: labSide(o.planBy, sk3), handsBy: labSide(o.handsBy, sk3), fix: labSide(o.fix, fixOk) };
   if (lab.fix) lab.fix = lab.fix.map(p => p && { aim: p.aim, guard: p.guard, pace: p.pace });
   Object.assign(G, { teams, skill: [0, 1].map(s => clamp(((o.skill || [])[s] ?? 1) | 0, 0, 2)), mounts, wind: [1, 1], n: 0, lab,
-    st: [jtBox(), jtBox()], pst: teams.map(T => T.roster.map(() => ({ courses: 0, breaks: 0, helms: 0, unhorse: 0 }))), plans: [[], []], last: null });
+    st: [jtBox(), jtBox()], pst: teams.map(T => T.roster.map(() => ({ courses: 0, breaks: 0, helms: 0, unhorse: 0, unhorsed: 0, rocked: 0, kept: 0, fouls: 0, jobs: 0 }))), plans: [[], []], last: null });
+  jtSquadStart(o, teams);
   GB = null;
   return G;
 }
@@ -40,6 +47,7 @@ const jtRsOf = (s, ri) => G.teams[s].roster[ri].rs;
 // the next course, CPU against CPU: { heat, course, tilt, riders, plans, rides, imp, rule } or null when the match is over
 function jtTurn() {
   if (!G || G.over) return null;
+  jtCornersDue();
   return jtRideCourse([jtPlan(0), jtPlan(1)]);
 }
 function jtRideCourse(plans, given, leans) { const P = jtCourseOpen(plans, given, leans); return P ? jtCourseClose(P) : null; }
@@ -49,7 +57,8 @@ function jtRideCourse(plans, given, leans) { const P = jtCourseOpen(plans, given
    come in the same order as jtImpact's: the rides, the leans, the two strikes, the two seats. P is plain data. */
 function jtCourseOpen(plans, given, leans, wait) {
   const riders = jtRiders(); if (!riders) return null;
-  const rides = [0, 1].map(s => (given && given[s]) || jtCharge({ plan: plans[s], rs: jtRsOf(s, riders[s]), mount: jtMountOf(s), wind: G.wind[s], hands: jtHands(s) }, R));
+  jtCornersDue();
+  const rides = [0, 1].map(s => (given && given[s]) || jtCharge(jtRideOpts(s, plans[s]), R));
   const lean = [0, 1].map(s => leans && leans[s] != null ? leans[s] : wait && wait[s] ? null : jtLean(s));
   const st = [jtStrike(rides[0], rides[1], R), jtStrike(rides[1], rides[0], R)];
   return { heat: G.heat, course: G.course, tilt: jtInTilt(), riders, plans, rides, lean, st, n: G.n };
@@ -61,16 +70,18 @@ function jtCourseClose(P, leans) {
   const imp = { res: [0, 1].map(s => ({ at: st[s].at, unhorse: seat[1 - s].unhorse })), st, seat };
   const lead = [0, 1].map(s => jtTotal(s) - jtTotal(1 - s)), rule = jtCourse(imp.res);
   // the mounts: the course's wind spent, a little back before the next; fresh mounts for a new heat
-  [0, 1].forEach(s => { const M = jtMount(rides[s].mount); G.wind[s] = clamp(G.wind[s] - jtWindCost(rides[s].pace, rides[s].rs) + M.rec * (.6 + .4 * (rides[s].rs.ride ?? .5)), 0, 1); });
+  [0, 1].forEach(s => { const M = jtMount(rides[s].mount); G.wind[s] = clamp(G.wind[s] - jtWindCost(rides[s].pace, rides[s].rs, rides[s].mount) + M.rec * (.6 + .4 * (rides[s].rs.ride ?? .5)), 0, 1); });
   if (rule.tiltNow) G.wind = [JT_TILT_WIND, JT_TILT_WIND]; else if (rule.heatOver) G.wind = [1, 1];
+  // the rider's arm, a rocking hit's shake, the girth, and the squires' corner before the next course (09-squad.js)
+  jtSquadAfter(rides, imp, rule);
   // the box score
   [0, 1].forEach(s => {
     const B = G.st[s], Pp = G.pst[s][riders[s]], sk = imp.st[s], se = imp.seat[s];
     B.courses++; Pp.courses++;
     if (sk.broke) { B.breaks++; Pp.breaks++; if (sk.zone === 'helm') { B.helms++; Pp.helms++; } }
-    else if (sk.at === 'glance') B.glances++; else if (sk.at === 'miss') B.misses++; else B.fouls++;
-    if (imp.res[s].unhorse) { B.unhorse++; Pp.unhorse++; G.st[1 - s].unhorsed++; }
-    if (se.rocked) { B.rocked++; if (!se.unhorse) B.kept++; }
+    else if (sk.at === 'glance') B.glances++; else if (sk.at === 'miss') B.misses++; else { B.fouls++; Pp.fouls = (Pp.fouls || 0) + 1; }
+    if (imp.res[s].unhorse) { B.unhorse++; Pp.unhorse++; G.st[1 - s].unhorsed++; const Q = G.pst[1 - s][riders[1 - s]]; Q.unhorsed = (Q.unhorsed || 0) + 1; }
+    if (se.rocked) { B.rocked++; Pp.rocked = (Pp.rocked || 0) + 1; if (!se.unhorse) { B.kept++; Pp.kept = (Pp.kept || 0) + 1; } }
     G.plans[s].push({ aim: plans[s].aim, guard: plans[s].guard, pace: plans[s].pace, why: plans[s].why || '', heat, course, at: sk.at, lead: lead[s] });
   });
   G.n++;
