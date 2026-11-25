@@ -8,7 +8,7 @@
 # jobs; tend gives back a share of the lost wind, steady the shake and the arm, the girth a seat for one course; care
 # sets how much. A Squire's corner picks anything, a Knight's works it out and beats it; any corner beats none.
 # Pressure: the last course behind and the tilt; nerve takes it off. On Play your squires' jobs are yours, your corner
-# suggesting. Each mount has a case where it's the better pick. Phase 1's targets hold with real kinds.
+# suggesting. Phase 1's targets hold with real kinds. (Each mount's case, 3,600 matches, is realm_lists_mounts.)
 # The Realm: every player has jousting ratings within a point of their kind, each level adds a point; an older save's
 # players get theirs; the four: your players first, call-ups at your level; roles swap, a reserve steps in; a mount is
 # picked or the captain's; your four go to the engine with their ratings, roles and mounts. The Lists tab, the practice
@@ -110,10 +110,14 @@ async def main():
           for (let i = 0; i < 30; i++) { wJT.start({ seed: 40 + i, skill: [0, 1] }); __ride(); for (const x of wJT.G.corners[0]) seen.add(x.jobs.join('/')); for (const x of wJT.G.corners[1]) why.push(x.why); }
           return { squire: seen.size, why: why.slice(0, 3), named: why.every(w => /tends the mount|steadies the rider|tightens the girth/.test(w) && /nobody spare to/.test(w)), n: why.length }; })()""")
         check(cp['squire'] >= 5 and cp['n'] > 20 and cp['named'], 'a Squire\'s corner picks any two jobs; a Knight\'s says which squire does what, and why', cp)
-        kv = await pg.evaluate("""(() => { const a = __run(1000, 20000, { skill: [1, 1], cornerBy: [null, 0] }), b = __run(1000, 30000, { skill: [1, 1], cornerBy: [0, null] }), n = __run(600, 40000, { skill: [1, 1], cornerBy: [null, 'none'] });
-          return { k: a[0] + b[1], sq: a[1] + b[0], none: n }; })()""")
-        print('   (a Knight\'s corner v a Squire\'s, 2000 matches:', kv['k'], '-', kv['sq'], '; a Knight\'s corner v none, 600:', kv['none'], ')')
-        check(kv['k'] / 2000 >= .505 and kv['none'][0] / 600 >= .55, 'a Knight\'s corner beats a Squire\'s, and any corner beats none', kv)
+        # (both edges are thin, and each side's seat counts: a Knight's corner against a Squire's runs 50.8 to 52.5% on every
+        # seed base tried, so it is asked only to win more than half; any corner against none runs 55 to 57% with the
+        # corner on either side of the same seeds, 50 to 62% on one side alone, so it rides both sides)
+        kv = await pg.evaluate("""(() => { const a = __run(1000, 20000, { skill: [1, 1], cornerBy: [null, 0] }), b = __run(1000, 30000, { skill: [1, 1], cornerBy: [0, null] });
+          const n0 = __run(400, 40000, { skill: [1, 1], cornerBy: [null, 'none'] }), n1 = __run(400, 40000, { skill: [1, 1], cornerBy: ['none', null] });
+          return { k: a[0] + b[1], sq: a[1] + b[0], none: [n0[0] + n1[1], n0[1] + n1[0]] }; })()""")
+        print('   (a Knight\'s corner v a Squire\'s, 2000 matches:', kv['k'], '-', kv['sq'], '; a Knight\'s corner v none, 800 (400 a side):', kv['none'], ')')
+        check(kv['k'] / 2000 > .5 and kv['none'][0] / 800 >= .53, 'a Knight\'s corner beats a Squire\'s, and any corner beats none', kv)
 
         # ---------- on Play: your squires' jobs ----------
         pl = await pg.evaluate("""(() => { wJT.start({ seed: 12, mode: 'play', skill: [1, 1] }); wJT.pause(true); const out = {};
@@ -129,21 +133,6 @@ async def main():
         check(pl['jobs'] and pl['squad'] and pl['swap'] == '' and pl['same'] and pl['set'] == '' and pl['corner'] == '' and pl['back'] and len(pl['back']) == 2,
               'between courses your corner suggests two jobs; you can give either squire another (they swap rather than double up)', pl)
         check(pl['done'] == [[['girth', 'steady'], 'your call']] and pl['girth'] > 0, 'your squires do your jobs when you ride', pl)
-
-        # ---------- the mounts ----------
-        # each mount has a case where it is the better pick (paired seeds, a Knight on either side, against a side of vampires on Destriers)
-        mt = await pg.evaluate("""(() => { const T = k => __T([k, k, k, k]), out = {};
-          const run = (k, c, m) => __run(400, 70000, { skill: [1, 1], courses: c, teams: [T(k), T('vampire')], mounts: [[m, m], ['destrier', 'destrier']] })[0];
-          for (const [k, c] of __CASES) out[k + c] = { charger: run(k, c, 'charger'), destrier: run(k, c, 'destrier'), courser: run(k, c, 'courser') };
-          return out; })()""".replace('__CASES', '[["elf", 3], ["dwarf", 5], ["harpy", 5]]'))
-        for k2, v2 in mt.items(): print(f'   ({k2}: {v2})')
-        best = {k2: max(v2, key=v2.get) for k2, v2 in mt.items()}
-        # (a Charger's and a Courser's cases hold on every seed base tried; a Destrier's doesn't: under a dwarf in a long heat
-        # the three come within the noise, the Destrier best on some seed bases and the Courser on others, phase 12's review)
-        close = max(mt['dwarf5'].values()) - min(mt['dwarf5'].values())
-        check(best['elf3'] == 'charger' and best['harpy5'] == 'courser' and close <= 32, 'a Charger is the better pick under an elf\'s lance in a short heat, a Courser under a harpy in a long one, and under a dwarf in a long heat no mount is far ahead', [best, close])
-        mf = await pg.evaluate("[['elf', 3], ['dwarf', 5], ['harpy', 5]].map(([k, c]) => wJT.mountFor(wJT.rs(k), c).m)")
-        check(mf == ['charger', 'destrier', 'courser'], 'the captain picks those mounts for them', mf)
 
         # ---------- phase 1's targets with real kinds ----------
         rk = await pg.evaluate("""(() => { const o = { n: 300, br: 0, c: 0, helm: 0, mu: 0, w: [0, 0] }, A = ['werewolf', 'elf', 'gorgon', 'spider'], B = ['minotaur', 'golem', 'harpy', 'ogre'];

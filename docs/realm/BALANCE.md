@@ -1614,10 +1614,12 @@ elf and the werewolf). Before is the first run, on phase 11's settings, at 300 a
    **What was left:** this journey's four, with an elf on a Charger and a werewolf (seats of 5 and 8), still saw an
    unhorsing in 64 to 71% of its matches (90% before); both its riders on Destriers, 57%. The follow-up below found why
    and fixed it.
-2. **The mounts.** Each is the best pick somewhere, on paired seeds (`realm_lists_four`, 400 matches a cell, a kind's
-   four against vampires on Destriers): an elf in a short heat wins 272 on Chargers, 257 on Coursers, 220 on Destriers; a
-   dwarf in a long heat 185, 204 and 210; a harpy in a long heat 151, 205 and 165. (After the follow-up: the elf 303, 261
-   and 235; the dwarf 189, 182 and 195; the harpy 194, 240 and 184.)
+2. **The mounts.** Each is the best pick somewhere, on paired seeds (`realm_lists_mounts` and `realm_lists_mounts_even`,
+   400 matches a cell, a kind's four against vampires on Destriers): an elf in a short heat wins 272 on Chargers, 257 on
+   Coursers, 220 on Destriers; a dwarf in a long heat 185, 204 and 210; a harpy in a long heat 151, 205 and 165. (After
+   the follow-up: the elf 303, 261 and 235; the dwarf 189, 182 and 195; the harpy 194, 240 and 184. On two more seed
+   bases the harpy's Courser stays ahead of the Destrier, by 25 and 46, but against the Charger it is 8 behind on one
+   and 17 ahead on the other, so the check asks only that it beat the Destrier and come within 20 of the Charger.)
 3. **A harpy never cast its lance power.** A rider shaky in the saddle (a seat under 0.4: a harpy, a skeleton) always
    reaches for the shield power, so with only the lance power to cast (`powOnly`) a harpy cast Dive 0 times a match,
    a skeleton its Bone Lance 0.17. The CPU now casts the lance's when it can't cast the shield's (not the mana, or not in

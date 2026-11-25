@@ -8,10 +8,9 @@
 # a Knight behind with too few courses left goes for the helm at a gallop, ahead it weighs the points against it
 # double, and in the tilt it rides the best expected margin; an Archmage saves its gallop for the heat's last course;
 # a Squire picks anything. The plan is a real choice: at a Knight's hands no aim is best everywhere and each is best
-# somewhere. The course is a game (phase 2's review): no plan always ridden, and neither guard always held, beats a
-# Knight; every plan always ridden loses to an Archmage, whose read beats a fixed plan by more than a Knight's plan does
-# and loses nothing to a Knight's; angled is the better guard against a rider who aims at the shield, square against
-# one who aims at the body; your squire's word does as well as a Knight's own plan; every reason is true to the plan.
+# somewhere. Every reason is true to the plan. (The course as a game, phase 2's review, rides about 14,000 matches, so
+# it is checks of its own: realm_lists_plans and realm_lists_plans_arch, a plan always ridden against a Knight and an
+# Archmage; realm_lists_policy, the guards and the Archmage's read; realm_lists_word, your squire's word.)
 # A match, CPU against CPU (calibrated): a Knight breaks a lance in about half its courses, helm breaks are rare,
 # about one match in three has an unhorsing, every match has a winner, and each skill beats the one below. The tilt
 # is capped, and the marshal's count settles it. simMatch leaves the match on the lists and its seeded stream alone,
@@ -140,31 +139,6 @@ async def main():
         check(all(a2 in bests for a2 in ('shield', 'body', 'helm')), 'each aim is the best somewhere: the shield, the body and the helm', bests)
         check(all(mx[f'{wd} square canter']['best'] == 'shield' for wd in ('fresh', 'tired')), 'the shield at a canter is the safe point against a square guard', mx)
         check(all(mx[f'{wd} angled {pc}']['row']['shield'] < mx[f'{wd} angled {pc}']['row']['body'] for wd in ('fresh', 'tired') for pc in ('canter', 'gallop')), 'an angled guard turns the shield aside: the body is the better aim against it', mx)
-        # (phase 2's review) the course is a game: a Knight rides the mix nobody beats by always riding one plan, so no
-        # plan always ridden (and neither guard always held) beats it by more than the noise; an Archmage reads the riders
-        # it faces, so every plan always ridden loses to it, and it beats a fixed plan by more than a Knight's plan does;
-        # angled is the better guard against a rider who aims at the shield, square against one who aims at the body; the
-        # squire's word is the right call by the odds
-        pol = await pg.evaluate("""(() => { const run = (o, n, s0) => { const w = [0, 0]; for (let i = 0; i < n; i++) w[wJT.simMatch(Object.assign({ seed: s0 + i }, o)).win]++; return w[0] / n; }, N = 300, out = { fk: {}, fa: {} };
-          for (const aim of ['shield', 'body', 'helm']) for (const guard of ['angled', 'square']) for (const pace of ['canter', 'gallop']) { const f = { aim, guard, pace }, k = `${aim}/${guard}/${pace}`;
-            out.fk[k] = run({ skill: [1, 1], fix: [f, null] }, N, 40000); out.fa[k] = run({ skill: [1, 2], fix: [f, null] }, N, 40000); }
-          out.gk = { angled: run({ skill: [1, 1], guardBy: ['angled', null] }, 600, 40000), square: run({ skill: [1, 1], guardBy: ['square', null] }, 600, 40000) };
-          const sh = { aim: 'shield', guard: 'square', pace: 'canter' }, bd = { aim: 'body', guard: 'square', pace: 'canter' };
-          out.vsShield = { angled: run({ skill: [1, 1], guardBy: ['angled', null], fix: [null, sh] }, 400, 41000), square: run({ skill: [1, 1], guardBy: ['square', null], fix: [null, sh] }, 400, 41000) };
-          out.vsBody = { angled: run({ skill: [1, 1], guardBy: ['angled', null], fix: [null, bd] }, 400, 41000), square: run({ skill: [1, 1], guardBy: ['square', null], fix: [null, bd] }, 400, 41000) };
-          out.read = { arch: run({ skill: [2, 1], handsBy: [1, null], fix: [null, sh] }, 400, 42000), knight: run({ skill: [1, 1], fix: [null, sh] }, 400, 42000) };
-          out.aVk = run({ skill: [2, 1], handsBy: [1, null] }, 600, 43000); out.kVr = run({ skill: [1, 1], planBy: [null, 0] }, 400, 9000);
-          out.word = { k: run({ skill: [1, 1], planBy: ['word', null] }, 600, 44000), a: run({ skill: [1, 2], planBy: ['word', null] }, 600, 44000), kk: run({ skill: [1, 1] }, 600, 44000), ka: run({ skill: [1, 2] }, 600, 44000) };
-          return out; })()""")
-        print('   (a plan always ridden v a Knight:', pol['fk'], ')'); print('   (... v an Archmage:', pol['fa'], ')')
-        print('   (a Knight with its guard held v a Knight:', pol['gk'], '; against always the shield:', pol['vsShield'], '; against always the body:', pol['vsBody'], ')')
-        print('   (against always the shield, an Archmage\'s plan (a Knight\'s hands):', pol['read']['arch'], 'a Knight\'s:', pol['read']['knight'], '; an Archmage\'s plan v a Knight\'s:', pol['aVk'], '; a Knight\'s v a random one:', pol['kVr'], ')')
-        print('   (riding your squire\'s word, a Knight\'s hands, v a Knight:', pol['word']['k'], 'v an Archmage:', pol['word']['a'], '; a Knight\'s own plan v them:', pol['word']['kk'], pol['word']['ka'], ')')
-        check(max(pol['fk'].values()) <= .56 and max(pol['gk'].values()) <= .55, 'no plan always ridden, and neither guard always held, beats a Knight by more than the noise', [pol['fk'], pol['gk']])
-        check(max(pol['fa'].values()) < .5, 'every plan always ridden loses to an Archmage (it reads them)', pol['fa'])
-        check(pol['vsShield']['angled'] > pol['vsShield']['square'] and pol['vsBody']['square'] > pol['vsBody']['angled'], 'angled is the better guard against a rider who aims at the shield, square against one who aims at the body', [pol['vsShield'], pol['vsBody']])
-        check(pol['read']['arch'] > pol['read']['knight'] + .03 and pol['aVk'] >= .47 and pol['kVr'] >= .55, 'an Archmage\'s read beats a fixed plan by more than a Knight\'s plan does, and loses nothing to a Knight\'s; a Knight\'s plan beats a random one', pol)
-        check(pol['word']['k'] >= pol['word']['kk'] - .02 and pol['word']['a'] >= pol['word']['ka'] - .02, 'your squire\'s word is the right call by the odds: riding it does as well as a Knight\'s own plan, against a Knight and an Archmage', pol['word'])
         # every reason is true to the plan: a gallop "with no more courses in the heat" only in a heat's last course, the
         # wind "saved" only on a canter, and nothing claims a sure break
         wy = await pg.evaluate("""(() => { const bad = []; let n = 0;
