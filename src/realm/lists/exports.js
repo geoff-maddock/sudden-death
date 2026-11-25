@@ -64,7 +64,12 @@
    with the reason), windWords(w); select({ line }) picks your line; a plan carries its line (and into: the share of the
    push it aims back); view adds ground (each rut, the wind
    and its words, each side's push and line, the other side's hidden until the course is committed); summary() adds
-   ground (the tally and the log). */
+   ground (the tally and the log).
+   Phase 11 is the Umbral's lists (15-umbral.js): start(opts) and simMatch(opts) take skill 3 for a side (the Lich: G.skill
+   stays 2, G.lich marks it), hexes (ids in hexes) and hexOn (the side they work against, 0 by default); a roster member
+   sent with ult (an id in ultOwn) casts it in place of their kind's; lich, hexes and ultOwn are the tables; hex() (the
+   match's: { ids, on }, or null), hexLine() (in words) and hexFx(s) (side s's ride's effects with them); card(s), view
+   and summary() add hex and lich. */
 return {
   rules: JSON.parse(JSON.stringify(JT_RULES)), at: JSON.parse(JSON.stringify(JT_AT)), get G() { return G; },
   newMatch: o => jtNewMatch(o), riders: () => jtRiders(), inTilt: () => jtInTilt(), left: () => jtLeft(),
@@ -112,5 +117,8 @@ return {
   // the Tilting Lists' ways (phase 8)
   groundRules: JSON.parse(JSON.stringify(JT_GND)), lines: JSON.parse(JSON.stringify(JT_LINE)), get ground() { return G && G.ground ? JSON.parse(JSON.stringify(G.ground)) : null; },
   gndPush: (s, pace) => jtGndPush(s, pace), gustK: pace => jtGustK(pace), lineK: (s, l) => jtLineK(s, l), lineFor: (s, plan, sk) => G && G.teams && !G.over ? jtLineFor(s, plan || jtPlanOwn(s), sk) : null, windWords: w => jtWindWords(w || { k: 0, dir: 1 }),
+  // the Umbral's lists (phase 11)
+  lich: JSON.parse(JSON.stringify(JT_LICH)), hexes: JSON.parse(JSON.stringify(JT_HEX)), ultOwn: JSON.parse(JSON.stringify(JT_ULT_OWN)),
+  hex: () => G && G.teams && G.hex ? JSON.parse(JSON.stringify(G.hex)) : null, hexLine: () => jtHexLine(), hexFx: s => G && G.teams ? jtRideFx(s) : null,
   mountFor: (rs, n) => jtMountFor(rs, n), squadRules: JSON.parse(JSON.stringify({ role: JT_ROLE, arm: JT_ARM, shake: JT_SHAKE, nerve: JT_NERVE, corner: JT_CORNER }))
 };

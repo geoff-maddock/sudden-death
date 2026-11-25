@@ -205,7 +205,7 @@ async def main():
           return { card: !!card, words, hexes, played: WG.bkg.games.length - n0, name: g.name, tier: g.tier, r: g.r, round: U.finale, ftries: U.tries.finale || 0, gold: RUN.gold - g0, pieces: U.pieces.length, live: wCourtLive() }; })()""")
         check(fn['card'] and fn['words']['seal'] and fn['words']['team'] and not fn['words']['toll'] and fn['hexes'] == 2 and fn['played'] == 1 and fn['name'] == 'Nadir Athletic' and fn['tier'] == 4 and not fn['live'],
               'a finale round of basketball goes through the adapter: the card says the Seal, Nadir Athletic, two hexes, no toll', fn)
-        check((fn['r'] == 'win' and fn['round'] == 1) or (fn['r'] != 'win' and fn['round'] == 0 and fn['ftries'] == 1) and fn['pieces'] == 9,
+        check((fn['r'] == 'win' and fn['round'] == 1) or (fn['r'] != 'win' and fn['round'] == 0 and fn['ftries'] == 1) and fn['pieces'] == 10,
               'a finale round settles as the finale\'s: a win takes the round, a loss counts a try; the pieces stay', fn)
 
         # and as the realm bot drives it: in LAB the real adapter simulates the round at once, and reports it

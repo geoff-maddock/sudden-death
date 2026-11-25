@@ -48,7 +48,7 @@ DB.chars.nadir_rink = { name: 'Hollis Grael, the Drowned Captain', kind: 'wraith
   greet: 'You crossed the cold for a game. I captain the Nadir on this pond, and I hold the PUCK. Say PLAY when you want to try to take it off me. Ask about the RULES first. The ice here has opinions.',
   topics: {
     job: { t: 'I went through the ice on this pond one winter, and I came up captain. I have not lost a game on it since.' },
-    puck: { t: 'The Dead Puck. One ninth of your Seal, frozen through. Beat my six at hockey and it is yours. Lose, and the next game costs a TOLL.' },
+    puck: { t: 'The Dead Puck. One piece of your Seal, frozen through. Beat my six at hockey and it is yours. Lose, and the next game costs a TOLL.' },
     rules: { t: 'Real hockey, five skaters and a goalie, three periods, our pond. My six skate harder than anything you have met, a Lich calls our lines, and our bench carries a full bag. I keep a NIGHT of my own for when it matters. Before the puck drops I draw the HEXES.' },
     hexes: { t: 'The pond has moods. It opens under the puck and gives it back at centre ice. The net wanders off its line. The cold gets into your legs. The whistle forgets whose side it is on. You will hear which before the puck drops, and they stay up on the board.' },
     toll: { t: 'Twenty gold a game, after the first. Paid when the puck drops. Walking away from the card costs nothing.' },

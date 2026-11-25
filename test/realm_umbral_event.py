@@ -49,7 +49,7 @@ async def main():
         await pg.wait_for_function("document.getElementById('modal').hidden")
         for _ in range(3): await pg.evaluate("wRenderHud()")
         sk = await pg.evaluate("""(() => ({ shut: document.getElementById('modal').hidden, log: WLOG.slice(-3).map(l => l[0]).join(' ') }))()""")
-        check(sk['shut'] and 'nine pieces' in sk['log'], 'Skip ends it, and what it said goes in the log; it does not come back', sk)
+        check(sk['shut'] and 'ten pieces' in sk['log'], 'Skip ends it, and what it said goes in the log; it does not come back', sk)
 
         await pg.evaluate("wSave()")
         await pg.goto(REALM_URL); await pg.wait_for_function("typeof wUmbScene === 'function'")
@@ -59,7 +59,7 @@ async def main():
 
         await pg.evaluate("WUS.speed = 30; wOpenJournal('umbral')")
         jt = await pg.evaluate("""(() => ({ tab: !!document.querySelector('[data-jtab="umbral"]'), text: document.getElementById('wJBody').textContent }))()""")
-        check(jt['tab'] and 'Pieces won: 0 of 9' in jt['text'], 'the Journal has its Umbral chapter, with the pieces won', jt)
+        check(jt['tab'] and 'Pieces won: 0 of 10' in jt['text'], 'the Journal has its Umbral chapter, with the pieces won', jt)
         await pg.click('#wJBody [data-umbscene]')
         await pg.wait_for_function("!!document.getElementById('wUmbEnd') && !document.getElementById('wUmbEnd').hidden", timeout=8000)
         rp = await pg.evaluate("""(() => { const n = document.querySelectorAll('#wUmbLines p').length, last = document.querySelector('#wUmbLines p:last-child').textContent; document.getElementById('wUmbGo').click(); return { n, last, want: 5 + W_UMB1.speech.length, shut: document.getElementById('modal').hidden }; })()""")

@@ -42,7 +42,7 @@ DB.chars.nadir_gridiron = { name: 'Ossian Pyre, the Ash Marshal', kind: 'lich', 
   greet: 'Another one who walked through the cold for a game. I captain the Nadir here, and I hold the BALL. Say PLAY when you are ready to lose it. Ask about the RULES first; nobody ever does.',
   topics: {
     job: { t: 'I call the plays in the Pit. I called them before the Ash Bowl had grass, and I will call them after it is ash.' },
-    ball: { t: 'The Ash Ball. One ninth of your Seal, and still warm. Beat my seven at football and it is yours. Lose, and the next game costs a TOLL.' },
+    ball: { t: 'The Ash Ball. One piece of your Seal, and still warm. Beat my seven at football and it is yours. Lose, and the next game costs a TOLL.' },
     rules: { t: 'Real football, seven a side, two halves, our field. My side plays harder than anything you have met, a Lich calls our plays, and our sideline carries a full bag. I keep an ECLIPSE for when it matters. Before kickoff I draw the HEXES.' },
     hexes: { t: 'The Pit has its moods. The end zone at your end creeps out, the ball rolls our way, the cold gets into your legs, the wind turns your kicks. You will hear which before kickoff.' },
     toll: { t: 'Twenty gold a game, after the first. Paid at kickoff. Walking away from the card costs nothing.' },

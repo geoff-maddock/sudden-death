@@ -25,3 +25,5 @@ src/jt/parts/12-powers.js
 src/jt/parts/13-kit.js
 # phase 8: the Tilting Lists' ways: the churned sand (a rut a lane, in it or beside it) and the pennant wind
 src/jt/parts/14-ground.js
+# phase 11: the Umbral's lists: the Lich, the hexes and a rider's own ultimate (nothing acts unless a match asks for it)
+src/jt/parts/15-umbral.js

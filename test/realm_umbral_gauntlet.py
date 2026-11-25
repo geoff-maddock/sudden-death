@@ -49,7 +49,7 @@ async def main():
             const gap = [0, 1].every(i => __at(g, i).join() === G.line[i].join() && G.line[i][1] === G.row && Math.abs(G.line[i][0] - G.gate[0]) === 1);
             out[g] = wall && edges && row[G.gate[0]] === W_UMB8D.gate && G.gate[1] === G.row && gap && !walkCh(W_UMB8D.gate) && !walkCh(W_UMB8D.wall) && walkCh(W_UMB8D.open) && c.y !== G.row ? 'ok' : JSON.stringify({ G, wall, edges, gap }); }
           return out; })()""")
-        check(all(v == 'ok' for v in st.values()) and len(st) == 8, 'every dark ground has the bone railing from stand to stand, the shut gate in the middle of the gap, and a guard either side of it', st)
+        check(all(v == 'ok' for v in st.values()) and len(st) == 9, 'every dark ground has the bone railing from stand to stand, the shut gate in the middle of the gap, and a guard either side of it', st)
 
         # before anything: the champion can't be walked to (by the game's own pathfinding, nor straight up the middle)
         b = await pg.evaluate("""(() => { const g = 'g_ballpark', m = MAPS['u:' + g], G = m.gauntlet, c = __champ(g), out = {};
@@ -218,7 +218,7 @@ async def main():
         # line, everyone in the way), on every ground, and every champion is among what this part judges
         ag = await pg.evaluate("""(() => { const out = {}; for (const g in W_UMB4.grounds) { const m = MAPS['u:' + g], B = wUmbBehind(m, g), r = wUmbGauntletReach(m, g, { open: false, beaten: false });
             out[g] = B.shut.every((v, i) => v === r[i]) && wUmbGroundChamps(g).every(k => B.npcs.includes(W_NADIR[k].char)); } return out; })()""")
-        check(all(ag.values()) and len(ag) == 8, 'one rule: the reach checks and the filter use the same play walk with the gate shut, and every champion is judged by it', ag)
+        check(all(ag.values()) and len(ag) == 9, 'one rule: the reach checks and the filter use the same play walk with the gate shut, and every champion is judged by it', ag)
 
         # a marked tile behind the line whose only open side is the champion's tile: somebody in the way, not the railing,
         # so the ground keeps its wall and the audit reports the tile

@@ -138,7 +138,7 @@ function jtHorse(c, x, y, k, dir, mount, col, phase, moving) {
 const JT_POSE = { legL: { a: -1.25, lift: .1 }, legR: { a: -1.05, lift: .1 }, armL: { x: -12, y: -46 }, armR: { x: 26, y: -50 }, lean: .08 };
 function jtRider(c, s, x, y, k, dir, o) {
   const T = G.teams[s], m = T.roster[o.ri] || {}, kind = m.kind && KIND[m.kind] ? m.kind : 'goblin', hpx = 1.55 * k, sc = hpx * (KIND[kind].h) / 100;
-  const sy = y - 1.42 * k - o.bob, fy = sy + 34 * sc, team = { color: T.color || '#888', light: '#f2e6c4', short: T.short };
+  const sy = y - 1.42 * k - o.bob, fy = sy + 34 * sc, team = { color: T.color || '#888', light: '#f2e6c4', short: T.short, shade: !!T.shade };
   c.save();
   if (o.fall) { c.translate(x, sy); c.rotate(-dir * o.fall * 1.4); c.translate(-x, -sy + -o.fall * .2 * k); c.translate(-dir * o.fall * .8 * k, o.fall * 1.2 * k); }
   // their shield shows on the far rider (its face to us), a sliver on yours

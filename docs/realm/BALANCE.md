@@ -2127,6 +2127,41 @@ to the bot in all (phase 10), so a hex on the brooms can't take much; a human wh
 round) 12.5%. A little under the 15 to 25% band, as golf's and football's champions are; a careful human, who sweeps
 their own stones and sees the curl the rime adds, wins far more.
 
+### Umbral: jousting (#117, phase 11)
+
+Measured in the page with the engine alone (`wJT.simMatch` on the options the Realm sends: your four at level 3, the
+journey's kinds (werewolf, goblin, minotaur, dwarf), riding as a Knight with no potions, as Simulate does; the Nadir
+four at level parity; three courses a heat; powers on; the Lists' ways off; their full bag). Rows in one run play match
+i on the same seed, so they are paired; two runs draw different fours (unseeded), so a row moves a few points between
+runs. Phase 12's lab measures it again.
+
+**The Lich.** Decisions alone were worth nothing here: its plan on odds reckoned against the rider it meets, and a
+quicker read, against an Archmage, the same riders, 400 a row: you won 38.0% against the Archmage and 37.8% against that
+Lich (the course is a game near its equilibrium, so a better read of it buys little); a surer lean (0.8 against 0.62)
+1.5 points more. Kept: the Lich also rides with sharper hands (`JT_LICH`: aim 0.75 against 0.85, couch 0.16 against
+0.2): **29.3%** against it, about 9 points, as the other engines' Lichs are 8 to 12 points better than an Archmage.
+
+**Tier U.** One rating point on each of their four (`W_JTG.oppBonus[4]`), the Lich, a full bag (two Stamina Draughts,
+a liniment, a tonic, two Squire's Oils). The Nadir four: a wraith rides the first heat (Sir Hollowmere), the champion
+the second and the tilt for the crown (Isolde Grave, a vampire, no points more; her own ultimate, The Pale Charge: her
+lance breaks on any fair touch and your tip sways a quarter more, for a course), a spider and a witch squire.
+
+| your win (400, paired within a run) | run 1 | run 2 |
+|---|---|---|
+| the Nadir four, no hexes | 21.0% | 14.8% |
+| ... with an Archmage for the Lich | | 21.0% |
+| Grave Mist (your tip sways 1.14 times) | 16.0% | 13.0% |
+| Hollow Mounts: first cut, wind 1.4 (then 2: -0.8) | 20.5% | |
+| **Hollow Mounts, kept: your mounts charge at 0.92, and 1.5 times the wind** | | **12.3%** (-5.8 in its own run) |
+| The Cold Saddle (your seat 0.08 worse) | 18.8% | 12.3% |
+| Shrouded Shields (your lance on their shield breaks 0.9 as often; 0.8 took 17 points in a first try) | 14.8% | 13.5% |
+| **the champion as played, one hex drawn a try (each in turn)** | **17.3%** | **11.3%** |
+| two hexes (the finale's round) | 15.0% | 10.5% |
+
+The mount's wind alone barely matters over three courses a heat (fresh mounts each heat), so Hollow Mounts also slows the
+charge. No hex takes more than about 6 points. The champion as played, about 14% across the two runs: where curling's
+sits, a little under the 15 to 25% band.
+
 ### Umbral: bowling (#99, 4g)
 
 `python3 test/realm_lanes_lab.py N '' umbral` (the Umbral part of the bowling lab). Games as Simulate plays the Drowned

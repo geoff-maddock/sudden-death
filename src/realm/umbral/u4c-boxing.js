@@ -48,7 +48,7 @@ DB.chars.nadir_ring = { name: 'Brakka Knell, the Broken Bell', kind: 'minotaur',
   greet: 'Every bell on this side rang once for somebody, and then it cracked. I hold the BELL. Say PLAY when you want to hear it ring for you. Ask about the RULES first, if you like.',
   topics: {
     job: { t: 'I box. I have boxed every fool who walked down this ring since the bell broke. None of them heard the end of the third round.' },
-    bell: { t: 'The Broken Bell. One ninth of your Seal. Win the card and it is yours. Lose, and the next card costs you a TOLL.' },
+    bell: { t: 'The Broken Bell. One piece of your Seal. Win the card and it is yours. Lose, and the next card costs you a TOLL.' },
     rules: { t: 'Three bouts, as in your Anvil Ring: two of my Nadir, then me. Everything here is harder. My boxers are stronger than yours, my corner is cleverer than any you have met, and before the bell I draw the HEXES. One or two, for you.' },
     hexes: { t: 'A ring that closes in. Bad water in your bucket. Heavy gloves. A quick count. You will hear which before the bell.' },
     toll: { t: 'Twenty gold a card, after the first. The first is free. The bell does not ring for nothing twice.' },

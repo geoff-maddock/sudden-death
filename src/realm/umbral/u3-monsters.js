@@ -5,15 +5,20 @@
    (W_UMB3.card): the other side has more HP and Strength, and you draw as at the Hall of Fame (B.drawMod, one card
    fewer). Its players are their umbral forms: drawn in shadow (e.shade: drained colours, pale glowing eyes, in the
    fight and on the map) and each with its kind's dark trait (W_UMB3.traits, named on the match's log).
-   The Nadir champions hold the Seal's nine pieces (W_UMB_PIECES). Each waits somewhere on the dark side (W_NADIR) and
+   The Nadir champions hold the Seal's ten pieces (W_UMB_PIECES). Each waits somewhere on the dark side (W_NADIR) and
    plays when asked (PLAY): a match that draws hexes (W_UMB3.hexes: one or two, announced on the match card and in the
    log), a piece to the winner. Lose, and the next try costs a toll. The first is the Gatekeeper, at the Gate on the
-   dark road just through the portal: the card game, played straight, the gentlest of the nine. The others come with
+   dark road just through the portal: the card game, played straight, the gentlest of them. The others come with
    their sports (phase 4).
+   The pieces the Seal asks for (wUmbNeed): every piece, for an Umbral opened since jousting's champion joined (issue
+   #117, phase 11: WG.umbral.need, set at the unlock). An Umbral opened before then asks for the nine it opened with
+   (W_UMB_NINE, set on loading such a journey, u4j): its jousting piece can still be won, and sings like any other, but
+   the Seal never waits for it. wUmbGot() counts the pieces held that the Seal asks for; wUmbNum(n) says a count in
+   words.
    A new curse: the Umbral Shade (u_shade), unplayable, 1 HP lost if it is in your hand at the end of your turn, and it
    fades at the end of the match like any match-only card.
 
-   W_UMB3, W_UMB_PIECES, W_NADIR, wNadirMatch, wUmbHexes
+   W_UMB3, W_UMB_PIECES, W_UMB_NINE, W_NADIR, wNadirMatch, wUmbHexes, wUmbNeed, wUmbGot, wUmbNum
    Wraps: wBuildEncounter (wWU3BuildEncounter: an Umbral match is tier 3 and carries its hexes), wPreGame (wWU3PreGame:
    the match card names tier U and the hexes), wRunAct (wWU3RunAct: PLAY), buildAllMaps (wWU3BuildAllMaps: the
    champions on their maps), wDrawActor (wWU3DrawActor: the dark side's people in shadow), wAudit (wWU3Audit: the
@@ -56,12 +61,19 @@ function wUmbHp(e, k) { e.max = Math.round(e.max * k); e.hp = Math.round(e.hp * 
 function wUmbSlip(id, n) { for (let i = 0; i < n; i++) B.draw.splice(ri(0, B.draw.length), 0, mkCard(id)); }
 K('u_shade', 'Umbral Shade', 'none', 'curse', -1, 'x', 'self', [], { endHurt: 1, fl: 'Unplayable. While in hand at the end of your turn, lose 1 HP. It fades when the match is over.' });
 
-// the nine pieces of the Seal of the Crown, one for every way to play
+// the ten pieces of the Seal of the Crown, one for every way to play (jousting's last: issue #117, phase 11)
 const W_UMB_PIECES = {
   card: { n: 'The Cracked Card', sport: 'the card game' }, baseball: { n: 'The Iron Stitch', sport: 'baseball' }, basketball: { n: 'The Black Net', sport: 'basketball' },
   golf: { n: 'The Hollow Flag', sport: 'golf' }, bowling: { n: 'The Drowned Pin', sport: 'bowling' }, curling: { n: 'The Sunken Stone', sport: 'curling' },
   football: { n: 'The Ash Ball', sport: 'football' }, boxing: { n: 'The Broken Bell', sport: 'boxing' }, hockey: { n: 'The Dead Puck', sport: 'hockey' },
+  jousting: { n: 'The Splintered Lance', sport: 'jousting' },
 };
+// the nine an Umbral opened before jousting's champion asks for
+const W_UMB_NINE = ['card', 'baseball', 'basketball', 'golf', 'bowling', 'curling', 'football', 'boxing', 'hockey'];
+// the pieces this journey's Seal asks for, in the pieces' own order
+function wUmbNeed() { const U = wUmb(), all = Object.keys(W_UMB_PIECES); return U && Array.isArray(U.need) ? all.filter(p => U.need.includes(p)) : all; }
+const wUmbGot = () => { const U = wUmb(); return U ? wUmbNeed().filter(p => U.pieces.includes(p)).length : 0; };
+const wUmbNum = n => ['none', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten', 'eleven', 'twelve'][n] || String(n);
 // the Nadir champions: where each waits, who they field, what they hold. Phase 4 adds the sports' champions.
 const W_NADIR = {
   gate: { piece: 'card', char: 'nadir_gate', map: 'u:umbralden', at: [9, 4], region: 'rime', ids: ['u_gatekeeper', 'boneline'], type: 'elite', hexes: 2, toll: 20, gold: 80 },
@@ -76,7 +88,7 @@ DB.chars.nadir_gate = { name: 'Morrow Vane, the Gatekeeper', kind: 'lich', look:
   greet: 'You came through. They always do, the first time. I hold the CARD. Say PLAY when you want to lose it to me again. Ask about the RULES first, if you like.',
   topics: {
     job: { t: 'I keep the Gate. Nobody comes further in without playing me first. Nobody has to, but they all do.' },
-    card: { t: 'The Cracked Card. One ninth of your Seal. Win a hand of ours and it is yours. Lose, and the next hand costs you a TOLL.' },
+    card: { t: 'The Cracked Card. One piece of your Seal. Win a hand of ours and it is yours. Lose, and the next hand costs you a TOLL.' },
     rules: { t: 'Our cards, our rules. Everything here is harder: my side has more in it, you hold one card fewer, and before we start I draw the HEXES. Two, for you.' },
     hexes: { t: 'A little something extra on the table. Shades in your deck, a grudge, cold hands. You will see which before we start.' },
     toll: { t: 'Twenty gold a hand, after the first. The first is free. Nothing else here is.' },
@@ -149,7 +161,9 @@ W_ON_END.nadir = function (r, ref) {
   if (r === 'win') {
     if (!U.pieces.includes(C.piece)) U.pieces.push(C.piece);
     U.beaten[ref.id] = WG.dayAbs; RUN.gold += C.gold;
-    wLog(`You beat ${DB.chars[C.char].name}, and ${W_UMB_PIECES[C.piece].n} is yours: ${U.pieces.length} of 9 pieces of the Seal. ${C.gold} gold.`, 'g');
+    // (a piece this journey's Seal doesn't ask for, the jousting piece of an Umbral opened before it: it only sings)
+    const need = wUmbNeed(), of = need.includes(C.piece) ? `${wUmbGot()} of ${need.length} pieces of the Seal` : `your Seal was cast without it, so it only sings for you (${wUmbGot()} of ${need.length} pieces)`;
+    wLog(`You beat ${DB.chars[C.char].name}, and ${W_UMB_PIECES[C.piece].n} is yours: ${of}. ${C.gold} gold.`, 'g');
     wGainCard({ pick: 3, rarity: 'r' }, DB.chars[C.char].name);
   } else U.tries[ref.id] = (U.tries[ref.id] || 0) + 1;
   wSave();

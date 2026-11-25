@@ -66,7 +66,7 @@ async def main():
           return out; })()""")
         check(sl['relic'] and sl['scene'] and sl['queued'] and sl['recruit'] and sl['redeemed'] == 'gate', 'forging the Seal gives the Seal of the Crown, shows its scene, and the cleanest-beaten champion asks to join once the world is free', sl)
         check(sl['mark2'] and 'stopped' in sl['dreams'], 'a later Crown keeps the legend mark; the innkeepers\' dreams are over', sl)
-        check(sl['mark'] and sl['medal'] == 10 and sl['rumour'] and sl['rumour']['sealed'] == 1, 'it marks your team\'s portrait, fills the medal (nine pieces and the Seal), and the profile remembers', sl)
+        check(sl['mark'] and sl['medal'] == 10 and sl['rumour'] and sl['rumour']['sealed'] == 1, 'it marks your team\'s portrait, fills the medal (gold for the Seal), and the profile remembers', sl)
 
         tr = await pg.evaluate("""(() => { const out = {}, keep = beginFight; beginFight = enc => { UI.busy = false; startCombat(enc.ids, enc.type, enc.sport, enc.trait); };
           const go = () => { RUN.pending = null; B = null; LAB = true; startMatch({ type: 'normal', ids: ['skelss'], tier: 1, world: { kind: 'wild', ref: null, region: 'plains' } }); LAB = false; const r = { block: B.P.block, hand: B.hand.length }; B = null; RUN.pending = null; return r; };

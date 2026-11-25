@@ -47,7 +47,7 @@ DB.chars.nadir_shed = { name: 'Grisel Mourne, the Sunken Skip', kind: 'lich', lo
   greet: 'The tide came in over this sheet a long time ago, and nobody told the stones. I skip the Nadir here, and I keep the STONE at the bottom of the house. Say PLAY when you want to curl for it. Ask about the RULES first. The ice here has its own.',
   topics: {
     job: { t: 'I skipped at the Shed when the pebble was water and the windows had glass. I still call every stone. The sea never asked me to stop.' },
-    stone: { t: 'The Sunken Stone. One ninth of your Seal, and it has sat on the button so long the button has forgotten it is there. Beat my four at curling and it is yours. Lose, and the next match costs a TOLL.' },
+    stone: { t: 'The Sunken Stone. One piece of your Seal, and it has sat on the button so long the button has forgotten it is there. Beat my four at curling and it is yours. Lose, and the next match costs a TOLL.' },
     rules: { t: 'Real curling, your four against my four, six ends, nobody goes home level. My side curls at your level and a little better at everything, a Lich calls our stones and reads every pebble as it is, our sweepers know where a stone is going before it does, and we bring a full bag. Before the first stone I draw the HEXES.' },
     hexes: { t: 'Rime on your pebble, so your stones curl past where your skip reads them. Brooms that weigh like lead. A house that slides away from you. Frost that sets my stones in the four-foot like rock. One of them, for you. You will hear which before the first stone.' },
     sunken: { t: 'Once a match I let the house go under. Your stones drag in the cold water, and they hardly curl. Mind the end I choose.' },

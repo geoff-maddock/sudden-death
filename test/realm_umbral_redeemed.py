@@ -149,7 +149,7 @@ async def main():
 
         # ---------- the registry: nine stars, each found by wStar, none of them in W_STARS ----------
         rg = await pg.evaluate("""(() => Object.keys(W_UMB9).map(k => { const s = wStar(W_NADIR[k].char); return s && [k, s.id, s.kind, s.name, s.num, !!CARDS[s.sig], s.home, s.ult ? s.ult.id : null]; }))()""")
-        check(len(rg) == 9 and all(r and r[5] for r in rg), 'each of the nine champions has a superstar entry, found by wStar, with a signature card', rg)
+        check(len(rg) == 10 and all(r and r[5] for r in rg), 'each of the ten champions has a superstar entry, found by wStar, with a signature card', rg)
         nw = await pg.evaluate("W_STARS.length === 6 && !W_STARS.some(s => s.redeemed) && !wCourtStarKind('lich') && !wRinkStarKind('wraith')")
         check(nw, 'the redeemed are not legend superstars: W_STARS and the engines\' star kinds are unchanged', nw)
         ids = await pg.evaluate("(() => { const out = {}; for (const k in W_UMB9) { const u = W_UMB9[k].ult; if (u) out[k] = u.id; } return { out, gf: !!wGF.ult('nadirEclipse'), bk: !!wBK.ultBook('lightsout'), gl: !!wGL.ultOwn.hollowflag, bl: !!wBL.ultOwn.drownbell, cr: !!wCR.ultOwn.sunkenstone }; })()")

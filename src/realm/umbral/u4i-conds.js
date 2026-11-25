@@ -1,7 +1,7 @@
 /* u4i: the champions' conditions (issue #99, "some champions also want a condition"). Loads after the sports'
    parts (u4a..u4h); changes earlier parts only by reassignment (saved originals carry the wWU4I prefix).
 
-   Four of the eight sports' champions want more than a win (W_UMB4I.conds, kept on each one's W_NADIR entry as C.cond):
+   Four of the sports' champions (not jousting's) want more than a win (W_UMB4I.conds, kept on each one's W_NADIR entry as C.cond):
      night   Vesper Gloam (basketball) and Sexton Vale (golf) play only after dark: by day, the game is turned away
              once everything else is in order (the guards beaten, the gate's item handed over, the toll affordable),
              so their other asks come first; a game left half-played resumes whatever the hour.
