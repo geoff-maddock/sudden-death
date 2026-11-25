@@ -253,6 +253,9 @@ SPORTS = [
          # (off until you press its button in Manage, as curling's: pressed here, through the page)
          auto=dict(have="'autoPow' in wJT", live="(() => { const b = document.querySelector('[data-jtauto]'); if (!b || wJT.mode !== 'manage') return false; if (!wJT.autoPow) b.click(); return wJT.autoPow === true && wJT.G.powSides[0] === true; })()",
                    help=('wListsHowPow', [r'Auto powers'])),
+         # (phase 8) the churned sand and the pennant wind, on in every match at the Lists (not the yard)
+         ground=dict(have="wJT.groundRules", live="!!wJT.G.ground && Array.isArray(wJT.G.ground.rut) && !!wJT.G.ground.wind && !!wJT.view.ground",
+                     help=('wListsHowGround', [r'churned sand', r'pennant wind'])),
          # (Manage waits at your plan beat for your calls: Send them, and on)
          play=dict(adv="(() => { if (wJT.phase === 'plan') wJT.press(); wJT.tick(0.05); })()", over="wJT.phase === 'over'",
                    until={'auto': ('your side casts as the match goes on', "wJT.G.casts.some(c => c.side === 0)"),

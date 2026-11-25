@@ -79,7 +79,7 @@ async def main():
 
         # ---------- You ride: the plan ----------
         a = await pg.evaluate("""(() => { W_LISTS_MODE = 'play'; wListsGame({ seed: 5, mode: 'play' }); wJT.pause(true); __to('plan'); const V = wJT.view;
-          return { ph: V.ph, sel: V.sel, rows: !$('wListsRows').hidden, btns: $('wListsRows').querySelectorAll('[data-jf]').length, msg: wJT.msg.includes('squire') }; })()""")
+          return { ph: V.ph, sel: V.sel, rows: !$('wListsRows').hidden, btns: $('wListsRows').querySelectorAll('[data-jf]:not([data-jf="line"])').length, msg: wJT.msg.includes('squire') }; })()""")
         check(a['ph'] == 'plan' and a['rows'] and a['btns'] == 7 and a['sel']['aim'] in ('shield', 'body', 'helm') and a['sel']['why'] and a['msg'], 'You ride: your course starts on your squire\'s plan, with the reason and the rows', a)
         c = await pg.evaluate("""(() => { const out = {}; $('wListsRows').querySelector('[data-jf="aim"][data-jv="helm"]').click(); out.row = wJT.view.sel.aim;
           out.bad = wJT.select({ aim: 'toString' }); wJT.select({ guard: 'angled', pace: 'canter' }); out.both = [wJT.view.sel.guard, wJT.view.sel.pace]; return out; })()""")

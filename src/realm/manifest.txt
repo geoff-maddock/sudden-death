@@ -195,6 +195,8 @@ src/realm/w151-listsyard.js
 src/realm/w152-listsfenna.js
 # powers at the Lists: mana, lance and shield powers, curses and the squire's lift, the cheer and the ultimate (issue #117, phase 6)
 src/realm/w153-listspowers.js
+# the Tilting Lists' ways: the churned sand and the pennant wind (issue #117, phase 8)
+src/realm/w155-listsground.js
 src/realm/w132-pets.js
 src/realm/w133-petegg.js
 src/realm/w134-petshop.js

@@ -50,7 +50,16 @@
    fxFor(s), cpuPower(s, plan), tip(s), jobsFor(s) (the jobs side s's squires may do: the lift while cursed); autoPow
    (Manage's Auto powers, kept in the snapshot). A roster member brings its pick as pw: { lance, shield } (0 or 1).
    select({ job: [squire, 'lift'] }) lifts a curse in place of a job; card(s) adds the other rider's powers and the
-   curses (pow, curse); summary() adds powers (the casts, the mana, the cheer). */
+   curses (pow, curse); summary() adds powers (the casts, the mana, the cheer).
+   Phase 8 is the Tilting Lists' ways (13-ground.js): start(opts) and simMatch(opts) take ground (true: the churned sand
+   and the pennant wind; lab: { sand: false } or { wind: false } leaves one out) and lineBy (lab: a line a side, 'rut' or
+   'side', or null); groundRules and lines are the tables; ground (G.ground, a copy: each lane's rut, the wind, the log
+   and the tally), gndPush(s, pace) (the wind's push on side s's tip, inches), gustK(pace) (its gusts on the sway),
+   lineK(s, line) (a line's sway and speed now), lineFor(s, plan, sk) (the line by a skill, and how far into the wind,
+   with the reason), windWords(w); select({ line }) picks your line; a plan carries its line (and into: the share of the
+   push it aims back); view adds ground (each rut, the wind
+   and its words, each side's push and line, the other side's hidden until the course is committed); summary() adds
+   ground (the tally and the log). */
 return {
   rules: JSON.parse(JSON.stringify(JT_RULES)), at: JSON.parse(JSON.stringify(JT_AT)), get G() { return G; },
   newMatch: o => jtNewMatch(o), riders: () => jtRiders(), inTilt: () => jtInTilt(), left: () => jtLeft(),
@@ -91,5 +100,8 @@ return {
   ultOf: (s, ri) => G && G.teams ? jtUltOf(s, ri) : null, powWhy: (s, k) => jtPowWhy(s, k), cast: (s, k, why) => jtCast(s, k, why || 'by hand'), castMine: k => jtCastMine(k),
   sitFits: (s, k) => jtSitFits(s, k), fxFor: s => jtFxFor(s), cpuPower: (s, plan) => G && G.teams ? jtCpuPower(s, plan || jtPlan(s)) : [], tip: s => jtPowerTip(s),
   jobsFor: s => G && G.teams ? jtJobsFor(s).slice() : JT_JOBS.slice(), get autoPow() { return !!(GP && GP.autoPow); }, set autoPow(v) { if (GP) GP.autoPow = !!v; },
+  // the Tilting Lists' ways (phase 8)
+  groundRules: JSON.parse(JSON.stringify(JT_GND)), lines: JSON.parse(JSON.stringify(JT_LINE)), get ground() { return G && G.ground ? JSON.parse(JSON.stringify(G.ground)) : null; },
+  gndPush: (s, pace) => jtGndPush(s, pace), gustK: pace => jtGustK(pace), lineK: (s, l) => jtLineK(s, l), lineFor: (s, plan, sk) => G && G.teams && !G.over ? jtLineFor(s, plan || jtPlanOwn(s), sk) : null, windWords: w => jtWindWords(w || { k: 0, dir: 1 }),
   mountFor: (rs, n) => jtMountFor(rs, n), squadRules: JSON.parse(JSON.stringify({ role: JT_ROLE, arm: JT_ARM, shake: JT_SHAKE, nerve: JT_NERVE, corner: JT_CORNER }))
 };
