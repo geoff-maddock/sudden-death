@@ -34,6 +34,8 @@ run_one() {
   [ "$t" = realm_gridiron_bench ] && lim=420
   # (nine champions through every engine, about 80 Simulated games: under 30s alone, past 240 beside other heavy checks)
   [ "$t" = realm_umbral_redeemed ] && lim=420
+  # (whole curling games in Play: about 30s alone, 182s on CI beside other heavy checks, and past 240 on a slow shard)
+  [ "$t" = realm_shed_game ] && lim=420
   if [ "$TO" = perl ]; then perl -e 'alarm shift @ARGV; exec @ARGV' $lim nice -n $nc "$PY" "test/$t.py" > "/tmp/sd-$t.log" 2>&1
   else "$TO" --foreground -k 10 $lim nice -n $nc "$PY" "test/$t.py" > "/tmp/sd-$t.log" 2>&1; fi; code=$?
   echo "$code $(( $(date +%s) - s ))" > "build/test-status/$t"
