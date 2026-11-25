@@ -6,7 +6,7 @@
    src/hk/, issue #83), Mossgate Links (wGL, golf; src/gl/, issue #92: a round at the Links, Watch or You play), the
    Saltmere Lanes (wBL, bowling; src/bl/, issue #100: a game at the Lanes, Watch, Manage or You play), the Curling Shed
    (wCR, curling; src/cr/, issue #102: a game at the Shed, Watch or You play) and the Tilting Lists (wJT, jousting;
-   src/jt/, issue #117: being built, with no page yet, so never on). Nothing here is saved. */
+   src/jt/, issue #117: a match at the Lists, Watch or You ride). Nothing here is saved. */
 
 const W_ENGINES = { diamond: { api: wBD, view: 'diamond', sport: 'baseball' }, gridiron: { api: wGF, view: 'gridiron', sport: 'football' },
   ring: { api: wBX, view: 'ring', sport: 'boxing' }, court: { api: wBK, view: 'court', sport: 'basketball' },

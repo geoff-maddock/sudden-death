@@ -45977,6 +45977,643 @@ function wpick(w) { let s = 0; for (const k in w) s += Math.max(0, w[k]); let r 
 function gauss() { let u = 0, v = 0; while (!u) u = R(); while (!v) v = R(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); }
 function txt(c, s, x, y, font, col, align = 'left', base = 'alphabetic') { c.font = font; c.fillStyle = col; c.textAlign = align; c.textBaseline = base; c.fillText(s, x, y); }
 function rr(c, x, y, w, h, r) { c.beginPath(); c.moveTo(x + r, y); c.arcTo(x + w, y, x + w, y + h, r); c.arcTo(x + w, y + h, x, y + h, r); c.arcTo(x, y + h, x, y, r); c.arcTo(x, y, x + w, y, r); c.closePath(); }
+/* The players, drawn: one file for the scoped engines (issue #85). Boxing (src/bx), football (src/gf), basketball
+   (src/bk), hockey (src/hk), bowling (src/bl, issue #100) and curling (src/cr, issue #102) each load this inside their own scope, so its names (KIND, BACK, HEAD, BODY, ink,
+   drawFig, ...) are that engine's own; it names no engine. It came from Brimstone Diamond's figures
+   (src/bd/parts/14-rendering.js), which keeps its own.
+   The animation clock is figClock(): seconds, a function each engine defines beside its drawing clock (BXT.t, GFT.t,
+   BKT.t, HKT.t, BLC.t, CRC.t).
+   drawFig(c, kind, x, y, hpx, team, o): an inked, cel-shaded player standing at (x, y), hpx tall, facing right (o.flip
+   faces left); team { color, light, short }; o { num, run (a stride phase), flip, alpha, throwK (0..1, the throwing or
+   shooting arm), lift, noShadow, stone, shade, pose, glove, bare }. A pose moves the arms (armL, the rear hand, and armR, the
+   lead), the legs (legL, legR), and lean, shift, drop and scale. o.glove (boxing): gloves in that colour, and no mitt
+   or ember in the hands; o.bare (bowling): no mitt on a pose's rear hand. What a player holds (a stick, a ball) is drawn by the engine.
+   o.shade, or a team sent with shade (an Umbral side, issue #111): the player in shadow, drained and violet, pale glowing
+   eyes, horns and cracks of light (shadeOf, shadeHorns, shadeCracks). A team without it is drawn as it always was. */
+const INK = '#17100e';
+const KIND = {
+  goblin:   { skin: '#7fae4e', h: .8,  w: .9,  cap: true, eye: '#ffe04a' },
+  kobold:   { skin: '#c85a32', h: .74, w: .86, cap: true, eye: '#ffd34a' },
+  werewolf: { skin: '#7a6653', h: 1.06, w: 1.08, eye: '#ffc02e' },
+  dwarf:    { skin: '#e3a47d', h: .8,  w: 1.28, eye: '#2a1a12' },
+  ogre:     { skin: '#8f9d58', h: 1.28, w: 1.6, cap: true, eye: '#3a2412', belly: true },
+  minotaur: { skin: '#70442a', h: 1.16, w: 1.28, eye: '#ff5a3a' },
+  troll:    { skin: '#5f7f8a', h: 1.14, w: 1.35, eye: '#f2e59a', hunch: true },
+  golem:    { skin: '#8e8d86', h: 1.12, w: 1.5, eye: '#7ff0ff' },
+  harpy:    { skin: '#dcc3a2', h: .96, w: .9,  eye: '#d9f25a', talon: true },
+  elf:      { skin: '#eed3b0', h: 1.03, w: .86, eye: '#3fae7a' },
+  wraith:   { skin: '#221c35', h: 1.03, w: .96, eye: '#9ff6ff', robe: '#2b2442' },
+  vampire:  { skin: '#ece7f1', h: 1,   w: .9,  eye: '#ff2a44' },
+  lich:     { skin: '#e6dfc6', h: 1.03, w: .95, eye: '#7fd4ff', robe: '#3d2553', bony: true },
+  zombie:   { skin: '#7f9c79', h: 1.05, w: 1.16, cap: true, eye: '#f2f2d2' },
+  gorgon:   { skin: '#6fa57d', h: 1,   w: .95, eye: '#ffe14a' },
+  spider:   { skin: '#4b2f55', h: .96, w: 1,   eye: '#ff3a4a' },
+  skeleton: { skin: '#ebe5d2', h: 1,   w: .95, eye: '#ff9a3a', bony: true },
+  witch:    { skin: '#bfd9e8', h: .98, w: .88, eye: '#6ad8ff' },
+};
+function rgbOf(h) {
+  if (h[0] === 'r') return h.match(/\d+/g).slice(0, 3).map(Number);
+  h = h.slice(1); if (h.length === 3) h = h.split('').map(x => x + x).join('');
+  const n = parseInt(h, 16); return [n >> 16 & 255, n >> 8 & 255, n & 255];
+}
+function tint(h, f) { const [r, g, b] = rgbOf(h), t = f < 0 ? 0 : 255, k = Math.abs(f); return `rgb(${Math.round(r + (t - r) * k)},${Math.round(g + (t - g) * k)},${Math.round(b + (t - b) * k)})`; }
+// a figure drawn in shadow (o.shade, or a team sent with shade: an Umbral side, issue #111): drained, darkened, turned
+// toward violet, pale eyes that glow, two short curved horns over the head (not on a kind that has its own) and two or
+// three thin cracks of light across the body, placed by a seed (the kind and the number) so they stay put
+function shadeOf(h) { const [r, g, b] = rgbOf(h), l = .3 * r + .59 * g + .11 * b, m = (v, k) => Math.max(0, Math.min(255, Math.round((v + (l - v) * .6) * .55 + k))); return `rgb(${m(r, 20)},${m(g, 8)},${m(b, 30)})`; }
+const SHADE_HORNED = ['minotaur', 'dwarf', 'kobold', 'fiend', 'behemoth', 'frostwyrm', 'hydra']; // (horns of their own, or no one head to put them on)
+function shadeRnd(d) { let h = 7; for (const ch of d.kind + ':' + (d.o.num ?? '') + ':' + (d.o.seed || 0)) h = (h * 31 + ch.charCodeAt(0)) % 1000003; return i => { const x = Math.sin(h * 12.9898 + i * 78.233) * 43758.5453; return x - Math.floor(x); }; }
+function shadeCracks(c, d, torso) {
+  const r = shadeRnd(d), n = 2 + Math.floor(r(0) * 2), col = d.o.crack || '#c8b8ff';
+  c.save(); c.clip(torso); c.shadowColor = col; c.shadowBlur = Math.max(2, 4 * FSC); c.strokeStyle = col; c.lineWidth = Math.max(.8, LW * .55); c.lineCap = 'round'; c.lineJoin = 'round';
+  for (let k = 0; k < n; k++) {
+    const x0 = (r(k * 7 + 1) - .5) * d.shw * 1.4, y0 = d.shY + 6 + r(k * 7 + 2) * 26, a = (r(k * 7 + 3) - .5) * 2.2 + Math.PI / 2, L = 10 + r(k * 7 + 4) * 9;
+    c.beginPath(); c.moveTo(x0, y0);
+    for (let j = 1; j <= 3; j++) { const t = L * j / 3, jit = (r(k * 7 + 4 + j) - .5) * 5; c.lineTo(x0 + Math.cos(a) * t - Math.sin(a) * jit, y0 + Math.sin(a) * t + Math.cos(a) * jit); }
+    c.stroke();
+  }
+  c.restore();
+}
+function shadeHorns(c, d) {
+  if (SHADE_HORNED.includes(d.kind)) return;
+  const { hy, hr } = d, col = shadeOf('#efe3c6');
+  for (const s of [-1, 1]) {
+    const p = new Path2D(); p.moveTo(s * hr * .35, hy - hr * .8); p.quadraticCurveTo(s * hr * 1.25, hy - hr * 1.15, s * hr * 1.2, hy - hr * 1.95);
+    p.quadraticCurveTo(s * hr * .95, hy - hr * 1.2, s * hr * .72, hy - hr * .55); p.closePath();
+    ink(c, p, col, 0, true);
+  }
+}
+function grey(h) { const [r, g, b] = rgbOf(h), l = .3 * r + .59 * g + .11 * b, v = Math.round(92 + l * .42); return `rgb(${v},${v},${v - 4})`; }
+function pRR(x, y, w, h, r) { const p = new Path2D(); r = Math.min(r, w / 2, h / 2); p.moveTo(x + r, y); p.arcTo(x + w, y, x + w, y + h, r); p.arcTo(x + w, y + h, x, y + h, r); p.arcTo(x, y + h, x, y, r); p.arcTo(x, y, x + w, y, r); p.closePath(); return p; }
+function pEl(x, y, rx, ry, rot = 0) { const p = new Path2D(); p.ellipse(x, y, rx, ry, rot, 0, Math.PI * 2); return p; }
+function pPoly(pts) { const p = new Path2D(); pts.forEach(([x, y], i) => i ? p.lineTo(x, y) : p.moveTo(x, y)); p.closePath(); return p; }
+let LW = 2, FSC = 1, FLIPPED = false;
+// fill + cel shadow (light from upper left) + ink outline
+function ink(c, path, fill, sx = 0, noShade) {
+  c.fillStyle = fill; c.fill(path);
+  if (!noShade) {
+    c.save(); c.clip(path); c.fillStyle = 'rgba(26,10,36,.3)';
+    c.beginPath(); c.moveTo(sx + 2, -300); c.lineTo(sx + 300, -300); c.lineTo(sx + 300, 80); c.lineTo(sx - 10, 80); c.closePath(); c.fill(); c.restore();
+  }
+  c.lineWidth = LW; c.strokeStyle = INK; c.lineJoin = 'round'; c.lineCap = 'round'; c.stroke(path);
+}
+function inkLine(c, pts, col = INK, w = 1) { c.beginPath(); pts.forEach(([x, y], i) => i ? c.lineTo(x, y) : c.moveTo(x, y)); c.strokeStyle = col; c.lineWidth = LW * w; c.lineCap = 'round'; c.lineJoin = 'round'; c.stroke(); }
+function glowEye(c, x, y, r, col, st) {
+  if (st) { circ(c, x, y, r, '#5a5a56'); return; }
+  c.save(); c.shadowColor = col; c.shadowBlur = Math.max(2, r * 3.2 * FSC); circ(c, x, y, r, col); c.restore();
+  circ(c, x - r * .35, y - r * .35, r * .38, 'rgba(255,255,255,.95)');
+}
+function slit(c, x, y, r) { c.fillStyle = INK; c.fillRect(x - r * .18, y - r * .8, r * .36, r * 1.6); }
+function cap(c, d, tilt = 0, scale = 1) {
+  const { hy, hr } = d, R = (hr + 1) * scale;
+  c.save(); c.translate(tilt * 8, hy - 3.5 * scale); c.rotate(tilt);
+  const dome = new Path2D(); dome.moveTo(-R, 0); dome.arc(0, 0, R, Math.PI, 0); dome.closePath();
+  ink(c, dome, d.jer);
+  c.fillStyle = d.jerD; c.fillRect(-.8, -R, 1.6, R);
+  ink(c, pEl(0, .6, R + 3.5, 3.1), d.jerD, 0, true);
+  if (FSC * scale > .35) { c.font = `900 ${8.5 * scale}px "Alegreya Sans", sans-serif`; c.textAlign = 'center'; c.textBaseline = 'alphabetic'; c.fillStyle = d.trimL; if (FLIPPED) { c.save(); c.scale(-1, 1); } c.fillText(d.letter, 0, -3.2 * scale); if (FLIPPED) c.restore(); }
+  c.restore();
+}
+
+/* things drawn behind the body */
+const BACK = {
+  harpy(c, d) {
+    const f = d.o.fly ? Math.sin(figClock() * 18) * 12 : Math.sin(figClock() * 2) * 2, col = d.C('#6b567c'), col2 = d.C('#8b76a0');
+    for (const s of [-1, 1]) {
+      const p = new Path2D(); p.moveTo(s * 8, d.shY + 4); p.quadraticCurveTo(s * 40, d.shY - 34 - f, s * 64, d.shY - 26 - f);
+      p.lineTo(s * 56, d.shY - 10 - f * .6); p.lineTo(s * 62, d.shY + 2 - f * .3); p.lineTo(s * 50, d.shY + 12); p.lineTo(s * 54, d.shY + 26); p.lineTo(s * 38, d.shY + 26); p.lineTo(s * 36, d.shY + 36); p.quadraticCurveTo(s * 20, d.shY + 20, s * 8, d.shY + 18); p.closePath();
+      ink(c, p, col, s > 0 ? -999 : 999);
+      for (let i = 0; i < 4; i++) inkLine(c, [[s * (14 + i * 9), d.shY + 4 + i * 2], [s * (26 + i * 9), d.shY - 12 - f * .5 + i * 7]], col2, .7);
+    }
+  },
+  vampire(c, d) {
+    const cape = pPoly([[-d.shw - 2, d.shY], [-d.shw - 12, -8], [0, -12], [d.shw + 12, -8], [d.shw + 2, d.shY]]);
+    ink(c, cape, d.C('#15101a'));
+    ink(c, pPoly([[-d.shw - 3, d.shY - 1], [-d.shw - 6, -14], [-d.shw + 2, d.shY + 4]]), d.C('#8e1426'), 0, true);
+    ink(c, pPoly([[d.shw + 3, d.shY - 1], [d.shw + 6, -14], [d.shw - 2, d.shY + 4]]), d.C('#8e1426'), 0, true);
+    // high collar
+    ink(c, pPoly([[-9, d.shY + 1], [-22, d.hy - 14], [-12, d.hy + 4]]), d.C('#8e1426'));
+    ink(c, pPoly([[9, d.shY + 1], [22, d.hy - 14], [12, d.hy + 4]]), d.C('#8e1426'));
+  },
+  spider(c, d) {
+    const k = d.o.run ? Math.sin(d.o.run) * 6 : Math.sin(figClock() * 3) * 1.5;
+    ink(c, pEl(0, -30, 20, 17), d.C('#2c1a34'));
+    ink(c, pPoly([[-4, -40], [4, -40], [0, -32], [4, -24], [-4, -24], [0, -32]]), d.C('#d83a4a'), 0, true);
+    for (let i = 0; i < 4; i++) for (const s of [-1, 1]) {
+      const y0 = d.shY + 10 + i * 7, kk = (i % 2 ? k : -k) * s;
+      inkLine(c, [[s * 10, y0], [s * (34 + i * 3), y0 - 18 + kk], [s * (44 + i * 2), y0 + 30 - i * 4]], INK, 2.6);
+      inkLine(c, [[s * 10, y0], [s * (34 + i * 3), y0 - 18 + kk], [s * (44 + i * 2), y0 + 30 - i * 4]], d.C('#4b2f55'), 1.3);
+    }
+  },
+  gorgon(c, d) { for (let i = 0; i < 5; i++) snake(c, d, Math.PI * (1.05 + i * .225), 24, i); },
+  witch(c, d) { ink(c, pRR(-15, d.hy - 6, 30, 34, 10), d.C('#eef2f8')); },
+  wraith(c, d) { robeBody(c, d, d.C('#2b2442'), true); },
+  lich(c, d) { robeBody(c, d, d.C('#3d2553'), false); },
+};
+function robeBody(c, d, col, tattered) {
+  const p = new Path2D(); p.moveTo(-d.shw + 2, d.shY); p.lineTo(-d.shw - 7, -4);
+  if (tattered) { for (let i = 0; i <= 8; i++) { const x = -d.shw - 7 + i * (2 * d.shw + 14) / 8; p.lineTo(x, i % 2 ? -10 - Math.sin(figClock() * 4 + i) * 2 : -1); } }
+  else p.lineTo(d.shw + 7, -4);
+  p.lineTo(d.shw - 2, d.shY); p.closePath();
+  ink(c, p, col);
+  if (!tattered) { c.fillStyle = d.C('#d8b64a'); c.fillRect(-d.shw - 6, -8, 2 * d.shw + 12, 2.4); }
+}
+function snake(c, d, a, len, i) {
+  const wv = Math.sin(figClock() * 5 + i * 1.7) * 4, x0 = Math.cos(a) * 10, y0 = d.hy + Math.sin(a) * 10;
+  const x1 = Math.cos(a) * len + wv, y1 = d.hy + Math.sin(a) * len - 2;
+  const body = [[x0, y0], [(x0 + x1) / 2 - wv, (y0 + y1) / 2 + 3], [x1, y1]];
+  inkLine(c, body, INK, 3.4); inkLine(c, body, d.C('#3f8a4f'), 2);
+  ink(c, pEl(x1, y1, 3.4, 2.6, a), d.C('#4f9a5d'), 0, true);
+  if (FSC > .4) { circ(c, x1 + Math.cos(a) * 1.2, y1 - 1, .8, d.C('#ffe14a')); }
+}
+
+/* heads and faces */
+const HEAD = {
+  goblin(c, d) {
+    const { hy, C, skin } = d;
+    for (const s of [-1, 1]) { ink(c, pPoly([[s * 9, hy - 4], [s * 35, hy - 15], [s * 29, hy - 6], [s * 10, hy + 5]]), skin); c.fillStyle = C('#c9807a'); c.fill(pPoly([[s * 12, hy - 3], [s * 29, hy - 11], [s * 26, hy - 7], [s * 12, hy + 2]])); }
+    ink(c, pEl(0, hy, 12.5, 12), skin);
+    cap(c, d, -.08);
+    glowEye(c, -5, hy + 1, 2.7, d.eye, d.st); glowEye(c, 5, hy + 1, 2.7, d.eye, d.st); slit(c, -5, hy + 1, 2.7); slit(c, 5, hy + 1, 2.7);
+    ink(c, pPoly([[-1.5, hy + 1], [5, hy + 7.5], [-1, hy + 8]]), tint(skin, -.18));
+    c.beginPath(); c.arc(0, hy + 5, 6.5, .35, Math.PI - .35); c.fillStyle = INK; c.fill();
+    for (const x of [-3.5, 2.5]) tri(c, [x, hy + 9.6], [x + 1.6, hy + 9.6], [x + .8, hy + 7.4], '#f4ecd6');
+  },
+  kobold(c, d) {
+    const { hy, C, skin } = d;
+    for (const s of [-1, 1]) ink(c, pPoly([[s * 7, hy - 8], [s * 18, hy - 24], [s * 12, hy - 7]]), C('#efe2c2'));
+    ink(c, pEl(0, hy - 1, 12, 11), skin);
+    cap(c, d, .06, .92);
+    ink(c, pEl(0, hy + 6.5, 9, 5.5), tint(skin, .18));
+    circ(c, -2.5, hy + 5, .9, INK); circ(c, 2.5, hy + 5, .9, INK);
+    inkLine(c, [[-5, hy + 9], [0, hy + 10], [5, hy + 9]], INK, .7);
+    glowEye(c, -5, hy - 1, 2.5, d.eye, d.st); glowEye(c, 5, hy - 1, 2.5, d.eye, d.st); slit(c, -5, hy - 1, 2.5); slit(c, 5, hy - 1, 2.5);
+    for (const [x, y] of [[-9, hy + 2], [8, hy + 3], [-7, hy - 5], [9, hy - 4]]) circ(c, x, y, .9, tint(skin, -.25));
+  },
+  werewolf(c, d) {
+    const { hy, C, skin } = d;
+    for (const s of [-1, 1]) { ink(c, pPoly([[s * 4, hy - 9], [s * 11, hy - 27], [s * 14, hy - 6]]), skin); c.fillStyle = C('#b88878'); c.fill(pPoly([[s * 7, hy - 10], [s * 11, hy - 22], [s * 12, hy - 9]])); }
+    const fur = []; for (let i = 0; i < 18; i++) { const a = i / 18 * Math.PI * 2, r = i % 2 ? 13 : 16; fur.push([Math.cos(a) * r, hy + 1 + Math.sin(a) * r * .95]); }
+    ink(c, pPoly(fur), skin);
+    ink(c, pEl(0, hy + 6, 8, 6.5), C('#c7b299'));
+    ink(c, pEl(0, hy + 2.5, 3, 2), INK, 0, true);
+    tri(c, [-3, hy + 10], [-1.6, hy + 10], [-2.3, hy + 13.5], '#fff'); tri(c, [1.6, hy + 10], [3, hy + 10], [2.3, hy + 13.5], '#fff');
+    inkLine(c, [[-9, hy - 6], [-3, hy - 3]], INK, .9); inkLine(c, [[9, hy - 6], [3, hy - 3]], INK, .9);
+    glowEye(c, -5.5, hy - 1.5, 2.4, d.eye, d.st); glowEye(c, 5.5, hy - 1.5, 2.4, d.eye, d.st);
+  },
+  dwarf(c, d) {
+    const { hy, C, skin } = d, beard = C('#d4692a');
+    ink(c, pEl(0, hy + 1, 12.5, 12), skin);
+    // beard with braids
+    const b = new Path2D(); b.moveTo(-13, hy + 1); b.quadraticCurveTo(-15, hy + 22, -6, hy + 30); b.lineTo(-4, hy + 38); b.lineTo(0, hy + 31); b.lineTo(4, hy + 38); b.lineTo(6, hy + 30); b.quadraticCurveTo(15, hy + 22, 13, hy + 1); b.quadraticCurveTo(0, hy + 10, -13, hy + 1); b.closePath();
+    ink(c, b, beard);
+    for (const x of [-4, 4]) { c.fillStyle = C('#e8c04a'); c.fillRect(x - 2, hy + 29, 4, 2.4); }
+    inkLine(c, [[-5, hy + 7], [0, hy + 9], [5, hy + 7]], tint(beard, -.3), .8);
+    ink(c, pEl(0, hy + 4.5, 3.6, 3), tint(skin, -.1));
+    // helm
+    const hm = new Path2D(); hm.moveTo(-14, hy - 1); hm.arc(0, hy - 1, 14, Math.PI, 0); hm.closePath();
+    for (const s of [-1, 1]) { const p = new Path2D(); p.moveTo(s * 12, hy - 7); p.quadraticCurveTo(s * 26, hy - 8, s * 25, hy - 24); p.quadraticCurveTo(s * 19, hy - 12, s * 10, hy - 3); p.closePath(); ink(c, p, C('#efe3c6')); }
+    ink(c, hm, C('#8f9aa4'));
+    c.fillStyle = C(d.teamColor); c.fillRect(-14, hy - 3, 28, 2.6);
+    ink(c, pRR(-1.8, hy - 3, 3.6, 8, 1), C('#8f9aa4'));
+    inkLine(c, [[-9, hy - 1], [-3, hy]], beard, 1.6); inkLine(c, [[9, hy - 1], [3, hy]], beard, 1.6);
+    glowEye(c, -5, hy + 1.5, 1.6, '#1e140e', true); glowEye(c, 5, hy + 1.5, 1.6, '#1e140e', true);
+  },
+  ogre(c, d) {
+    const { hy, C, skin } = d;
+    for (const s of [-1, 1]) ink(c, pEl(s * 11.5, hy + 1, 3.2, 4), skin);
+    ink(c, pEl(0, hy, 11, 11.5), skin);
+    ink(c, pEl(0, hy + 7, 10, 5.5), tint(skin, -.05));
+    cap(c, d, .32, .72);
+    ink(c, pRR(-10, hy - 4, 20, 4, 2), tint(skin, -.15));
+    glowEye(c, -4.5, hy + 1, 1.5, '#2a1a0e', true); glowEye(c, 4.5, hy + 1, 1.5, '#2a1a0e', true);
+    ink(c, pEl(0, hy + 4, 4, 2.6), tint(skin, -.12));
+    for (const s of [-1, 1]) ink(c, pPoly([[s * 5, hy + 8], [s * 6.5, hy + 1.5], [s * 3, hy + 8]]), C('#f4ecd6'), 0, true);
+    inkLine(c, [[-6, hy + 9], [6, hy + 9]], INK, .8);
+    circ(c, 7, hy - 5, 1, tint(skin, -.3)); circ(c, -6, hy + 6, .8, tint(skin, -.3));
+  },
+  minotaur(c, d) {
+    const { hy, C, skin } = d;
+    for (const s of [-1, 1]) { const p = new Path2D(); p.moveTo(s * 9, hy - 9); p.quadraticCurveTo(s * 32, hy - 8, s * 31, hy - 33); p.quadraticCurveTo(s * 24, hy - 14, s * 9, hy - 3); p.closePath(); ink(c, p, C('#efe3c6')); c.fillStyle = C('#b7a78a'); c.fill(pPoly([[s * 29, hy - 26], [s * 31, hy - 33], [s * 25, hy - 22]])); }
+    for (const s of [-1, 1]) ink(c, pEl(s * 16, hy - 2, 6, 2.8, s * .4), skin);
+    ink(c, pEl(0, hy, 13.5, 14), skin);
+    ink(c, pEl(0, hy + 8, 9.5, 7), C('#9a6a4a'));
+    circ(c, -3.5, hy + 8, 1.4, INK); circ(c, 3.5, hy + 8, 1.4, INK);
+    c.beginPath(); c.arc(0, hy + 12, 4, .1, Math.PI - .1); c.strokeStyle = C('#e8c04a'); c.lineWidth = LW * 1.2; c.stroke();
+    ink(c, pPoly([[-5, hy - 13], [0, hy - 6], [5, hy - 13], [0, hy - 16]]), C('#3a2415'), 0, true);
+    glowEye(c, -6, hy - 3, 2.2, d.eye, d.st); glowEye(c, 6, hy - 3, 2.2, d.eye, d.st);
+  },
+  troll(c, d) {
+    const { hy, C, skin } = d;
+    for (let i = -3; i <= 3; i++) inkLine(c, [[i * 3, hy - 10], [i * 6 + Math.sin(figClock() * 2 + i) * 1.5, hy - 22 - Math.abs(i)]], C('#3f5a2a'), 1.8);
+    ink(c, pEl(0, hy, 13, 12), skin);
+    ink(c, pPoly([[-3, hy - 3], [3, hy - 3], [4, hy + 12], [0, hy + 15], [-2, hy + 11]]), tint(skin, -.1));
+    for (const s of [-1, 1]) ink(c, pPoly([[s * 4, hy + 9], [s * 6, hy + 4], [s * 2.5, hy + 9]]), C('#f0e6cc'), 0, true);
+    glowEye(c, -6, hy - 3, 2, d.eye, d.st); glowEye(c, 6, hy - 3, 2, d.eye, d.st);
+    inkLine(c, [[-10, hy - 7], [-3, hy - 5]], INK, .9); inkLine(c, [[10, hy - 7], [3, hy - 5]], INK, .9);
+    circ(c, -8, hy + 4, 1.1, tint(skin, -.3)); circ(c, 9, hy + 2, .9, tint(skin, -.3));
+  },
+  golem(c, d) {
+    const { hy, C, skin } = d;
+    for (const s of [-1, 1]) ink(c, pEl(s * (d.shw + 1), d.shY + 3, 9, 7), tint(skin, -.06));
+    ink(c, pRR(-14, hy - 13, 28, 25, 4), skin);
+    ink(c, pRR(-15, hy - 6, 30, 5, 2), tint(skin, -.12));
+    inkLine(c, [[-8, hy - 13], [-4, hy - 6]], INK, .6); inkLine(c, [[6, hy + 3], [11, hy + 10]], INK, .6); inkLine(c, [[-11, hy + 5], [-6, hy + 9], [-7, hy + 12]], INK, .6);
+    for (const x of [-6, 6]) { if (d.st) { c.fillStyle = '#5a5a56'; c.fillRect(x - 3, hy - 1, 6, 3); } else { c.save(); c.shadowColor = d.eye; c.shadowBlur = Math.max(2, 7 * FSC); c.fillStyle = d.eye; c.fillRect(x - 3.2, hy - 1, 6.4, 3); c.restore(); } }
+    c.fillStyle = INK; c.fillRect(-5, hy + 7, 10, 2);
+    // glowing chest rune
+    if (!d.st) { c.save(); c.shadowColor = d.eye; c.shadowBlur = Math.max(2, 6 * FSC); inkLine(c, [[-4, d.shY + 12], [0, d.shY + 7], [4, d.shY + 12], [0, d.shY + 17], [-4, d.shY + 12]], d.eye, .9); c.restore(); }
+  },
+  harpy(c, d) {
+    const { hy, C, skin } = d, fe = C('#6b4f86');
+    for (let i = 0; i < 7; i++) { const a = Math.PI * (1.08 + i * .14); ink(c, pEl(Math.cos(a) * 14, hy - 2 + Math.sin(a) * 14, 3, 8, a + Math.PI / 2), i % 2 ? fe : tint(fe, .15)); }
+    ink(c, pPoly([[-11, hy - 4], [-12, hy + 4], [-5, hy + 12], [0, hy + 13], [5, hy + 12], [12, hy + 4], [11, hy - 4], [0, hy - 11]]), skin);
+    ink(c, pPoly([[-1.5, hy + 1], [2.5, hy + 5], [0, hy + 7.5], [-2, hy + 5]]), C('#e8b43a'), 0, true);
+    glowEye(c, -5, hy - 1, 2.3, d.eye, d.st); glowEye(c, 5, hy - 1, 2.3, d.eye, d.st);
+    inkLine(c, [[-8, hy - 5], [-2.5, hy - 3.5]], INK, .8); inkLine(c, [[8, hy - 5], [2.5, hy - 3.5]], INK, .8);
+  },
+  elf(c, d) {
+    const { hy, C, skin } = d, hood = C('#2e5a34');
+    ink(c, pPoly([[0, hy - 25], [15, hy - 6], [17, hy + 12], [0, hy + 17], [-17, hy + 12], [-15, hy - 6]]), hood);
+    for (const s of [-1, 1]) ink(c, pPoly([[s * 9, hy - 1], [s * 29, hy - 12], [s * 11, hy + 5]]), skin);
+    ink(c, pEl(0, hy + 2, 10.5, 11.5), skin);
+    c.fillStyle = C('#caa25a'); c.beginPath(); c.moveTo(-10, hy - 2); c.quadraticCurveTo(0, hy - 13, 10, hy - 2); c.quadraticCurveTo(0, hy - 7, -10, hy - 2); c.fill();
+    for (const s of [-1, 1]) { ink(c, pEl(s * 4.5, hy + 2.5, 2.4, 1.7), '#fff', 0, true); circ(c, s * 4.5, hy + 2.5, 1.3, d.st ? '#555' : d.eye); }
+    inkLine(c, [[-7, hy - .5], [-2.5, hy]], INK, .7); inkLine(c, [[7, hy - .5], [2.5, hy]], INK, .7);
+    inkLine(c, [[-2, hy + 9], [2, hy + 9]], C('#9a5a4a'), .7);
+    ink(c, pEl(0, d.shY + 1, 3.2, 3.2), C('#7fc05a'));
+  },
+  wraith(c, d) {
+    const { hy, C } = d;
+    ink(c, pPoly([[0, hy - 22], [14, hy - 8], [17, hy + 14], [0, hy + 12], [-17, hy + 14], [-14, hy - 8]]), C('#2b2442'));
+    ink(c, pEl(0, hy + 2, 9.5, 10.5), '#05040a', 0, true);
+    glowEye(c, -3.8, hy + 1, 2.2, d.eye, d.st); glowEye(c, 3.8, hy + 1, 2.2, d.eye, d.st);
+    if (!d.st && FSC > .4) for (let i = 0; i < 3; i++) { c.globalAlpha *= .5; circ(c, Math.sin(figClock() * 2 + i * 2) * 8, hy - 26 - ((figClock() * 10 + i * 6) % 18), 1.6, '#9ff6ff'); c.globalAlpha *= 2; }
+  },
+  vampire(c, d) {
+    const { hy, C, skin } = d;
+    for (const s of [-1, 1]) ink(c, pPoly([[s * 11, hy - 3], [s * 18, hy - 10], [s * 12, hy + 3]]), skin);
+    ink(c, pEl(0, hy + 1, 11.5, 13), skin);
+    const hair = new Path2D(); hair.moveTo(-12, hy + 1); hair.quadraticCurveTo(-13, hy - 14, 0, hy - 13); hair.quadraticCurveTo(13, hy - 14, 12, hy + 1); hair.lineTo(8, hy - 6); hair.lineTo(0, hy - 2); hair.lineTo(-8, hy - 6); hair.closePath();
+    ink(c, hair, C('#141019'));
+    glowEye(c, -4.5, hy + 1, 2, d.eye, d.st); glowEye(c, 4.5, hy + 1, 2, d.eye, d.st);
+    inkLine(c, [[-8, hy - 2.5], [-2, hy - 1]], INK, .8); inkLine(c, [[8, hy - 2.5], [2, hy - 1]], INK, .8);
+    inkLine(c, [[-3.5, hy + 8], [3.5, hy + 8]], C('#7a1020'), .9);
+    tri(c, [-3, hy + 8.2], [-1.6, hy + 8.2], [-2.3, hy + 11.5], '#fff'); tri(c, [1.6, hy + 8.2], [3, hy + 8.2], [2.3, hy + 11.5], '#fff');
+  },
+  lich(c, d) {
+    const { hy, C, skin } = d;
+    ink(c, pEl(0, hy - 1, 12.5, 12.5), skin);
+    ink(c, pRR(-7, hy + 6, 14, 8, 3), skin);
+    for (const s of [-1, 1]) { ink(c, pEl(s * 4.8, hy, 3.6, 4), '#0d0d14', 0, true); glowEye(c, s * 4.8, hy, 1.5, d.eye, d.st); }
+    ink(c, pPoly([[0, hy + 3], [-1.8, hy + 6.5], [1.8, hy + 6.5]]), '#0d0d14', 0, true);
+    for (let i = -2; i <= 2; i++) inkLine(c, [[i * 2.6, hy + 9], [i * 2.6, hy + 13]], INK, .45);
+    inkLine(c, [[3, hy - 12], [5, hy - 7], [3, hy - 5]], INK, .5);
+    const cr = new Path2D(); cr.moveTo(-12, hy - 8); for (let i = 0; i <= 6; i++) cr.lineTo(-12 + i * 4, hy - (i % 2 ? 13 : 22)); cr.lineTo(12, hy - 8); cr.closePath();
+    ink(c, cr, C('#d8b64a'));
+    glowEye(c, 0, hy - 11, 1.8, '#9d7bff', d.st);
+    ink(c, pPoly([[-d.shw + 2, d.shY], [0, d.shY + 12], [d.shw - 2, d.shY], [d.shw - 6, d.shY - 6], [0, d.shY + 3], [-d.shw + 6, d.shY - 6]]), C('#d8b64a'), 0);
+  },
+  zombie(c, d) {
+    const { hy, C, skin } = d;
+    ink(c, pEl(-11.5, hy + 1, 2.5, 3.5), skin);
+    ink(c, pEl(0, hy, 12.5, 12.5), skin);
+    cap(c, d, -.34, .95);
+    inkLine(c, [[-10, hy - 3], [3, hy - 7]], C('#3a2a2a'), .6);
+    for (let x = -8; x < 3; x += 3) inkLine(c, [[x, hy - 5.5], [x + 1.4, hy - 3.2]], C('#3a2a2a'), .5);
+    glowEye(c, -5, hy + 1, 3, d.eye, d.st); circ(c, -5, hy + 1, 1, INK);
+    inkLine(c, [[3, hy], [7, hy + 2]], INK, .8); inkLine(c, [[3, hy + 2], [7, hy]], INK, .8);
+    ink(c, pRR(-5, hy + 6, 10, 4.5, 2), '#2a1414', 0, true);
+    for (let x = -3.5; x < 4; x += 2.4) c.fillStyle = '#e9e2c6', c.fillRect(x, hy + 6, 1.4, 1.8);
+  },
+  gorgon(c, d) {
+    const { hy, C, skin } = d;
+    ink(c, pEl(0, hy + 1, 12, 13), skin);
+    for (let i = 0; i < 4; i++) snake(c, d, Math.PI * (1.18 + i * .22), 19, i + 7);
+    for (const [x, y] of [[-8, hy + 5], [8, hy + 5], [-6, hy - 6], [7, hy - 6], [0, hy - 9]]) inkLine(c, [[x - 1, y], [x, y - 1], [x + 1, y]], tint(skin, -.25), .5);
+    glowEye(c, -4.8, hy + 1, 2.4, d.eye, d.st); glowEye(c, 4.8, hy + 1, 2.4, d.eye, d.st); slit(c, -4.8, hy + 1, 2.4); slit(c, 4.8, hy + 1, 2.4);
+    inkLine(c, [[0, hy + 8], [0, hy + 12], [-1.2, hy + 13.5]], C('#d83a4a'), .7); inkLine(c, [[0, hy + 12], [1.2, hy + 13.5]], C('#d83a4a'), .7);
+  },
+  spider(c, d) {
+    const { hy, C, skin } = d;
+    ink(c, pEl(0, hy, 12.5, 12), skin);
+    const cr = new Path2D(); cr.moveTo(-10, hy - 8); cr.lineTo(-8, hy - 20); cr.lineTo(-4, hy - 12); cr.lineTo(0, hy - 22); cr.lineTo(4, hy - 12); cr.lineTo(8, hy - 20); cr.lineTo(10, hy - 8); cr.closePath();
+    ink(c, cr, C('#b89ad0'));
+    for (const [x, y, r] of [[-4, hy - 1, 2.2], [4, hy - 1, 2.2], [-8, hy - 3, 1.5], [8, hy - 3, 1.5], [-2, hy - 5, 1.2], [2, hy - 5, 1.2]]) glowEye(c, x, y, r, d.eye, d.st);
+    for (const s of [-1, 1]) { const p = new Path2D(); p.moveTo(s * 2.5, hy + 5); p.quadraticCurveTo(s * 7, hy + 9, s * 3, hy + 13); p.quadraticCurveTo(s * 4, hy + 9, s * 1, hy + 7); p.closePath(); ink(c, p, C('#e9e2f2'), 0, true); }
+  },
+  skeleton(c, d) {
+    const { hy, C } = d, steel = C('#7c8490');
+    const pl = new Path2D(); pl.moveTo(0, hy - 14); pl.quadraticCurveTo(10, hy - 34, 20, hy - 30); pl.quadraticCurveTo(10, hy - 26, 4, hy - 13); pl.closePath();
+    ink(c, pl, d.jer);
+    ink(c, pRR(-13, hy - 14, 26, 27, 9), steel);
+    ink(c, pRR(-11, hy - 3, 22, 4.5, 2), '#0b0b10', 0, true);
+    glowEye(c, -4.5, hy - .8, 1.6, d.eye, d.st); glowEye(c, 4.5, hy - .8, 1.6, d.eye, d.st);
+    c.fillStyle = INK; c.fillRect(-.8, hy + 2, 1.6, 9);
+    for (const y of [hy + 5, hy + 8]) for (const x of [-6, -3.5, 3.5, 6]) circ(c, x, y, .8, INK);
+    for (const x of [-10, 10]) circ(c, x, hy - 8, 1, C('#b8c0ca'));
+  },
+  witch(c, d) {
+    const { hy, C, skin } = d;
+    ink(c, pEl(0, hy + 1, 11, 12), skin);
+    c.fillStyle = C('#eef2f8'); for (const s of [-1, 1]) c.fill(pPoly([[s * 11, hy - 4], [s * 13, hy + 14], [s * 7, hy + 6], [s * 8, hy - 6]]));
+    ink(c, pEl(0, hy - 8, 23, 5), C('#16132a'));
+    const cone = new Path2D(); cone.moveTo(-11, hy - 9); cone.quadraticCurveTo(-5, hy - 30, 8, hy - 47); cone.quadraticCurveTo(4, hy - 30, 11, hy - 9); cone.closePath();
+    ink(c, cone, C('#16132a'));
+    c.fillStyle = d.jer; c.fill(pPoly([[-11, hy - 10], [11, hy - 10], [10, hy - 14], [-10, hy - 14]]));
+    ink(c, pRR(-2.5, hy - 14.5, 5, 5, 1), C('#d8b64a'), 0, true);
+    glowEye(c, -4.3, hy + 2, 2, d.eye, d.st); glowEye(c, 4.3, hy + 2, 2, d.eye, d.st);
+    inkLine(c, [[-2.5, hy + 8.5], [2.5, hy + 8.5]], C('#4a7aa8'), .8);
+    if (!d.st && FSC > .4) for (let i = 0; i < 3; i++) { const a = figClock() * 1.5 + i * 2.1; txt(c, '✦', Math.cos(a) * 20, hy - 18 + Math.sin(a) * 6, '6px sans-serif', 'rgba(200,240,255,.8)', 'center'); }
+  },
+};
+
+/* ---------- bodies: tapered, jointed limbs and a shaped torso, with flourishes per creature ---------- */
+// per-kind body details: feet, socks, muscle, tails, fur, armour and trinkets
+const BODY = {
+  goblin:   { foot: 'claw', musc: 0, slim: true, strap: '#5a3a22', wrist: true },
+  kobold:   { foot: 'claw', slim: true, tail: 'lizard', scales: true },
+  werewolf: { foot: 'claw', musc: .65, tail: 'bushy', tuft: '#4f3d2e', clawHand: true, fur: true },
+  dwarf:    { foot: 'boot', musc: .55, bracer: '#6b4a2a', stout: true },
+  ogre:     { foot: 'claw', musc: .85, torn: true, bone: true },
+  minotaur: { foot: 'hoof', musc: 1, tail: 'tuft', tuft: '#3e2718', bracer: '#6b4a2a', shinFur: '#4a2e1c' },
+  troll:    { foot: 'claw', musc: .7, armLen: 1.16, moss: true, clawHand: true },
+  golem:    { foot: 'stone', musc: .45, stone: true },
+  harpy:    { foot: 'talon', slim: true, birdLeg: true, feathers: true, clawHand: true },
+  elf:      { foot: 'boot', slim: true, cloak: '#2e5a34', bracer: '#7a5a34', quiver: true },
+  wraith:   { robe: true, clawHand: true, slim: true },
+  vampire:  { foot: 'pointy', slim: true, lace: true },
+  lich:     { robe: true, slim: true },
+  zombie:   { foot: 'cleat', musc: .3, stitches: true, torn: true },
+  gorgon:   { foot: 'cleat', slim: true, scales: true, snakeBelt: true },
+  spider:   { foot: 'cleat', slim: true, clawHand: true },
+  skeleton: { foot: 'sabaton', armor: true, slim: true },
+  witch:    { foot: 'pointy', slim: true, stripes: true },
+};
+// a limb segment: round ends, tapered, with optional bulges on either side (muscle, calf)
+function capsule(x1, y1, r1, x2, y2, r2, b1 = 0, b2 = 0) {
+  const dx = x2 - x1, dy = y2 - y1, L = Math.hypot(dx, dy) || 1, nx = -dy / L, ny = dx / L;
+  const an = Math.atan2(ny, nx), mx = (x1 + x2) / 2, my = (y1 + y2) / 2, rm = (r1 + r2) / 2;
+  const p = new Path2D();
+  p.moveTo(x1 + nx * r1, y1 + ny * r1);
+  p.quadraticCurveTo(mx + nx * (rm + 2 * b1), my + ny * (rm + 2 * b1), x2 + nx * r2, y2 + ny * r2);
+  p.arc(x2, y2, r2, an, an - Math.PI, true);
+  p.quadraticCurveTo(mx - nx * (rm + 2 * b2), my - ny * (rm + 2 * b2), x1 - nx * r1, y1 - ny * r1);
+  p.arc(x1, y1, r1, an - Math.PI, an - 2 * Math.PI, true);
+  p.closePath(); return p;
+}
+const lerpP = (a, b, t) => ({ x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t });
+function bands(c, path, list) { c.save(); c.clip(path); for (const [y0, h, col] of list) { c.fillStyle = col; c.fillRect(-60, y0, 120, h); } c.restore(); c.lineWidth = LW; c.strokeStyle = INK; c.stroke(path); }
+
+// a leg in its own frame: hip at the origin, foot on the ground 36 below; lift raises the knee and foot
+function leg(c, x, a, w, d, side, lift = 0) {
+  const B = d.B, det = FSC > .45;
+  c.save(); c.translate(x, -36); c.rotate(a);
+  const hip = { x: 0, y: -2 }, knee = { x: side * lift * 3, y: 16 - lift * 5 }, ank = { x: side * lift * 1.2, y: 30 - lift * 14 };
+  const rH = w * .47, rK = w * .38, rA = w * (B.birdLeg ? .16 : .25);
+  // shin: sock, stocking, fur, bird leg, stone or greave
+  const shinCol = B.birdLeg ? d.C('#d9a74a') : B.stone ? d.skin : B.armor ? d.C('#8a929c') : B.shinFur ? d.C(B.shinFur) : B.fur ? d.skin : B.stripes ? d.C('#1a1426') : d.jer;
+  const shin = capsule(knee.x, knee.y, rK * (B.birdLeg ? .5 : .95), ank.x, ank.y, rA, w * (B.birdLeg ? 0 : .08), w * (B.birdLeg ? 0 : .06));
+  ink(c, shin, shinCol);
+  if (B.stripes) bands(c, shin, [0, 1, 2, 3].map(i => [knee.y + 2 + i * 3.6, 1.8, d.C('#8a5ad0')]));
+  else if (!B.birdLeg && !B.stone && !B.armor && !B.shinFur && !B.fur) bands(c, shin, [[knee.y + 5, 1.7, d.trimL], [knee.y + 8.2, 1.7, d.trimL]]);
+  if (det) {
+    if (B.birdLeg) for (let i = 1; i < 4; i++) { const p = lerpP(knee, ank, i / 4); inkLine(c, [[p.x - 1.6, p.y], [p.x + 1.6, p.y]], d.C('#9a6a2a'), .5); }
+    if (B.stone) inkLine(c, [[knee.x - 2, knee.y + 5], [knee.x + 1, knee.y + 9], [knee.x - 1, knee.y + 12]], INK, .5);
+    if (B.armor) ink(c, pEl(knee.x, knee.y + 1, rK * 1.05, rK * .9), d.C('#b8c0ca'), 0, true);
+    if (B.fur || B.shinFur) for (const t of [.35, .6]) { const p = lerpP(knee, ank, t); inkLine(c, [[p.x - rK * .6, p.y], [p.x - rK * .2, p.y + 2.5]], INK, .45); inkLine(c, [[p.x + rK * .6, p.y - 1], [p.x + rK * .25, p.y + 1.8]], INK, .45); }
+    if (B.torn && !B.fur) ink(c, pEl(knee.x + side * .6, knee.y + 8, rK * .45, 2.2), d.skin, 0, true);
+  }
+  // thigh in baseball knickers, gathered below the knee
+  const thigh = capsule(hip.x, hip.y, rH, knee.x, knee.y + 1.5, rK * 1.08, w * .07, w * .05);
+  ink(c, thigh, B.stone ? d.skin : d.pants);
+  ink(c, pEl(knee.x, knee.y + 2.6, rK * 1.14, 2.6), B.stone ? tint(d.skin, -.08) : d.pants, 0, true);
+  if (det) inkLine(c, [[knee.x - rK * .9, knee.y + 3.2], [knee.x + rK * .9, knee.y + 3.2]], tint(d.pants, -.25), .45);
+  // team piping down the outer seam
+  if (!B.stone) inkLine(c, [[side * rH * .82, hip.y + 1], [knee.x + side * rK * .95, knee.y]], d.jer, .9);
+  foot(c, ank, w, d, side);
+  c.restore();
+}
+function foot(c, a, w, d, side) {
+  const B = d.B, f = B.foot || 'cleat', x = a.x, y = a.y + 2.4;
+  if (f === 'talon') { for (const dx of [-3.5, 0, 3.5]) ink(c, pPoly([[x + dx - 1.5, a.y + 1], [x + dx + 1.5, a.y + 1], [x + dx + .5, a.y + 6]]), d.C('#e8b43a'), 0, true); return; }
+  if (f === 'hoof') { for (const s of [-1, 1]) ink(c, pEl(x + s * w * .27, y + .4, w * .3, 3.4), d.C('#1b1410'), 0, true); c.fillStyle = d.C('#4a3a30'); c.fillRect(x - w * .5, a.y - 1.2, w, 1.6); return; }
+  if (f === 'stone') { ink(c, pRR(x - w * .62, a.y - 1, w * 1.24, 6.6, 2.4), tint(d.skin, -.1)); return; }
+  if (f === 'claw') {
+    ink(c, pEl(x + side * .6, y, w * .6, 3.6), B.fur ? tint(d.skin, -.1) : d.skin);
+    if (FSC > .35) for (const dx of [-.34, 0, .34]) ink(c, pPoly([[x + dx * w - 1.2, y + 2], [x + dx * w + 1.2, y + 2], [x + dx * w + side * .4, y + 4.8]]), d.C('#efe6cf'), 0, true);
+    return;
+  }
+  const col = f === 'sabaton' ? d.C('#8a929c') : f === 'boot' ? d.C('#4a2e1c') : '#1d1714';
+  if (f === 'boot') ink(c, pRR(x - w * .46, a.y - 4, w * .92, 7, 2.5), col, 0, true);
+  ink(c, pEl(x + side * .9, y, w * .64, 3.8), col, 0, true);
+  if (f === 'pointy') { const p = new Path2D(); p.moveTo(x + side * w * .4, y - 2.4); p.quadraticCurveTo(x + side * w * 1.1, y - .5, x + side * w * 1.05, y - 4.5); p.quadraticCurveTo(x + side * w * .9, y + 2.6, x + side * w * .3, y + 2.6); p.closePath(); ink(c, p, col, 0, true); }
+  if (FSC > .45 && f === 'cleat') inkLine(c, [[x - w * .25, y - 1.8], [x + w * .25, y - 1.8]], '#e8e0cc', .6);
+  if (FSC > .45 && f === 'sabaton') inkLine(c, [[x - w * .4, y - .6], [x + w * .4, y - .6]], d.C('#b8c0ca'), .5);
+}
+
+// an arm from shoulder to hand target, bent at an elbow found by two-bone IK; the old callers pass the same arguments
+function arm(c, sx, sy, hx, hy, d, opt = {}) {
+  const B = d.B, det = FSC > .45, musc = B.musc || 0, bony = d.bony;
+  const aw = 7.2 * clamp(d.w, .9, 1.5) * (bony ? .78 : 1) * (B.slim ? .92 : 1);
+  let Lu = 17.5 * (B.armLen || 1), Lf = 16.5 * (B.armLen || 1);
+  let dx = hx - sx, dy = hy - sy, D = Math.hypot(dx, dy);
+  if (D < 10) { dx = 0; dy = 10; D = 10; }
+  const reach = (Lu + Lf) * .995; if (D > reach) { const k = D / reach; Lu *= k; Lf *= k; }
+  const th = Math.atan2(dy, dx), al = Math.acos(clamp((Lu * Lu + D * D - Lf * Lf) / (2 * Lu * D), -1, 1));
+  const out = sx < 0 ? -1 : 1, E = s => ({ x: sx + Lu * Math.cos(th + s * al), y: sy + Lu * Math.sin(th + s * al) });
+  const e1 = E(1), e2 = E(-1), sc = e => e.x * out + .35 * e.y, el = sc(e1) >= sc(e2) ? e1 : e2;
+  const S = { x: sx, y: sy }, H = { x: sx + dx, y: sy + dy };
+  const skin = d.armC;
+  // forearm, then upper arm over the elbow
+  const fore = capsule(el.x, el.y, aw * .48, H.x, H.y, aw * .34, aw * (.06 + .14 * musc), aw * (.04 + .06 * musc));
+  const upper = capsule(S.x, S.y, aw * .56, el.x, el.y, aw * .46, aw * .14 * musc, aw * .1 * musc);
+  if (d.robe) {
+    ink(c, fore, skin); ink(c, upper, skin);
+    const tip = lerpP(el, H, .82);
+    ink(c, capsule(S.x, S.y, aw * .66, el.x, el.y, aw * .62), d.robe);
+    ink(c, capsule(el.x, el.y, aw * .6, tip.x, tip.y, aw * .86, aw * .06, aw * .06), d.robe);
+    if (det) inkLine(c, [[tip.x - aw * .7, tip.y], [tip.x + aw * .7, tip.y]], d.C('#d8b64a'), .8);
+  } else {
+    ink(c, fore, skin); ink(c, upper, skin);
+    if (bony && det) { inkLine(c, [[el.x, el.y], [lerpP(el, H, .85).x, lerpP(el, H, .85).y]], tint(skin, -.25), .5); circ(c, el.x, el.y, aw * .3, tint(skin, -.08)); }
+    if (B.stone && det) { const m = lerpP(el, H, .5); inkLine(c, [[m.x - 2, m.y - 2], [m.x + 1, m.y], [m.x - 1, m.y + 3]], INK, .5); if (!d.st) { c.save(); c.shadowColor = d.eye; c.shadowBlur = 5 * FSC; circ(c, el.x, el.y, 1.4, d.eye); c.restore(); } }
+    if (B.stitches && det) { const a0 = lerpP(el, H, .25), a1 = lerpP(el, H, .7); inkLine(c, [[a0.x, a0.y], [a1.x, a1.y]], INK, .5); for (let i = 1; i < 4; i++) { const p = lerpP(a0, a1, i / 4); inkLine(c, [[p.x - 1.6, p.y - .6], [p.x + 1.6, p.y + .6]], INK, .45); } }
+    if (B.scales && det) for (const t of [.3, .55, .8]) { const p = lerpP(el, H, t); c.beginPath(); c.arc(p.x, p.y, 1.2, 0, Math.PI); c.strokeStyle = tint(skin, -.3); c.lineWidth = LW * .45; c.stroke(); }
+    if (B.tuft && det) { const w2 = lerpP(el, H, .78), dir = Math.atan2(H.y - el.y, H.x - el.x) + Math.PI / 2; for (let i = -1; i <= 1; i++) { const bx = w2.x + Math.cos(dir) * aw * .45 * i, by = w2.y + Math.sin(dir) * aw * .45 * i; ink(c, pPoly([[bx - 1.4, by - 1], [bx + 1.4, by - 1], [bx + (H.x - el.x) * .06, by + 4]]), d.C(B.tuft), 0, true); } }
+    if (B.feathers && det) for (let i = 0; i < 4; i++) { const p = lerpP(el, H, .1 + i * .22); ink(c, pEl(p.x + out * aw * .55, p.y + 2, 1.8, 5, out * .5), d.C((B.fea || ['#6b4f86', '#8b76a0'])[i % 2 ? 0 : 1]), 0, true); }
+    if (B.bracer) { const b0 = lerpP(el, H, .5), b1 = lerpP(el, H, .9); ink(c, capsule(b0.x, b0.y, aw * .46, b1.x, b1.y, aw * .42), d.C(B.bracer), 0, true); if (det) inkLine(c, [[lerpP(b0, b1, .5).x - aw * .4, lerpP(b0, b1, .5).y], [lerpP(b0, b1, .5).x + aw * .4, lerpP(b0, b1, .5).y]], d.C('#d8b64a'), .5); }
+    if (B.wrist) { const b0 = lerpP(el, H, .72), b1 = lerpP(el, H, .9); ink(c, capsule(b0.x, b0.y, aw * .4, b1.x, b1.y, aw * .38), d.trimL, 0, true); }
+    // sleeve: short baseball sleeve over the top of the upper arm, torn for the brutes
+    if (!opt.glove) {
+    const sEnd = lerpP(S, el, .55);
+    const sl = capsule(S.x, S.y - 1, aw * .7, sEnd.x, sEnd.y, aw * .62, aw * .05, aw * .05);
+    ink(c, sl, d.jer);
+    if (det) { const ang = Math.atan2(el.y - S.y, el.x - S.x) + Math.PI / 2, cx = Math.cos(ang) * aw * .6, cy = Math.sin(ang) * aw * .6, t2 = lerpP(S, el, .44);
+      if (B.torn) { const pts = []; for (let i = 0; i <= 4; i++) { const k = i / 4 - .5; pts.push([sEnd.x + cx * 2 * k + (i % 2 ? (el.x - S.x) * .08 : 0), sEnd.y + cy * 2 * k + (i % 2 ? (el.y - S.y) * .08 : 0)]); } inkLine(c, pts, INK, .6); }
+      else inkLine(c, [[t2.x - cx, t2.y - cy], [t2.x + cx, t2.y + cy]], d.trimL, 1.3); }
+    }
+    if (B.lace && det) { const p = lerpP(el, H, .9); for (let i = -1; i <= 1; i++) circ(c, p.x + i * aw * .32, p.y + 1.2, aw * .2, '#f2eee6'); }
+  }
+  // hand, turned along the forearm
+  const ang = Math.atan2(-(H.x - el.x), H.y - el.y);
+  c.save(); c.translate(H.x, H.y); c.rotate(ang);
+  if (opt.glove) { ink(c, pEl(0, 3, aw * 1.08, aw * 1.2), d.C(opt.glove)); if (det) { ink(c, pEl(-out * aw * .55, 1.5, aw * .38, aw * .55, out * .4), d.C(tint(opt.glove, -.18)), 0, true); circ(c, out * aw * .3, 1, aw * .22, 'rgba(255,255,255,.35)'); } ink(c, pRR(-aw * .62, -2.2, aw * 1.24, 3, 1), d.C('#efe6d4'), 0, true); }
+  else if (opt.mitt) { ink(c, pEl(0, 2.5, aw * .95, aw * 1.1), d.C('#8a5530')); inkLine(c, [[-aw * .5, 1.5], [aw * .5, 1.5]], d.C('#5a3218'), .6); if (det) inkLine(c, [[-aw * .3, 4.2], [0, 5.4], [aw * .3, 4.2]], d.C('#5a3218'), .5); }
+  else if (!opt.noHand) {
+    ink(c, pEl(0, 1.2, aw * .6, aw * .64), bony ? tint(skin, -.05) : skin);
+    if (det && !opt.ball) ink(c, pEl(-out * aw * .5, .2, aw * .22, aw * .36, out * .5), skin, 0, true);
+    if (bony && det) for (const fx of [-.3, 0, .3]) inkLine(c, [[fx * aw, aw * .5], [fx * aw * 1.2, aw * 1.3]], INK, .45);
+    if ((B.clawHand || B.fur) && det) for (const fx of [-.32, 0, .32]) ink(c, pPoly([[fx * aw - 1, aw * .55], [fx * aw + 1, aw * .55], [fx * aw * 1.25, aw * .55 + 3.2]]), d.C('#efe6cf'), 0, true);
+  }
+  if (opt.ball) ink(c, pEl(0, 3, 3.4, 3.4), '#f6f0e0', 0, true);
+  if (opt.ember && !d.st) { c.save(); c.shadowColor = '#ff8a2a'; c.shadowBlur = Math.max(2, 8 * FSC); circ(c, 0, 4, 2.2 + Math.sin(figClock() * 20) * .5, '#ffcf5a'); c.restore(); }
+  c.restore();
+  // shoulder pieces sit on top of the sleeve
+  if (B.armor) { ink(c, pEl(S.x + out * 1.5, S.y - 1, aw * .95, aw * .72, out * .3), d.C('#8a929c')); if (det) inkLine(c, [[S.x - aw * .6 + out * 1.5, S.y + 1], [S.x + aw * .6 + out * 1.5, S.y + 1]], d.C('#b8c0ca'), .6); }
+  if (B.stone) ink(c, pEl(S.x + out * 1.5, S.y - 2, aw * .95, aw * .8), tint(d.skin, -.06));
+  if (B.moss && det) { for (let i = 0; i < 4; i++) ink(c, pEl(S.x - aw * .5 + i * aw * .34, S.y - 3 - (i % 2) * 1.5, 2.4, 1.8), d.C(i % 2 ? '#4f7a2e' : '#6a9a3a'), 0, true); circ(c, S.x + out * aw * .4, S.y - 6, 1.6, d.C('#d8c9a0')); }
+}
+
+/* tails and cloaks drawn behind the body */
+function tailChain(c, pts, col, tipCol) {
+  for (let i = 0; i < pts.length - 1; i++) ink(c, capsule(pts[i][0], pts[i][1], pts[i][2], pts[i + 1][0], pts[i + 1][1], pts[i + 1][2]), i === pts.length - 2 && tipCol ? tipCol : col, 0, true);
+}
+BACK.werewolf = (c, d) => {
+  const s = Math.sin(figClock() * 3 + (d.o.run || 0)) * 4, x = d.shw;
+  const p = new Path2D(); p.moveTo(4, -42); p.bezierCurveTo(x + 6, -46, x + 22 + s, -34, x + 18 + s, -10); p.bezierCurveTo(x + 14 + s, -18, x + 8, -30, 2, -34); p.closePath();
+  ink(c, p, d.C('#5d4a3a')); if (FSC > .45) ink(c, pEl(x + 17 + s, -13, 3.5, 5), d.C('#d8cbb4'), 0, true);
+};
+BACK.minotaur = (c, d) => {
+  const s = Math.sin(figClock() * 2.4 + (d.o.run || 0)) * 5, x = d.shw;
+  const tl = [[4, -40], [x + 6, -38], [x + 13 + s, -30], [x + 15 + s * 1.3, -22]];
+  inkLine(c, tl, INK, 2.6); inkLine(c, tl, d.skin, 1.4);
+  ink(c, pEl(x + 15 + s * 1.3, -19, 2.8, 4.6, s * .05), d.C('#2a1a10'));
+};
+BACK.kobold = (c, d) => {
+  const s = Math.sin(figClock() * 3.4 + (d.o.run || 0)) * 4, x = d.shw;
+  tailChain(c, [[2, -38, 5], [x + 6, -26, 4], [x + 16 + s, -10, 2.4], [x + 24 + s * 1.4, -12, .8]], d.skin);
+  if (!d.st && FSC > .3) { c.save(); c.shadowColor = '#ff8a2a'; c.shadowBlur = 8 * FSC; const f = Math.sin(figClock() * 18) * .8; ink(c, pPoly([[x + 21 + s * 1.4, -13], [x + 27 + s * 1.4, -13], [x + 24 + s * 1.4 + f, -21]]), '#ffb03a', 0, true); c.restore(); }
+};
+BACK.elf = (c, d) => {
+  const fl = Math.sin(figClock() * 2.2 + (d.o.run || 0)) * (d.o.run ? 5 : 1.5), col = d.C(d.B.cloak);
+  const p = new Path2D(); p.moveTo(-d.shw + 1, d.shY); p.quadraticCurveTo(-d.shw - 9, -30, -d.shw - 7 - fl, -10); p.quadraticCurveTo(0, -4 + fl, d.shw + 7 + fl, -10); p.quadraticCurveTo(d.shw + 9, -30, d.shw - 1, d.shY); p.closePath();
+  ink(c, p, col); if (FSC > .45) inkLine(c, [[-d.shw - 5, -12], [-d.shw + 4, -24]], tint(d.B.cloak, -.3), .5);
+};
+
+// a shaped torso: sloped shoulders, chest, waist and hips; bellies for the big eaters
+function torsoPath(d, K) {
+  const B = d.B, shw = d.shw, shY = d.shY, hipY = -36;
+  const waist = shw * (K.belly ? .92 : B.slim ? .7 : B.stout ? .86 : .76), chest = shw * (B.musc ? 1 + .06 * B.musc : .98), belly = K.belly ? 11 * d.w : B.stout ? 3 : 0;
+  const t = new Path2D();
+  t.moveTo(-7, shY - 2);
+  t.quadraticCurveTo(-shw + 5, shY - 3.5, -shw, shY + 4);
+  t.bezierCurveTo(-chest - 1, shY + 14, -waist - belly, hipY - 12, -waist, hipY);
+  t.quadraticCurveTo(0, hipY + 3, waist, hipY);
+  t.bezierCurveTo(waist + belly, hipY - 12, chest + 1, shY + 14, shw, shY + 4);
+  t.quadraticCurveTo(shw - 5, shY - 3.5, 7, shY - 2);
+  t.quadraticCurveTo(0, shY + 1, -7, shY - 2);
+  t.closePath();
+  return { t, waist, belly };
+}
+
+function drawFig(c, kind, x, y, hpx, team, o = {}) {
+  const K = KIND[kind] || KIND.goblin, s = hpx * K.h / 100, w = K.w, st = !!o.stone, sh = !!(o.shade || team.shade);
+  const C = v => st ? (sh ? shadeOf(grey(v)) : grey(v)) : sh ? shadeOf(v) : v; // (stone in shadow: an Umbral player turned to stone keeps its look)
+  const hunch = K.hunch ? 6 : 0, shY = -70 + hunch, hipY = -36;
+  const shw = 17 * w * (kind === 'ogre' ? .9 : 1);
+  const hy = kind === 'ogre' ? -80 : kind === 'golem' ? -80 : -83 + hunch * 1.4;
+  const hr = kind === 'ogre' ? 11 : kind === 'minotaur' ? 14 : 12.5;
+  const B = BODY[kind] || {};
+  const d = {
+    o, C, st, w, shY, shw, hy, hr, kind, eye: sh ? '#c8fff0' : K.eye, skin: C(K.skin), jer: C(team.color), jerD: C(tint(team.color, -.38)), trimL: C(team.light || '#fff'),
+    teamColor: team.color, letter: (team.short || '?')[0], pants: C('#e4dbc6'), armC: C(K.bony ? '#ebe5d2' : K.skin), bony: K.bony, robe: K.robe ? C(K.robe) : null, B,
+  };
+  c.save(); c.translate(x, y); c.scale(o.flip ? -s : s, s);
+  LW = Math.max(1.25, 1 / s); FSC = s; FLIPPED = !!o.flip;
+  const pose = o.pose || null, det = s > .45;
+  if (o.alpha != null) c.globalAlpha *= o.alpha;
+  if (!o.noShadow) ell(c, 0, 0, 24 * w, 5, 'rgba(0,0,0,.35)');
+  if (o.lift) c.translate(0, -o.lift);
+  const run = o.run || 0, sw = Math.sin(run);
+  if (run) c.translate(0, -Math.abs(Math.cos(run)) * 2.5);
+  if (pose) { c.translate(pose.shift || 0, pose.drop || 0); if (pose.scale && pose.scale !== 1) c.scale(pose.scale, pose.scale); }
+  if (BACK[kind]) BACK[kind](c, d);
+  // legs: running lifts the leading leg; poses drive them directly
+  if (!K.robe) {
+    const lw = 10.5 * w, lx = 6.2 * w;
+    const lL = pose ? pose.legL : { a: sw * .55, lift: run ? Math.max(0, sw) * .4 : 0 }, lR = pose ? pose.legR : { a: -sw * .55, lift: run ? Math.max(0, -sw) * .4 : 0 };
+    leg(c, -lx, lL.a, lw, d, -1, lL.lift || 0); leg(c, lx, lR.a, lw, d, 1, lR.lift || 0);
+    { const sw2 = shw * (K.belly ? .7 : .52), seat = new Path2D(); seat.moveTo(-sw2, hipY - 2); seat.quadraticCurveTo(-sw2 * .9, hipY + 7, 0, hipY + 6); seat.quadraticCurveTo(sw2 * .9, hipY + 7, sw2, hipY - 2); seat.closePath(); ink(c, seat, d.pants, 0, true); } // seat of the knickers
+  } else if (kind === 'lich') { for (const s2 of [-1, 1]) ink(c, pEl(s2 * 6, -2, 5, 3), '#1d1714', 0, true); }
+  c.save(); if (pose && pose.lean) { c.translate(0, hipY); c.rotate(pose.lean); c.translate(0, -hipY); }
+  // torso / jersey
+  const { t, waist } = torsoPath(d, K);
+  ink(c, t, d.jer);
+  if (det) {
+    // placket and buttons, a fold at the waist
+    inkLine(c, [[1.5, shY + 7], [1.5, hipY - 4]], d.jerD, .7);
+    for (let i = 0; i < 3; i++) circ(c, 3.4, shY + 12 + i * 8, .9, d.trimL);
+    inkLine(c, [[-waist + 3, hipY - 9], [-waist + 9, hipY - 6.5]], d.jerD, .5);
+  }
+  inkLine(c, [[-7, shY - 1.5], [0, shY + 7], [7, shY - 1.5]], d.trimL, 1.6);
+  // creature trimmings on the chest
+  if (B.tuft) ink(c, pPoly([[-5, shY - 1], [-3, shY + 5], [-1, shY + 1], [1, shY + 6], [3, shY + 1], [5, shY + 5], [6, shY - 1]]), d.C(B.tuft), 0, true);
+  if (B.strap && det) { inkLine(c, [[-shw + 3, shY + 3], [waist - 2, hipY - 3]], d.C(B.strap), 2.2); for (const k of [.35, .6]) { const px = lerp(-shw + 3, waist - 2, k), py = lerp(shY + 3, hipY - 3, k); ink(c, pRR(px - 2.5, py - 2, 5, 5, 1.2), d.C('#7a5230'), 0, true); } }
+  if (B.quiver && det) inkLine(c, [[shw - 3, shY + 2], [-waist + 2, hipY - 4]], d.C('#6a4a2a'), 1.6);
+  if (B.lace) ink(c, pPoly([[-4, shY - 1], [4, shY - 1], [2.5, shY + 9], [0, shY + 11], [-2.5, shY + 9]]), d.C('#f2eee6'), 0, true);
+  if (B.torn && det) { ink(c, pPoly([[-shw * .45, shY + 20], [-shw * .2, shY + 17], [-shw * .1, shY + 24], [-shw * .3, shY + 27]]), kind === 'zombie' ? d.C('#3a2a2a') : d.skin, 0, true); if (kind === 'zombie') for (let i = 0; i < 3; i++) inkLine(c, [[-shw * .42, shY + 20.5 + i * 2], [-shw * .18, shY + 19.5 + i * 2]], d.C('#e9e2c6'), .5); }
+  if (B.stone && det) { inkLine(c, [[-shw * .5, shY + 6], [-shw * .3, shY + 14], [-shw * .45, shY + 20]], INK, .6); inkLine(c, [[shw * .55, hipY - 14], [shw * .35, hipY - 8]], INK, .6); }
+  if (B.scales && det) for (let i = 0; i < 5; i++) { c.beginPath(); c.arc(-shw * .55 + i * 2.5, shY + 8 + (i % 2) * 2, 1.2, 0, Math.PI); c.strokeStyle = d.jerD; c.lineWidth = LW * .5; c.stroke(); }
+  // belt, and whatever is tucked in it
+  ink(c, pRR(-waist - .5, hipY - 3.5, 2 * waist + 1, 5.5, 1.5), B.snakeBelt ? d.C('#3f8a4f') : '#2a1d17', 0, true);
+  if (B.snakeBelt && det) { ink(c, pEl(waist - 1, hipY - 1, 3.4, 2.6), d.C('#4f9a5d'), 0, true); circ(c, waist, hipY - 1.6, .7, d.C('#ffe14a')); }
+  else ink(c, pRR(B.stout ? -4 : -2.2, hipY - (B.stout ? 4.5 : 3.2), B.stout ? 8 : 4.4, B.stout ? 7 : 4.8, .8), C('#d8b64a'), 0, true);
+  if (B.bone && det) { ink(c, pRR(waist - 8, hipY - 7, 3, 11, 1.4), d.C('#efe6cf'), 0, true); circ(c, waist - 6.5, hipY - 7, 2, d.C('#efe6cf')); }
+  // number
+  if (s * 100 > 26) {
+    c.font = `900 ${16}px "Alegreya Sans", sans-serif`; c.textAlign = 'center'; c.textBaseline = 'alphabetic';
+    if (o.flip) { c.save(); c.scale(-1, 1); }
+    c.lineWidth = LW * 1.1; c.strokeStyle = INK; c.strokeText(String(o.num ?? ''), 0, shY + 25); c.fillStyle = st ? '#ddd' : '#fbf6ea'; c.fillText(String(o.num ?? ''), 0, shY + 25);
+    if (o.flip) c.restore();
+  }
+  if (sh) shadeCracks(c, d, t);
+  // arms
+  const swing = run ? sw * 7 : 0;
+  if (pose && pose.armR) {
+    arm(c, -shw + 2, shY + 3, pose.armL.x, pose.armL.y, d, { mitt: !o.glove && !o.bare, glove: o.glove });
+    if (pose.trailR && pose.trailR.length > 1 && !st) {
+      c.save(); c.lineCap = 'round';
+      for (let i = pose.trailR.length - 1; i > 0; i--) { const a = pose.trailR[i], b = pose.trailR[i - 1]; c.strokeStyle = `rgba(255,248,230,${.32 * (1 - i / pose.trailR.length)})`; c.lineWidth = 7 * (1 - i / pose.trailR.length) + 1; c.beginPath(); c.moveTo(a[0], a[1]); c.lineTo(b[0], b[1]); c.stroke(); }
+      c.restore();
+    }
+    arm(c, shw - 2, shY + 3, pose.armR.x, pose.armR.y, d, { ball: pose.ball, ember: kind === 'kobold' && !o.glove, glove: o.glove });
+  } else if (o.throwK != null) {
+    const k = clamp(o.throwK, 0, 1), th = lerp(2.5, -.25, k), hx2 = shw + 27 * Math.sin(th), hy2 = shY + 2 - 27 * Math.cos(th);
+    arm(c, -shw + 2, shY + 3, -shw - 5, shY + 22, d, { mitt: true });
+    arm(c, shw - 2, shY + 3, hx2, hy2, d, { ball: true, ember: kind === 'kobold' });
+  } else if (o.follow) {
+    arm(c, -shw + 2, shY + 3, -shw - 5, shY + 22, d, { mitt: true });
+    arm(c, shw - 2, shY + 3, -4, shY + 24, d, {});
+  } else if (kind === 'zombie') {
+    arm(c, -shw + 2, shY + 3, -shw + 2 + swing, shY + 24, d, { mitt: o.mitt });
+    arm(c, shw - 2, shY + 3, shw + 4 - swing, shY + 10, d, {});
+  } else {
+    arm(c, -shw + 2, shY + 3, -shw - 4 + swing, shY + 33, d, { mitt: o.mitt });
+    arm(c, shw - 2, shY + 3, shw + 4 - swing, shY + 33, d, { ember: kind === 'kobold' });
+  }
+  // neck + head
+  if (!K.robe && kind !== 'golem') ink(c, capsule(0, shY + 1, 4.2, 0, hy + 9, 4.6), d.skin, 0, true);
+  HEAD[kind] ? HEAD[kind](c, d) : ink(c, pEl(0, hy, 12, 12), d.skin);
+  if (sh) shadeHorns(c, d);
+  c.restore();
+  c.restore();
+}
+
+
+function tri(c, a, b, d, col) { c.beginPath(); c.moveTo(a[0], a[1]); c.lineTo(b[0], b[1]); c.lineTo(d[0], d[1]); c.closePath(); c.fillStyle = col; c.fill(); }
+function circ(c, x, y, r, col) { c.beginPath(); c.arc(x, y, r, 0, Math.PI * 2); c.fillStyle = col; c.fill(); }
+function ell(c, x, y, rx, ry, col) { c.beginPath(); c.ellipse(x, y, rx, ry, 0, 0, Math.PI * 2); c.fillStyle = col; c.fill(); }
 /* The Tilting Lists: the rules (issue #117, phase 0), as pure functions on a plain-JSON match (G). The Realm takes the
    engine inside a scope (src/realm/lists/manifest.txt, through `scope wJT ...`), so none of these names reach the page.
 
@@ -46349,28 +46986,40 @@ function jtTurn() {
   if (!G || G.over) return null;
   return jtRideCourse([jtPlan(0), jtPlan(1)]);
 }
-function jtRideCourse(plans, given, leans) {
+function jtRideCourse(plans, given, leans) { const P = jtCourseOpen(plans, given, leans); return P ? jtCourseClose(P) : null; }
+/* a course in two halves, so Play can hold the seat until your balance moment: jtCourseOpen draws any ride not given
+   (and each lean not given, unless wait[s] holds it back for the close), and strikes both lances; jtCourseClose(P,
+   leans) takes the held leans, decides both seats, scores the course and keeps the box score. The random numbers
+   come in the same order as jtImpact's: the rides, the leans, the two strikes, the two seats. P is plain data. */
+function jtCourseOpen(plans, given, leans, wait) {
   const riders = jtRiders(); if (!riders) return null;
-  const heat = G.heat, course = G.course, tilt = jtInTilt();
   const rides = [0, 1].map(s => (given && given[s]) || jtCharge({ plan: plans[s], rs: jtRsOf(s, riders[s]), mount: jtMountOf(s), wind: G.wind[s], hands: jtHands(s) }, R));
-  const lean = [0, 1].map(s => leans && leans[s] != null ? leans[s] : jtLean(s));
-  const lead = [0, 1].map(s => jtTotal(s) - jtTotal(1 - s)), imp = jtImpact(rides, lean, R), rule = jtCourse(imp.res);
+  const lean = [0, 1].map(s => leans && leans[s] != null ? leans[s] : wait && wait[s] ? null : jtLean(s));
+  const st = [jtStrike(rides[0], rides[1], R), jtStrike(rides[1], rides[0], R)];
+  return { heat: G.heat, course: G.course, tilt: jtInTilt(), riders, plans, rides, lean, st, n: G.n };
+}
+function jtCourseClose(P, leans) {
+  if (!P || P.n !== G.n || G.over) return null;
+  const { heat, course, tilt, riders, plans, rides, st } = P, lean = [0, 1].map(s => leans && leans[s] != null ? clamp(+leans[s] || 0, 0, 1) : P.lean[s] != null ? P.lean[s] : .5);
+  const seat = [jtSeat(st[1], rides[0], lean[0], R), jtSeat(st[0], rides[1], lean[1], R)];
+  const imp = { res: [0, 1].map(s => ({ at: st[s].at, unhorse: seat[1 - s].unhorse })), st, seat };
+  const lead = [0, 1].map(s => jtTotal(s) - jtTotal(1 - s)), rule = jtCourse(imp.res);
   // the mounts: the course's wind spent, a little back before the next; fresh mounts for a new heat
   [0, 1].forEach(s => { const M = jtMount(rides[s].mount); G.wind[s] = clamp(G.wind[s] - jtWindCost(rides[s].pace, rides[s].rs) + M.rec * (.6 + .4 * (rides[s].rs.ride ?? .5)), 0, 1); });
   if (rule.tiltNow) G.wind = [JT_TILT_WIND, JT_TILT_WIND]; else if (rule.heatOver) G.wind = [1, 1];
   // the box score
   [0, 1].forEach(s => {
-    const B = G.st[s], P = G.pst[s][riders[s]], st = imp.st[s], seat = imp.seat[s];
-    B.courses++; P.courses++;
-    if (st.broke) { B.breaks++; P.breaks++; if (st.zone === 'helm') { B.helms++; P.helms++; } }
-    else if (st.at === 'glance') B.glances++; else if (st.at === 'miss') B.misses++; else B.fouls++;
-    if (imp.res[s].unhorse) { B.unhorse++; P.unhorse++; G.st[1 - s].unhorsed++; }
-    if (seat.rocked) { B.rocked++; if (!seat.unhorse) B.kept++; }
-    G.plans[s].push({ aim: plans[s].aim, guard: plans[s].guard, pace: plans[s].pace, at: st.at, lead: lead[s] });
+    const B = G.st[s], Pp = G.pst[s][riders[s]], sk = imp.st[s], se = imp.seat[s];
+    B.courses++; Pp.courses++;
+    if (sk.broke) { B.breaks++; Pp.breaks++; if (sk.zone === 'helm') { B.helms++; Pp.helms++; } }
+    else if (sk.at === 'glance') B.glances++; else if (sk.at === 'miss') B.misses++; else B.fouls++;
+    if (imp.res[s].unhorse) { B.unhorse++; Pp.unhorse++; G.st[1 - s].unhorsed++; }
+    if (se.rocked) { B.rocked++; if (!se.unhorse) B.kept++; }
+    G.plans[s].push({ aim: plans[s].aim, guard: plans[s].guard, pace: plans[s].pace, at: sk.at, lead: lead[s] });
   });
   G.n++;
-  const ev = { heat, course, tilt, riders, plans, rides, imp, rule };
-  G.last = { heat, course, tilt, riders, plans: plans.map(p => ({ aim: p.aim, guard: p.guard, pace: p.pace })), res: imp.res, pts: rule.pts };
+  const ev = { heat, course, tilt, riders, plans, rides, lean, imp, rule };
+  G.last = { heat, course, tilt, riders, plans: plans.map(p => ({ aim: p.aim, guard: p.guard, pace: p.pace })), res: imp.res, pts: rule.pts, zone: st.map(x => x.zone) };
   GB = ev;
   return ev;
 }
@@ -46389,6 +47038,640 @@ function jtSimMatch(opts) {
     return Object.assign({ win: G.over ? G.over.win : -1 }, jtSummary());
   } finally { G = keep; GB = keepB; engRand = keepR; }
 }
+/* The Tilting Lists: the match on show and riding by hand (issue #117, phase 2). GP is the page's: the beat, your
+   plan, the charge as you ride it, the balance moment. It is not the match's state (G is) and is never saved.
+
+   The beat (GP.ph): next (who rides) → plan (yours: aim, guard and pace, on your squire's word) → charge (the few
+   seconds down the lists) → seat (yours, only when their lance broke on you: the balance moment) → after (the herald's
+   call) → next, and over at the end. A CPU course goes next → herald (the riders named) → charge → after.
+   The charge on Play has four beats, each a number for the model (04-course.js), through the same sway() and speed():
+   - the spur (the first JT_PLAY.spur.until of the charge): tap with the hoofbeats (Space, or tap the lists). Taps on
+     the beat, within JT_PLAY.spur.win, build your speed; taps off it and beats missed don't (a stumble costs). Your
+     speed at impact is speed() for your pace, mount and wind, times JT_PLAY.spur.min to 1 by how well you spurred.
+   - the couch (after the spur): hold Space (or hold a finger down) to lower the lance. The right moment is
+     JT_PLAY.couch.ideal of the way down; the couch's error is how far off it you were, over JT_PLAY.couch.span (-1 far
+     too early, 1 far too late). Too early tires the arm and the tip droops; too late leaves it scattered. Let go
+     before the impact and the lance comes up: a miss.
+   - the aim: once couched, the tip rides the stride's figure-eight, sway()'s spread times JT_PLAY.aim.eight wide;
+     your hand (the arrows, or drag) holds it on your mark. At impact the tip is the mark, plus the eight, plus your
+     hand, plus a little of your rider's own miss (JT_PLAY.aim.noise of the spread), less the droop.
+   - the impact, then the seat: if their lance broke on you, a short balance moment follows: the rider wobbles and you
+     lean against it (the arrows, drag, or the Lean buttons). How well you held it is your lean (0 to 1) for seat().
+   Watch: the CPU rides both. You ride: your side's courses are yours (side 0). */
+const JT_PLAY = { charge: 3.6, spur: { until: .42, win: .09, min: .86, beat: { canter: .46, gallop: .34 } }, couch: { ideal: .66, span: .3, high: 40 },
+  aim: { eight: 2.6, noise: .3, reach: 18, key: 40 }, seat: { time: 1.4, amp: 1, key: 2.6 }, pace: { herald: 1.2, after: 2.4, heat: 3.2, over: 3.4 } };
+const JT_HOOK = { onPhase: null, onPick: null, onOver: null };
+const JT_MODES = ['watch', 'play'];
+let GP = null;
+
+function jtPlayStart(o) {
+  GP = { mode: JT_MODES.includes(o && o.mode) ? o.mode : 'watch', you: 0, ph: 'next', t: 0, wait: 0, msg: '', sel: null, plans: null, cpuRides: null, ch: null, seatM: null, P: null, last: null, call: '', fx: [] };
+  jtGo('next');
+  return GP;
+}
+function jtGo(ph, wait, msg) {
+  GP.ph = ph; GP.t = 0; GP.wait = wait || 0; if (msg != null) GP.msg = msg;
+  if (JT_HOOK.onPhase) try { JT_HOOK.onPhase(ph); } catch (e) { console.error(e); }
+}
+const jtName = (s, ri) => (G.teams[s].roster[ri] || {}).n || 'Someone';
+const jtYours = s => GP.mode === 'play' && s === GP.you;
+const jtSide = s => G.teams[s].name;
+function jtPicked() { if (JT_HOOK.onPick) try { JT_HOOK.onPick(); } catch (e) { console.error(e); } }
+
+/* ---------- your plan ---------- */
+// your squire's word: the plan a Knight would ride here, with the reason
+function jtSuggest(s) {
+  const keep = G.skill[s]; G.skill[s] = 1; let P;
+  try { P = jtPlan(s); } finally { G.skill[s] = keep; }
+  return { aim: P.aim, guard: P.guard, pace: P.pace, why: P.why };
+}
+/* change your plan: { aim, guard, pace, suggest }. Returns '' or why not */
+function jtSelect(o) {
+  if (!GP || GP.ph !== 'plan' || !GP.sel) return 'Not now.';
+  o = o || {};
+  if (o.suggest) { GP.sel = jtSuggest(GP.you); jtPicked(); return ''; }
+  const S = Object.assign({}, GP.sel);
+  for (const k of ['aim', 'guard', 'pace']) if (o[k] != null) { if (!jtOwn(JT_PLAN[k], o[k])) return `No such ${k}.`; S[k] = o[k]; }
+  GP.sel = S; jtPicked(); return '';
+}
+
+/* ---------- the charge ---------- */
+const jtBeat = pace => JT_PLAY.spur.beat[jtBeatPace(pace)];
+const jtBeatPace = pace => jtOwn(JT_PLAY.spur.beat, pace) ? pace : 'canter';
+// a press: in your plan it rides; in the spur a tap; after the spur it lowers the lance (held: jtCouch(false) lets go)
+function jtPress() {
+  if (!GP || GP.mode !== 'play') return false;
+  if (GP.ph === 'plan' && GP.sel) { jtCharge0(); return true; }
+  const C = GP.ch; if (GP.ph !== 'charge' || !C || !C.mine) return false;
+  if (C.p < JT_PLAY.spur.until) return jtSpur();
+  return jtCouch(true);
+}
+// a tap of the spur, now: on the beat or off it
+function jtSpur() {
+  const C = GP && GP.ch; if (!C || !C.mine || GP.ph !== 'charge' || C.p >= JT_PLAY.spur.until) return false;
+  const b = jtBeat(C.pace), t = C.p * JT_PLAY.charge, k = Math.round(t / b), off = Math.abs(t - k * b);
+  if (k >= 1 && off <= JT_PLAY.spur.win && !C.hit.includes(k)) { C.hit.push(k); C.taps.push({ t, ok: true }); }
+  else { C.bad++; C.taps.push({ t, ok: false }); }
+  return true;
+}
+// the couch: down (held) or up
+function jtCouch(on) {
+  const C = GP && GP.ch; if (!C || !C.mine || GP.ph !== 'charge') return false;
+  if (on && C.p < JT_PLAY.spur.until) return false;
+  if (on && !C.down) { C.down = true; C.downAt = C.p; } else if (!on && C.down) { C.down = false; C.downAt = null; }
+  return true;
+}
+// the hand on the lance: set where it holds the tip (inches off the mark), or move it at a speed (the arrows)
+function jtAim(x, y) { const C = GP && GP.ch; if (!C || !C.mine) return false; const R0 = JT_PLAY.aim.reach; C.hand = { x: clamp(+x || 0, -R0, R0), y: clamp(+y || 0, -R0, R0) }; return true; }
+function jtNudge(vx, vy) { if (GP) GP.keyV = { x: clamp(vx || 0, -1, 1), y: clamp(vy || 0, -1, 1) }; }
+// your lean in the balance moment (-1 left to 1 right), or set by the arrows' speed
+function jtLeanTo(v) { const M = GP && GP.seatM; if (!M) return false; M.lean = clamp(+v || 0, -1.5, 1.5); return true; }
+function jtCharge0() {
+  const riders = jtRiders(); if (!riders) return;
+  const plans = [0, 1].map(s => jtYours(s) ? Object.assign({}, GP.sel) : GP.plans[s]);
+  // the CPU's rides are drawn as it sets off (the page draws its lance from them); yours is built as you ride
+  const cpuRides = [0, 1].map(s => jtYours(s) ? null : jtCharge({ plan: plans[s], rs: jtRsOf(s, riders[s]), mount: jtMountOf(s), wind: G.wind[s], hands: jtHands(s) }, R));
+  const mine = jtYours(0) || jtYours(1), s = GP.you;
+  GP.plans = plans; GP.cpuRides = cpuRides; GP.keyV = { x: 0, y: 0 };
+  GP.ch = { p: 0, mine, pace: mine ? plans[s].pace : plans[0].pace, hit: [], taps: [], bad: 0, down: false, downAt: null, hand: { x: 0, y: 0 }, tipNow: null, riders };
+  jtGo('charge', 0, mine ? `${jtName(s, riders[s])} sets off. Tap with the hoofbeats to spur, then hold to couch the lance, and keep the tip on ${JT_PLAN.aim[plans[s].aim].n}.` : `${jtName(0, riders[0])} and ${jtName(1, riders[1])} set off down the lists…`);
+}
+// how well you spurred: on-beat taps over the beats there were, less the stumbles (0 to 1)
+function jtSpurQ(C) {
+  const n = Math.max(1, Math.floor(JT_PLAY.spur.until * JT_PLAY.charge / jtBeat(C.pace)));
+  return clamp((C.hit.length - .5 * C.bad) / n, 0, 1);
+}
+// your couch's error (-1 early to 1 late), or null with the lance still up
+const jtCouchErr = C => C.down && C.downAt != null ? clamp((C.downAt - JT_PLAY.couch.ideal) / JT_PLAY.couch.span, -1, 1) : null;
+// the stride's figure-eight at time t (seconds), for an amplitude: { x, y }
+function jtEight(t, amp, pace) { const w = Math.PI / jtBeat(pace); return { x: amp * Math.sin(w * t), y: amp * .7 * Math.sin(2 * w * t) }; }
+// your sway now: sway() for your plan, your rider and mount, and the couch as it stands (late if still up)
+function jtYourSway(C) {
+  const s = GP.you, ri = C.riders[s], e = jtCouchErr(C);
+  return jtSway({ pace: GP.plans[s].pace, mount: jtMountOf(s), rs: jtRsOf(s, ri), wind: G.wind[s], couch: e == null ? 0 : e, hands: 1 });
+}
+// where your tip is now (inches, on their target), once couched; null while the lance is up
+function jtTipNow(C) {
+  if (!C.down) return null;
+  const A = JT_PLAN.aim[GP.plans[GP.you].aim], sw = jtYourSway(C), E = jtEight(C.p * JT_PLAY.charge, sw.sigma * JT_PLAY.aim.eight, GP.plans[GP.you].pace);
+  return { x: A.x + E.x + C.hand.x, y: A.y + E.y + C.hand.y - sw.droop };
+}
+// your ride at impact, for the model
+function jtYourRide(C) {
+  const s = GP.you, ri = C.riders[s], plan = GP.plans[s], rs = jtRsOf(s, ri), mount = jtMountOf(s), q = jtSpurQ(C), e = jtCouchErr(C);
+  const speed = jtSpeed({ pace: plan.pace, mount, rs, wind: G.wind[s] }) * (JT_PLAY.spur.min + (1 - JT_PLAY.spur.min) * q);
+  const A = JT_PLAN.aim[plan.aim];
+  if (e == null) return { aim: plan.aim, guard: plan.guard, pace: plan.pace, mount, rs, speed, couch: 1, tip: { x: A.x, y: A.y + JT_PLAY.couch.high }, spurQ: q, up: true };
+  const sw = jtYourSway(C), t = jtTipNow(C);
+  return { aim: plan.aim, guard: plan.guard, pace: plan.pace, mount, rs, speed, couch: e, tip: { x: t.x + gauss() * sw.sigma * JT_PLAY.aim.noise, y: t.y + gauss() * sw.sigma * JT_PLAY.aim.noise }, spurQ: q };
+}
+function jtChargeTick(dt) {
+  const C = GP.ch; if (!C) return;
+  C.p = Math.min(1, C.p + dt / JT_PLAY.charge);
+  if (C.mine) {
+    const V = GP.keyV || { x: 0, y: 0 }, R0 = JT_PLAY.aim.reach;
+    if (C.down && (V.x || V.y)) C.hand = { x: clamp(C.hand.x + V.x * JT_PLAY.aim.key * dt, -R0, R0), y: clamp(C.hand.y + V.y * JT_PLAY.aim.key * dt, -R0, R0) };
+    C.tipNow = jtTipNow(C);
+  }
+  if (C.p >= 1) jtImpactNow();
+}
+function jtImpactNow() {
+  const C = GP.ch, s = GP.you, rides = GP.cpuRides.slice();
+  if (C.mine) rides[s] = jtYourRide(C);
+  const P = jtCourseOpen(GP.plans, rides, null, [C.mine && s === 0, C.mine && s === 1]);
+  GP.P = P; GP.rides = rides;
+  jtSplinters(P);
+  // their lance broke on you: the balance moment
+  if (C.mine && P && P.st[1 - s].broke) {
+    GP.seatM = { t: 0, lean: 0, w: 0, err: 0, n: 0, amp: JT_PLAY.seat.amp * clamp(P.st[1 - s].rock, .4, 1.6), ph: R() * 6.28, v: 0 };
+    jtGo('seat', 0, `${jtCap(JT_AT[P.st[1 - s].zone] || 'a hit')}! Your rider rocks: lean against it to keep your seat.`);
+    return;
+  }
+  jtFinish();
+}
+// the wobble in the balance moment at time t: the hit throws the rider one way, then the other
+const jtWobble = M => M.amp * Math.exp(-M.t * .6) * (Math.sin(M.t * 5.2 + M.ph) + .55 * Math.sin(M.t * 8.7 + M.ph * 1.7));
+function jtSeatTick(dt) {
+  const M = GP.seatM; if (!M) return;
+  M.t += dt;
+  const V = GP.keyV || { x: 0, y: 0 };
+  if (V.x) M.lean = clamp(M.lean + V.x * JT_PLAY.seat.key * dt, -1.5, 1.5);
+  M.w = jtWobble(M); M.err += Math.abs(M.w + M.lean); M.n++;
+  if (M.t >= JT_PLAY.seat.time) jtFinish();
+}
+// how well you leaned (0 to 1): the wobble left after your lean, against the wobble itself
+const jtLeanQ = M => !M || !M.n ? .5 : clamp(1 - (M.err / M.n) / Math.max(.2, M.amp * .75), 0, 1);
+function jtFinish() {
+  const P = GP.P, s = GP.you, mine = GP.ch && GP.ch.mine, leans = [null, null];
+  if (mine && P && P.lean[s] == null) leans[s] = GP.seatM ? jtLeanQ(GP.seatM) : .5;
+  const ev = jtCourseClose(P, leans);
+  GP.P = null; GP.seatM = null; GP.ch = null; GP.keyV = { x: 0, y: 0 };
+  if (!ev) { jtGo('next'); return; }
+  GP.last = { heat: ev.heat, course: ev.course, tilt: ev.tilt, riders: ev.riders, plans: ev.plans.map(p => ({ aim: p.aim, guard: p.guard, pace: p.pace })), res: ev.imp.res,
+    pts: ev.rule.pts, zone: ev.imp.st.map(x => x.zone), broke: ev.imp.st.map(x => x.broke), lean: ev.lean, rides: ev.rides.map(r => ({ speed: r.speed, couch: r.couch, tip: r.tip, spurQ: r.spurQ ?? null, up: !!r.up })),
+    unhorsed: ev.rule.unhorsed, rule: { heatOver: ev.rule.heatOver, tiltNow: ev.rule.tiltNow, over: ev.rule.over } };
+  GP.call = jtHerald(ev);
+  const R0 = ev.rule;
+  jtGo('after', G.over ? JT_PLAY.pace.over : R0.heatOver || R0.tiltNow ? JT_PLAY.pace.heat : JT_PLAY.pace.after, GP.call);
+  if (G.over && JT_HOOK.onOver) try { JT_HOOK.onOver(jtSummary()); } catch (er) { console.error(er); }
+}
+const JT_NUM = ['Nothing', 'One', 'Two', 'Three'];
+const jtCap = t => t ? t[0].toUpperCase() + t.slice(1) : t;
+// the herald's call for a course: each strike, the points, an unhorsing, the heat and the match
+function jtHerald(ev) {
+  const st = ev.imp.st, R0 = ev.rule, say = [];
+  for (const s of [0, 1]) {
+    const k = st[s], who = jtName(s, ev.riders[s]), p = R0.pts[s], un = ev.imp.res[s].unhorse;
+    if (un) say.push(`${who} unhorses ${jtName(1 - s, ev.riders[1 - s])}! Three to ${jtSide(s)}!`);
+    else if (k.broke) say.push(`A lance broken on the ${k.zone}! ${JT_NUM[p] || p} to ${jtSide(s)}.`);
+    else if (JT_RULES.fouls.includes(k.at)) say.push(`${who}: ${JT_AT[k.at]}. Sir Ruddock takes a point off.`);
+    else if (k.at === 'glance') say.push(`${who}'s lance glances off.`);
+    else say.push(`${who} misses.`);
+  }
+  if (R0.heatOver && !R0.over) say.push(R0.heatOver.by === 'unhorse' ? `The heat ends there, ${R0.heatOver.tot[0]} to ${R0.heatOver.tot[1]}.` : `End of the heat: ${R0.heatOver.tot[0]} to ${R0.heatOver.tot[1]}.`);
+  if (R0.tiltNow) say.push('Level! The tilt for the crown: the best riders, until one scores.');
+  if (R0.over) say.push(`${jtSide(R0.over.win)} win the tourney, ${R0.over.text}!`);
+  return say.join(' ');
+}
+// the splinters of a broken lance and the spark of a glance, for the drawing (not the match's state)
+function jtSplinters(P) {
+  if (!P) return;
+  for (const s of [0, 1]) {
+    const k = P.st[s]; if (!k.broke && k.at !== 'glance') continue;
+    const n = k.broke ? 26 : 6;
+    for (let i = 0; i < n; i++) GP.fx.push({ s, t: 0, life: k.broke ? 1.4 : .5, x: 0, y: 0, vx: (Math.random() - .5) * 5 + (s ? -1.5 : 1.5), vy: -Math.random() * 4 - 1, r: Math.random() * 6.28, vr: (Math.random() - .5) * 12, spark: !k.broke });
+  }
+}
+
+/* ---------- the beat ---------- */
+function jtTick(dt) {
+  if (!GP || !G || !G.teams) return;
+  GP.t += dt;
+  for (const f of GP.fx) { f.t += dt; f.x += f.vx * dt; f.y += f.vy * dt; f.vy += 9 * dt; f.r += f.vr * dt; }
+  GP.fx = GP.fx.filter(f => f.t < f.life);
+  const P = GP.ph;
+  if (P === 'next') jtPlayNext();
+  else if (P === 'herald') { if (GP.t >= JT_PLAY.pace.herald) jtCharge0(); }
+  else if (P === 'charge') jtChargeTick(dt);
+  else if (P === 'seat') jtSeatTick(dt);
+  else if (P === 'after') { if (GP.t >= GP.wait) jtGo(G.over ? 'over' : 'next'); }
+}
+function jtWhere() { return jtInTilt() ? `The tilt for the crown, course ${G.course + 1}` : `Heat ${G.heat + 1}, course ${G.course + 1} of ${G.courses}`; }
+function jtPlayNext() {
+  const riders = jtRiders(); if (!riders) { jtGo('over'); return; }
+  GP.plans = [0, 1].map(s => jtYours(s) ? null : jtPlan(s));
+  const vs = `${jtName(0, riders[0])} (${jtSide(0)}) against ${jtName(1, riders[1])} (${jtSide(1)})`;
+  if (jtYours(GP.you)) { GP.sel = jtSuggest(GP.you); jtGo('plan', 0, `${jtWhere()}: ${vs}. Your squire says: ${GP.sel.aim === 'helm' ? 'the helm' : JT_PLAN.aim[GP.sel.aim].n}, ${GP.sel.guard}, at ${JT_PLAN.pace[GP.sel.pace].n} (${GP.sel.why}). Change the plan if you like, then Ride.`); return; }
+  jtGo('herald', 0, `${jtWhere()}: ${vs}.`);
+}
+function jtSetMode(m) {
+  if (!GP || !JT_MODES.includes(m)) return;
+  GP.mode = m;
+  // a plan you were making goes back to the CPU in Watch; a charge in progress finishes as it began
+  if (m !== 'play' && GP.ph === 'plan') jtGo('next');
+}
+// what the page needs, as a copy
+function jtView() {
+  if (!GP) return null;
+  const C = GP.ch, M = GP.seatM, r = jtRiders();
+  return { mode: GP.mode, you: GP.you, ph: GP.ph, msg: GP.msg, call: GP.call, riders: r, heat: G.heat, course: G.course, inTilt: jtInTilt(),
+    sel: GP.sel ? Object.assign({}, GP.sel) : null, plans: GP.plans ? JSON.parse(JSON.stringify(GP.plans)) : null,
+    charge: C ? { p: C.p, mine: C.mine, pace: C.pace, hits: C.hit.length, bad: C.bad, spurQ: jtSpurQ(C), down: C.down, downAt: C.downAt, couch: jtCouchErr(C), hand: Object.assign({}, C.hand), tip: C.tipNow ? Object.assign({}, C.tipNow) : null } : null,
+    seat: M ? { t: M.t, w: M.w, lean: M.lean, q: jtLeanQ(M) } : null, wind: G.wind.slice() };
+}
+/* The Tilting Lists: drawing (issue #117, phase 2). The picture is 960 by 600, the lists from the side:
+   - the sand yard JT_LISTS.yards long with the tilt (the barrier) down the middle, the striped tents at either end,
+     pennants on their poles and the gallery behind the far side. Your rider (side 0) rides the near side from the left,
+     theirs the far side from the right, left side to left side across the tilt, so you see your lance arm and their
+     shield (square, or angled edge-on).
+   - the camera shows the whole lists while the riders are named and planned, then closes in on the meeting point as
+     they converge, held there for the impact: the lances, the splinters of a break, a rider unhorsed falling to the sand.
+   - over it: the tourney board (a pennant a course for each side, its points on it; grey for nothing, red for a foul;
+     the tilt's after), the herald's call after each course, and on Play the charge's beats: the hoofbeats and your
+     taps, the charge's progress with the couch's right moment marked, and the target as your lance sees it (the
+     shield, the body, the helm, your mark, the tip riding its eight), and the balance moment's wobble and your lean.
+   The mounts are one drawing (jtHorse): a Charger black with a steel chanfron and a short caparison, a Destrier grey
+   under a full caparison to the knees, a Courser chestnut with only a saddle cloth; the cloth in the side's colour.
+   Drawing only: nothing here is in the match's state. jtAimScr maps the target's inches to the target panel. */
+const JT_VIEW = { w: 960, h: 600, base: 455, depth: .32, near: 1.3, far: -1.3, zoomOut: 14.5, zoomIn: 58, meet: 30, lance: 3.6 };
+const JT_TGT = { x: 830, y: 196, k: 3, w: 230, h: 214 };
+const JTC = { t: 0, camX: 30, zoom: 14.5 };
+function figClock() { return JTC.t; }
+const JT_COAT = { charger: '#2b211d', destrier: '#9a958c', courser: '#9a5426' };
+const jtScrX = x => JT_VIEW.w / 2 + (x - JTC.camX) * JTC.zoom;
+// (the ground line rises as the camera pulls back, so the wide shot is mostly the lists, not the sky)
+const jtBase = () => JT_VIEW.base - 110 * (1 - clamp((JTC.zoom - JT_VIEW.zoomOut) / (JT_VIEW.zoomIn - JT_VIEW.zoomOut), 0, 1));
+const jtScrY = z => jtBase() + z * Math.max(JTC.zoom, 26) * JT_VIEW.depth;
+// the target panel: a point of the target (inches from the middle of the chest) on the picture, and back
+const jtAimScr = (x, y) => [JT_TGT.x + x * JT_TGT.k, JT_TGT.y - y * JT_TGT.k];
+const jtAimUn = (sx, sy) => ({ x: (sx - JT_TGT.x) / JT_TGT.k, y: (JT_TGT.y - sy) / JT_TGT.k });
+const jtEase = p => p < .5 ? 2 * p * p : 1 - Math.pow(-2 * p + 2, 2) / 2;
+
+// where each rider is along the lists now (yards), and how far down the charge (0 to 1, on past 1 after the impact)
+function jtRidersNow() {
+  const ph = GP ? GP.ph : 'next', C = GP && GP.ch;
+  let p = C ? C.p : ph === 'seat' ? 1 + Math.min(.25, GP.seatM ? GP.seatM.t * .05 : 0) : ph === 'after' || ph === 'over' ? 1 + Math.min(.4, GP.t * .22) : 0;
+  const run = JT_VIEW.meet - 2, e = p <= 1 ? jtEase(p) : 1 + (p - 1) * .9;
+  return { p, x: [2 + run * e, JT_LISTS.yards - 2 - run * e], moving: !!C || ph === 'after' || ph === 'seat' };
+}
+function jtCamTo(dt) {
+  const R0 = jtRidersNow(), close = R0.p <= 1 ? clamp((R0.p - .45) / .5, 0, 1) : 1;
+  const zoom = JT_VIEW.zoomOut + (JT_VIEW.zoomIn - JT_VIEW.zoomOut) * jtEase(close), cam = JT_VIEW.meet;
+  const k = dt ? Math.min(1, dt * 5) : 1;
+  JTC.zoom += (zoom - JTC.zoom) * k; JTC.camX += (cam - JTC.camX) * k;
+}
+
+/* ---------- the lists ---------- */
+function jtListsDraw(c) {
+  const W = JT_VIEW.w, H = JT_VIEW.h, z = JTC.zoom, gy = jtScrY(-5);
+  const sky = c.createLinearGradient(0, 0, 0, gy); sky.addColorStop(0, '#9cc4e4'); sky.addColorStop(1, '#dfe8d8'); c.fillStyle = sky; c.fillRect(0, 0, W, gy);
+  c.fillStyle = 'rgba(255,255,255,.75)';
+  for (let i = 0; i < 5; i++) { const x = ((i * 233 + JTC.t * 6) % (W + 200)) - 100, y = 90 + (i * 47) % 120; for (const [dx, dy, r] of [[0, 0, 22], [24, -8, 18], [44, 2, 16], [-20, 4, 14]]) { c.beginPath(); c.arc(x + dx, y + dy, r, 0, 6.28); c.fill(); } }
+  // the Mosswold's trees beyond
+  c.fillStyle = '#4c6a3e'; c.beginPath(); c.moveTo(0, gy);
+  for (let i = 0; i <= 24; i++) { const x = i * 40, h = 30 + 18 * Math.sin(i * 1.7) + 10 * Math.sin(i * 4.1); c.lineTo(x, gy - h); }
+  c.lineTo(W, gy); c.closePath(); c.fill();
+  // the gallery behind the far side: a timber stand and the crowd
+  const g0 = jtScrX(-4), g1 = jtScrX(JT_LISTS.yards + 4), gh = 2.2 * z, gt = gy - gh;
+  c.fillStyle = '#6a4a2e'; c.fillRect(g0, gt, g1 - g0, gh);
+  c.save(); c.beginPath(); c.rect(Math.max(0, g0), gt, Math.min(W, g1) - Math.max(0, g0), gh); c.clip();
+  for (let i = 0; i < 320; i++) {
+    const x = -4 + (i * 0.23) % (JT_LISTS.yards + 8), row = i % 3, sx = jtScrX(x), sy = gt + gh * (.25 + row * .25) + Math.sin(JTC.t * 3 + i) * .6;
+    if (sx < -10 || sx > W + 10) continue;
+    c.fillStyle = ['#c94a3a', '#e0b84a', '#3a5a9a', '#5a8a4a', '#e6dccb', '#8a4a8a'][i % 6]; c.beginPath(); c.arc(sx, sy, Math.max(1.2, z * .13), 0, 6.28); c.fill();
+  }
+  c.restore();
+  // the sand
+  const sand = c.createLinearGradient(0, gy, 0, H); sand.addColorStop(0, '#d8bc84'); sand.addColorStop(1, '#c9a46c'); c.fillStyle = sand; c.fillRect(0, gy, W, H - gy);
+  c.fillStyle = 'rgba(120,90,50,.18)'; for (let i = 0; i < 90; i++) { const x = jtScrX((i * 7.3) % 70 - 5), y = gy + ((i * 37) % (H - gy)); if (x > -5 && x < W + 5) c.fillRect(x, y, Math.max(1, z * .2), 1); }
+  // the tents at either end, striped, with pennants
+  for (const [x, col] of [[-3, '#3a5a9a'], [JT_LISTS.yards + 3, '#c94a3a']]) jtTent(c, x, col);
+  for (let i = 0; i <= 6; i++) jtPennant(c, i * JT_LISTS.yards / 6, -4.6, ['#3a5a9a', '#e0b84a', '#c94a3a'][i % 3], i);
+}
+function jtTent(c, x, col) {
+  const sx = jtScrX(x), sy = jtScrY(-3.5), z = JTC.zoom, w = 3.4 * z, h = 3 * z;
+  if (sx < -w || sx > JT_VIEW.w + w) return;
+  for (let i = 0; i < 6; i++) { c.fillStyle = i % 2 ? '#f2ece0' : col; c.beginPath(); c.moveTo(sx, sy - h); c.lineTo(sx - w / 2 + i * w / 6, sy); c.lineTo(sx - w / 2 + (i + 1) * w / 6, sy); c.closePath(); c.fill(); }
+  c.strokeStyle = 'rgba(40,25,15,.6)'; c.lineWidth = 1; c.beginPath(); c.moveTo(sx, sy - h); c.lineTo(sx - w / 2, sy); c.lineTo(sx + w / 2, sy); c.closePath(); c.stroke();
+  c.strokeStyle = '#3a2a1a'; c.beginPath(); c.moveTo(sx, sy - h); c.lineTo(sx, sy - h - .8 * z); c.stroke();
+  c.fillStyle = col; c.beginPath(); c.moveTo(sx, sy - h - .8 * z); c.lineTo(sx + .7 * z, sy - h - .65 * z + Math.sin(JTC.t * 4) * 2); c.lineTo(sx, sy - h - .5 * z); c.fill();
+}
+function jtPennant(c, x, zz, col, i) {
+  const sx = jtScrX(x), sy = jtScrY(zz), z = JTC.zoom; if (sx < -20 || sx > JT_VIEW.w + 20) return;
+  c.strokeStyle = '#4a3420'; c.lineWidth = Math.max(1, z * .06); c.beginPath(); c.moveTo(sx, sy); c.lineTo(sx, sy - 2.6 * z); c.stroke();
+  const f = Math.sin(JTC.t * 3.4 + i) * .15;
+  c.fillStyle = col; c.beginPath(); c.moveTo(sx, sy - 2.6 * z); c.quadraticCurveTo(sx + .6 * z, sy - (2.5 + f) * z, sx + 1.2 * z, sy - (2.35 + f * 2) * z); c.lineTo(sx, sy - 2.15 * z); c.fill();
+}
+// the tilt: a painted rail on posts down the middle
+function jtTiltDraw(c) {
+  const z = JTC.zoom, y = jtScrY(0), h = 1.15 * z, x0 = jtScrX(1), x1 = jtScrX(JT_LISTS.yards - 1);
+  c.fillStyle = 'rgba(0,0,0,.15)'; c.fillRect(x0, y - 2, x1 - x0, 4);
+  for (let x = 1; x <= JT_LISTS.yards - 1; x += 2.5) { const sx = jtScrX(x); if (sx < -10 || sx > JT_VIEW.w + 10) continue; c.fillStyle = '#5a3e26'; c.fillRect(sx - z * .06, y - h, z * .12, h); }
+  const bands = Math.ceil((JT_LISTS.yards - 2) / 1.5);
+  for (let i = 0; i < bands; i++) { const a = jtScrX(1 + i * 1.5), b = jtScrX(Math.min(JT_LISTS.yards - 1, 1 + (i + 1) * 1.5)); if (b < 0 || a > JT_VIEW.w) continue; c.fillStyle = i % 2 ? '#e8dcc0' : '#3a5a9a'; c.fillRect(a, y - h, b - a, h * .28); }
+  c.strokeStyle = 'rgba(30,20,10,.55)'; c.lineWidth = 1; c.strokeRect(x0, y - h, x1 - x0, h * .28);
+}
+
+/* ---------- a mount ---------- */
+// a horse at (x, y) on the sand, k pixels a yard, facing dir (1 right, -1 left), its gait's phase, and its rider's colour
+function jtHorse(c, x, y, k, dir, mount, col, phase, moving) {
+  const coat = JT_COAT[mount] || JT_COAT.destrier, u = k / 100, dark = tint(coat, -.35);
+  c.save(); c.translate(x, y); c.scale(dir * u, u);
+  c.fillStyle = 'rgba(0,0,0,.22)'; c.beginPath(); c.ellipse(0, 0, 80, 9, 0, 0, 6.28); c.fill();
+  const g = moving ? Math.sin(phase) : 0, g2 = moving ? Math.sin(phase + 1.3) : 0, bob = moving ? Math.abs(Math.cos(phase)) * 5 : 0;
+  c.translate(0, -bob);
+  const leg = (hx, a, col2) => { const kx = hx + Math.sin(a) * 26, ky = -52; c.strokeStyle = col2; c.lineWidth = 11; c.lineCap = 'round'; c.beginPath(); c.moveTo(hx, -92); c.lineTo(kx, ky); c.lineTo(kx + Math.sin(a * 1.6) * 16, -4 + bob); c.stroke(); c.fillStyle = '#2a1e18'; c.beginPath(); c.arc(kx + Math.sin(a * 1.6) * 16, -3 + bob, 6, 0, 6.28); c.fill(); };
+  // the far legs, then the body, then the near legs
+  leg(-48, -g * .6, dark); leg(44, g2 * .6, dark);
+  // the tail
+  c.strokeStyle = tint(coat, -.5); c.lineWidth = 9; c.beginPath(); c.moveTo(-70, -118); c.quadraticCurveTo(-98, -100 + g * 6, -92, -60); c.stroke();
+  // the body, the neck, the head
+  c.fillStyle = coat; c.strokeStyle = '#17100e'; c.lineWidth = 3;
+  c.beginPath(); c.ellipse(-4, -108, 74, 28, 0, 0, 6.28); c.fill(); c.stroke();
+  c.beginPath(); c.moveTo(40, -126); c.lineTo(78, -176); c.lineTo(98, -168); c.lineTo(70, -104); c.closePath(); c.fill(); c.stroke();
+  c.save(); c.translate(100, -168); c.rotate(.55); c.beginPath(); c.ellipse(0, 0, 26, 12, 0, 0, 6.28); c.fill(); c.stroke(); c.restore();
+  c.fillStyle = tint(coat, -.5); c.beginPath(); c.moveTo(74, -178); c.lineTo(48, -128); c.lineTo(56, -126); c.lineTo(82, -174); c.fill();
+  c.fillStyle = '#17100e'; c.beginPath(); c.arc(98, -174, 2.6, 0, 6.28); c.fill();
+  c.beginPath(); c.moveTo(86, -186); c.lineTo(90, -198); c.lineTo(94, -184); c.fill();
+  // the barding, in the rider's colour
+  const cloth = col, trim = '#f2e6c4';
+  if (mount === 'destrier') {
+    c.fillStyle = cloth; c.beginPath(); c.moveTo(-80, -126); c.lineTo(62, -130); c.lineTo(72, -62);
+    for (let i = 0; i <= 8; i++) c.lineTo(72 - i * 19, -58 + (i % 2) * 7);
+    c.lineTo(-84, -64); c.closePath(); c.fill(); c.stroke();
+    c.strokeStyle = trim; c.lineWidth = 4; c.beginPath(); c.moveTo(-82, -70); c.lineTo(70, -68); c.stroke(); c.strokeStyle = '#17100e'; c.lineWidth = 3;
+    c.fillStyle = cloth; c.beginPath(); c.moveTo(44, -128); c.lineTo(76, -174); c.lineTo(92, -166); c.lineTo(68, -110); c.closePath(); c.fill(); c.stroke();
+  } else if (mount === 'charger') {
+    c.fillStyle = cloth; c.beginPath(); c.moveTo(-78, -124); c.lineTo(60, -128); c.lineTo(64, -88); c.lineTo(-80, -86); c.closePath(); c.fill(); c.stroke();
+    c.strokeStyle = trim; c.lineWidth = 3; c.beginPath(); c.moveTo(-80, -90); c.lineTo(63, -92); c.stroke(); c.strokeStyle = '#17100e'; c.lineWidth = 3;
+    c.save(); c.translate(100, -168); c.rotate(.55); c.fillStyle = '#b8bcc4'; c.beginPath(); c.ellipse(4, -2, 20, 9, 0, 0, 6.28); c.fill(); c.stroke(); c.restore();
+  } else {
+    c.fillStyle = cloth; c.fillRect(-26, -134, 46, 30); c.strokeRect(-26, -134, 46, 30);
+  }
+  // the saddle
+  c.fillStyle = '#5a3a22'; c.beginPath(); c.moveTo(-30, -134); c.quadraticCurveTo(-34, -150, -26, -152); c.lineTo(-20, -138); c.lineTo(14, -138); c.lineTo(20, -150); c.quadraticCurveTo(26, -140, 22, -134); c.closePath(); c.fill(); c.stroke();
+  // the near legs
+  leg(-34, g * .6, coat); leg(58, -g2 * .6, coat);
+  c.restore();
+  return bob * u;
+}
+// a rider in the saddle: the figure seated, the shield, the lance (raised, or couched toward the other rider)
+const JT_SIT = { legL: { a: -1.25, lift: .1 }, legR: { a: -1.05, lift: .1 }, armL: { x: -12, y: -46 }, armR: { x: 26, y: -50 }, lean: .08 };
+function jtRider(c, s, x, y, k, dir, o) {
+  const T = G.teams[s], m = T.roster[o.ri] || {}, kind = m.kind && KIND[m.kind] ? m.kind : 'goblin', hpx = 1.55 * k, sc = hpx * (KIND[kind].h) / 100;
+  const sy = y - 1.42 * k - o.bob, fy = sy + 34 * sc, team = { color: T.color || '#888', light: '#f2e6c4', short: T.short };
+  c.save();
+  if (o.fall) { c.translate(x, sy); c.rotate(-dir * o.fall * 1.4); c.translate(-x, -sy + -o.fall * .2 * k); c.translate(-dir * o.fall * .8 * k, o.fall * 1.2 * k); }
+  // their shield shows on the far rider (its face to us), a sliver on yours
+  const shX = x + dir * 2 * sc, shY = fy - 58 * sc;
+  if (s === 0) jtShield(c, shX - dir * 8 * sc, shY, sc * .8, T.color, o.guard, true);
+  drawFig(c, kind, x - dir * 4 * sc, fy, hpx, team, { flip: dir < 0, noShadow: true, pose: JT_SIT, num: '' });
+  if (s === 1) jtShield(c, shX + dir * 6 * sc, shY, sc, T.color, o.guard, false);
+  // the lance: from the hand, raised until couched, then level and pointing at the other rider
+  const hx = x + dir * 22 * sc, hy = fy - 52 * sc, ang = o.couched ? (o.droop || 0) * .02 : -1.05 + (o.lower || 0) * 1.05, L = JT_VIEW.lance * k;
+  if (!o.broken) jtLance(c, hx, hy, dir, ang, L, T.color, 1);
+  else jtLance(c, hx, hy, dir, ang, L * .38, T.color, .38);
+  c.restore();
+}
+function jtShield(c, x, y, sc, col, guard, back) {
+  c.save(); c.translate(x, y); const w = guard === 'angled' ? .45 : 1; c.scale(w * sc, sc);
+  c.beginPath(); c.moveTo(-15, -22); c.lineTo(15, -22); c.quadraticCurveTo(16, 6, 0, 28); c.quadraticCurveTo(-16, 6, -15, -22); c.closePath();
+  c.fillStyle = back ? tint(col, -.3) : col; c.fill(); c.lineWidth = 2.6 / sc; c.strokeStyle = '#17100e'; c.stroke();
+  if (!back) { c.fillStyle = '#f2e6c4'; c.fillRect(-3, -18, 6, 36); c.fillRect(-12, -6, 24, 6); }
+  c.restore();
+}
+function jtLance(c, x, y, dir, ang, L, col, part) {
+  c.save(); c.translate(x, y); c.scale(dir, 1); c.rotate(ang);
+  c.fillStyle = '#d8c39a'; c.beginPath(); c.moveTo(-L * .12, -3); c.lineTo(L * part, -1); c.lineTo(L * part, 1); c.lineTo(-L * .12, 3); c.closePath(); c.fill();
+  c.strokeStyle = '#17100e'; c.lineWidth = 1.2; c.stroke();
+  for (let i = 1; i < 6; i++) { const a = L * i / 7; if (a > L * part) break; c.strokeStyle = col; c.lineWidth = 2.4; c.beginPath(); c.moveTo(a, -2.4); c.lineTo(a + L * .05, 2.4); c.stroke(); }
+  c.fillStyle = '#9aa0aa'; c.beginPath(); c.moveTo(L * .02, -9); c.lineTo(L * .13, -2.5); c.lineTo(L * .13, 2.5); c.lineTo(L * .02, 9); c.closePath(); c.fill(); c.strokeStyle = '#17100e'; c.lineWidth = 1; c.stroke();
+  if (part < 1) { c.strokeStyle = '#d8c39a'; c.lineWidth = 2; for (let i = 0; i < 4; i++) { c.beginPath(); c.moveTo(L * part, 0); c.lineTo(L * part + 6 + i * 2, (i - 1.5) * 4); c.stroke(); } }
+  c.restore();
+}
+
+/* ---------- the riders on the lists ---------- */
+function jtRidersDraw(c) {
+  const r = jtRiders() || (GP && GP.last ? GP.last.riders : [0, 0]), R0 = jtRidersNow(), z = JTC.zoom, C = GP && GP.ch, L = GP && GP.last;
+  const after = GP && (GP.ph === 'after' || GP.ph === 'over') && L, broken = after ? L.broke : GP && GP.P ? GP.P.st.map(x => x.broke) : [false, false];
+  const ri = after ? L.riders : r, plans = (C || (GP && GP.P)) && GP.plans ? GP.plans : after ? L.plans : GP && GP.plans ? GP.plans.map((p, s) => p || (GP.sel && s === GP.you ? GP.sel : null)) : [null, null];
+  for (const s of [1, 0]) {
+    // (in the wide shot the riders are drawn a little larger than the yard's scale, so they read)
+    const x = jtScrX(R0.x[s]), y = jtScrY(s ? JT_VIEW.far : JT_VIEW.near), dir = s ? -1 : 1, k = Math.max(z, 26) * (s ? .94 : 1);
+    if (x < -4 * k || x > JT_VIEW.w + 4 * k) { if (s === 1) jtTiltDraw(c); continue; }
+    const plan = plans[s] || { guard: 'square', pace: 'canter' }, mount = G.mounts ? jtMountOf(s) : JT_MOUNT_DEF;
+    const phase = JTC.t * (plan.pace === 'gallop' ? 15 : 11) + s * 1.7;
+    const bob = jtHorse(c, x, y, k, dir, mount, G.teams[s].color || '#888', phase, R0.moving);
+    // the couch: the CPU's from its ride (its moment from its couch error), yours as you hold it
+    let lower = 0, couched = false, droop = 0;
+    if (C) {
+      if (C.mine && s === GP.you) { couched = C.down; lower = C.down ? 1 : 0; const e = jtCouchErr(C); droop = e != null && e < 0 ? -e : 0; }
+      else { const rd = GP.cpuRides && GP.cpuRides[s], at = JT_PLAY.couch.ideal + (rd ? rd.couch : 0) * JT_PLAY.couch.span; lower = clamp((C.p - at) / .06, 0, 1); couched = lower >= 1; }
+    } else if (GP && (GP.ph === 'seat' || after)) couched = true;
+    const un = after && L.unhorsed && L.unhorsed.includes(s) ? clamp(GP.t / .7, 0, 1) : 0;
+    jtRider(c, s, x, y, k, dir, { ri: ri ? ri[s] : 0, bob, guard: plan.guard, couched, lower, droop, broken: !!broken[s] && (after || (GP && GP.ph === 'seat')), fall: un });
+    if (s === 1) jtTiltDraw(c);
+  }
+  // the splinters at the meeting point
+  const mx = jtScrX(JT_VIEW.meet), my = jtScrY(0) - 2.2 * z;
+  for (const f of (GP ? GP.fx : [])) {
+    const a = 1 - f.t / f.life; c.save(); c.globalAlpha = a; c.translate(mx + f.x * z * .5, my + f.y * z * .5); c.rotate(f.r);
+    if (f.spark) { c.fillStyle = '#fff2a8'; c.fillRect(-2, -2, 4, 4); } else { c.fillStyle = '#d8c39a'; c.fillRect(-z * .18, -1.5, z * .36, 3); }
+    c.restore();
+  }
+}
+
+/* ---------- the board, the call and your beats ---------- */
+function jtBoardDraw(c) {
+  const B = jtBoard(); if (!B) return;
+  const n = B.courses, tl = B.tilt[0].length, cols = n * 2 + tl, w = 150 + cols * 24 + 46, x0 = 10, y0 = 10;
+  c.save(); c.fillStyle = 'rgba(24,20,16,.78)'; rr(c, x0, y0, Math.min(w, JT_VIEW.w - 20), 62, 8); c.fill();
+  for (const s of [0, 1]) {
+    const y = y0 + 20 + s * 26, T = G.teams[s];
+    c.fillStyle = T.color || '#888'; c.fillRect(x0 + 8, y - 9, 6, 18);
+    txt(c, (T.name || '').replace(/ (Jousting )?Club$/, '').slice(0, 16), x0 + 20, y + 4, '700 13px "Alegreya Sans", sans-serif', '#f2ece0');
+    let x = x0 + 150;
+    for (let h = 0; h < 2; h++) for (let i = 0; i < n; i++, x += 24) jtFlag(c, x, y, B.sc[s][h][i], h === B.heat && i === B.course && !B.inTilt && !G.over, T.color);
+    for (let i = 0; i < tl; i++, x += 24) jtFlag(c, x, y, B.tilt[s][i], false, '#e0b84a');
+    txt(c, String(B.tot[s]), x + 12, y + 5, '800 16px "Alegreya Sans", sans-serif', '#ffe08a', 'center');
+  }
+  txt(c, B.inTilt && !G.over ? 'The tilt for the crown' : G.over ? 'Final' : `Heat ${B.heat + 1}`, x0 + 150, y0 + 8, '600 9px "Alegreya Sans", sans-serif', '#c8bfae');
+  c.restore();
+}
+// a pennant for a course: its points on it, gold for a score, grey for nothing, red for a foul, a dark outline not yet ridden
+function jtFlag(c, x, y, v, now, col) {
+  c.beginPath(); c.moveTo(x, y - 9); c.lineTo(x + 20, y); c.lineTo(x, y + 9); c.closePath();
+  if (v == null) { c.strokeStyle = now ? '#ffe08a' : 'rgba(242,236,224,.35)'; c.lineWidth = now ? 2 : 1; c.stroke(); return; }
+  c.fillStyle = v > 0 ? col : v < 0 ? '#b83a2a' : '#6a6458'; c.fill(); c.strokeStyle = '#f2ece0'; c.lineWidth = 1; c.stroke();
+  if (v) txt(c, String(v), x + 7, y + 4, '800 11px "Alegreya Sans", sans-serif', '#fff', 'center');
+}
+function jtCallDraw(c) {
+  if (!GP || !(GP.ph === 'after' || GP.ph === 'over') || !GP.call) return;
+  const s = GP.call, W = Math.min(820, JT_VIEW.w - 40), x = (JT_VIEW.w - W) / 2, y = 92;
+  c.save(); c.font = '700 16px "Alegreya Sans", sans-serif';
+  const words = s.split(' '), lines = []; let cur = '';
+  for (const wd of words) { const tr = cur ? cur + ' ' + wd : wd; if (c.measureText(tr).width > W - 40 && cur) { lines.push(cur); cur = wd; } else cur = tr; }
+  if (cur) lines.push(cur);
+  c.fillStyle = 'rgba(58,40,22,.9)'; rr(c, x, y, W, 22 + lines.length * 20, 10); c.fill(); c.strokeStyle = '#e0b84a'; c.lineWidth = 2; c.stroke();
+  lines.forEach((l, i) => txt(c, l, JT_VIEW.w / 2, y + 26 + i * 20, '700 16px "Alegreya Sans", sans-serif', '#fff4d8', 'center'));
+  c.restore();
+}
+// the target as your lance sees it: their shield by their guard, the body, the helm, your mark and your tip
+function jtTargetDraw(c, plan, guard, tip) {
+  const Z = JT_ZONE, g = guard === 'angled' ? 'angled' : 'square', k = JT_TGT.k, P = (x, y) => jtAimScr(x, y);
+  c.save(); c.fillStyle = 'rgba(24,20,16,.78)'; rr(c, JT_TGT.x - JT_TGT.w / 2, JT_TGT.y - 124, JT_TGT.w, JT_TGT.h, 10); c.fill();
+  txt(c, `Their guard: ${g}`, JT_TGT.x, JT_TGT.y - 106, '700 12px "Alegreya Sans", sans-serif', '#f2ece0', 'center');
+  const box = (b, col) => { const [a1, a2] = P(b.x0, b.y1), [b1, b2] = P(b.x1, b.y0); c.fillStyle = col; c.fillRect(a1, a2, b1 - a1, b2 - a2); };
+  box(Z.torso, '#8a7a66'); box(Z.shield[g], '#3a5a9a');
+  const [hx, hy] = P(Z.helm.x, Z.helm.y); c.fillStyle = '#9aa0aa'; c.beginPath(); c.arc(hx, hy, Z.helm[g] * k, 0, 6.28); c.fill();
+  const [lx, ly] = P(-12, Z.torso.y0); c.fillStyle = 'rgba(184,58,42,.35)'; c.fillRect(lx, ly, 24 * k, (Z.torso.y0 - Z.low) * k);
+  txt(c, 'below the belt', JT_TGT.x, ly + 14, '600 10px "Alegreya Sans", sans-serif', '#f2c0b0', 'center');
+  if (plan) { const A = JT_PLAN.aim[plan.aim], [ax, ay] = P(A.x, A.y); c.strokeStyle = '#ffe08a'; c.lineWidth = 2; c.beginPath(); c.arc(ax, ay, 9, 0, 6.28); c.stroke(); c.beginPath(); c.moveTo(ax - 13, ay); c.lineTo(ax + 13, ay); c.moveTo(ax, ay - 13); c.lineTo(ax, ay + 13); c.stroke(); }
+  if (tip) { const [tx, ty] = P(clamp(tip.x, -36, 36), clamp(tip.y, -30, 34)); c.fillStyle = '#fff'; c.strokeStyle = '#17100e'; c.lineWidth = 2; c.beginPath(); c.arc(tx, ty, 6, 0, 6.28); c.fill(); c.stroke(); }
+  c.restore();
+}
+function jtBeatsDraw(c) {
+  const V = jtView(); if (!V) return;
+  const C = V.charge;
+  if (V.ph === 'plan' && V.sel) {
+    jtTargetDraw(c, V.sel, V.plans && V.plans[1 - V.you] ? V.plans[1 - V.you].guard : 'square', null);
+    return;
+  }
+  if (C && C.mine && V.ph === 'charge') {
+    const x0 = 20, y0 = 500, w = 520;
+    c.save(); c.fillStyle = 'rgba(24,20,16,.78)'; rr(c, x0 - 10, y0 - 34, w + 20, 100, 10); c.fill();
+    // the charge's progress: the spur, then the couch's right moment
+    const px = p => x0 + p * w;
+    c.fillStyle = 'rgba(224,184,74,.25)'; c.fillRect(px(0), y0 + 26, px(JT_PLAY.spur.until) - px(0), 10);
+    c.fillStyle = 'rgba(90,170,90,.55)'; c.fillRect(px(JT_PLAY.couch.ideal - .04), y0 + 26, px(.08) - px(0), 10);
+    c.fillStyle = '#fff'; c.fillRect(px(C.p) - 1.5, y0 + 22, 3, 18);
+    if (C.downAt != null) { c.fillStyle = '#ffe08a'; c.fillRect(px(C.downAt) - 1, y0 + 24, 2, 14); }
+    txt(c, 'spur', px(JT_PLAY.spur.until / 2), y0 + 52, '600 11px "Alegreya Sans", sans-serif', '#e0b84a', 'center');
+    txt(c, 'couch', px(JT_PLAY.couch.ideal), y0 + 52, '600 11px "Alegreya Sans", sans-serif', '#8ad08a', 'center');
+    txt(c, 'impact', px(1) - 4, y0 + 52, '600 11px "Alegreya Sans", sans-serif', '#f2ece0', 'right');
+    // the hoofbeats and your taps
+    const b = jtBeat(C.pace), T = C.p * JT_PLAY.charge, span = JT_PLAY.spur.until * JT_PLAY.charge;
+    if (C.p < JT_PLAY.spur.until) {
+      for (let k = 1; k * b <= span + .01; k++) { const dx = (k * b - T) * 140; if (dx < -20 || dx > w) continue; const on = Math.abs(k * b - T) <= JT_PLAY.spur.win; c.fillStyle = on ? '#ffe08a' : '#c8a46a'; c.beginPath(); c.arc(x0 + 40 + dx, y0 + 6, on ? 8 : 5, 0, 6.28); c.fill(); }
+      c.strokeStyle = '#fff'; c.lineWidth = 2; c.beginPath(); c.moveTo(x0 + 40, y0 - 6); c.lineTo(x0 + 40, y0 + 18); c.stroke();
+      txt(c, `Tap with the hoofbeats: ${C.hits} on the beat${C.bad ? `, ${C.bad} off` : ''}`, x0, y0 - 14, '700 13px "Alegreya Sans", sans-serif', '#f2ece0');
+    } else txt(c, C.down ? (C.p < JT_PLAY.couch.ideal - .05 ? 'Couched early: the arm tires' : 'Couched: keep the tip on your mark') : 'Hold to couch the lance!', x0, y0 - 6, '700 14px "Alegreya Sans", sans-serif', C.down ? '#8ad08a' : '#ffe08a');
+    c.restore();
+    jtTargetDraw(c, V.plans[V.you], V.plans[1 - V.you].guard, C.tip);
+  }
+  if (V.ph === 'seat' && V.seat) {
+    const cx = JT_VIEW.w / 2 - 60, cy = 200, M = V.seat, a = clamp(M.w + M.lean, -1.6, 1.6);
+    c.save(); c.fillStyle = 'rgba(24,20,16,.82)'; rr(c, cx - 170, cy - 110, 340, 150, 12); c.fill();
+    txt(c, 'Keep your seat! Lean against the wobble', cx, cy - 86, '700 15px "Alegreya Sans", sans-serif', '#ffe08a', 'center');
+    c.strokeStyle = '#6a6458'; c.lineWidth = 10; c.beginPath(); c.arc(cx, cy + 20, 100, Math.PI * 1.15, Math.PI * 1.85); c.stroke();
+    c.strokeStyle = '#5aaa5a'; c.beginPath(); c.arc(cx, cy + 20, 100, Math.PI * 1.45, Math.PI * 1.55); c.stroke();
+    const ang = -Math.PI / 2 + a * .55; c.strokeStyle = '#fff'; c.lineWidth = 4; c.beginPath(); c.moveTo(cx, cy + 20); c.lineTo(cx + Math.cos(ang) * 96, cy + 20 + Math.sin(ang) * 96); c.stroke();
+    c.restore();
+  }
+}
+function jtDraw(c, dt) {
+  JTC.t += dt; jtCamTo(dt);
+  c.clearRect(0, 0, JT_VIEW.w, JT_VIEW.h);
+  if (!G || !G.teams) { c.fillStyle = '#c9a46c'; c.fillRect(0, 0, JT_VIEW.w, JT_VIEW.h); return; }
+  jtListsDraw(c); jtRidersDraw(c); jtBoardDraw(c); jtCallDraw(c); jtBeatsDraw(c);
+}
+/* The Lists' page in the Realm (issue #117, phase 2). A canvas in #v-lists, after the Shed's, and a frame loop that
+   runs only while it is on screen (show/hide): it moves the match on (jtTick) and draws it (jtDraw), at the screen's
+   density. The engine's parts don't touch the page; this file is the only one that does.
+   In You ride it hears the keys only while the Lists are on screen (not under How to play), in the capture phase:
+   - your plan: 1, 2, 3 the aim (shield, body, helm); Q and W the guard (angled, square); E and R the pace (canter,
+     gallop); G your squire's plan again; Space rides;
+   - the charge: Space tapped with the hoofbeats spurs; after the spur, Space held couches the lance (let go and it
+     comes up); the arrows move your hand on the lance to hold the tip on your mark;
+   - the seat: the left and right arrows lean.
+   The mouse or a finger: a tap on the lists spurs; after the spur a press held couches, and dragging while you hold
+   moves the tip (the drag is your hand); in the balance moment a drag left or right leans. */
+const JTP = { on: false, paused: false, host: null, cv: null, c: null, raf: 0, last: 0, dpr: 1, speed: 1, ptr: null, keys: {} };
+(() => {
+  const h = document.createElement('div'); h.id = 'v-lists'; h.hidden = true;
+  const cv = document.createElement('canvas'); cv.width = 960; cv.height = 600;
+  cv.style.cssText = 'display:block;width:100%;max-width:1180px;margin:0 auto;aspect-ratio:960/600;background:#c9a46c;border-radius:6px;touch-action:none';
+  h.appendChild(cv);
+  (document.getElementById('v-shed') || document.getElementById('v-lanes') || document.getElementById('v-world') || document.getElementById('v-panel')).insertAdjacentElement('afterend', h);
+  Object.assign(JTP, { host: h, cv, c: cv.getContext('2d') });
+})();
+function jtRender(dt) {
+  const d = Math.min(2, window.devicePixelRatio || 1);
+  if (d !== JTP.dpr || JTP.cv.width !== Math.round(960 * d)) { JTP.dpr = d; JTP.cv.width = Math.round(960 * d); JTP.cv.height = Math.round(600 * d); }
+  const c = JTP.c; c.save(); c.setTransform(d, 0, 0, d, 0, 0); jtDraw(c, dt || 0); c.restore();
+}
+function jtKeysV() {
+  const K = JTP.keys, x = (K.arrowright ? 1 : 0) - (K.arrowleft ? 1 : 0), y = (K.arrowup ? 1 : 0) - (K.arrowdown ? 1 : 0);
+  if (!JTP.ptr) jtNudge(x, y);
+}
+function jtFrame(now) {
+  if (!JTP.on) return;
+  const dt = Math.min(.05, Math.max(0, (now - JTP.last) / 1000)); JTP.last = now;
+  const md = document.getElementById('modal'), boxed = !!md && !md.hidden;
+  jtKeysV();
+  if (!JTP.paused && !boxed) for (let i = 0; i < JTP.speed && !JTP.paused; i++) jtTick(dt);
+  jtRender(JTP.paused ? 0 : dt);
+  JTP.raf = requestAnimationFrame(jtFrame);
+}
+function jtShow() { JTP.host.hidden = false; if (JTP.on) return; JTP.on = true; JTP.last = performance.now(); JTP.raf = requestAnimationFrame(jtFrame); }
+function jtHide() { JTP.ptr = null; JTP.keys = {}; if (GP) jtNudge(0, 0); JTP.host.hidden = true; JTP.on = false; cancelAnimationFrame(JTP.raf); }
+
+/* ---------- the keys ---------- */
+const JT_KEYS = { 1: ['aim', 'shield'], 2: ['aim', 'body'], 3: ['aim', 'helm'], q: ['guard', 'angled'], w: ['guard', 'square'], e: ['pace', 'canter'], r: ['pace', 'gallop'] };
+function jtKeyOk(e) {
+  if (!e.key) return false;
+  if (!JTP.on || !GP || GP.mode !== 'play' || JTP.paused || JTP.cv.offsetParent === null) return false;
+  if (!['plan', 'charge', 'seat'].includes(GP.ph)) return false;
+  if (e.ctrlKey || e.metaKey || e.altKey) return false;
+  if (e.target && e.target.closest && e.target.closest('input,textarea,select')) return false;
+  const m = document.getElementById('modal'); if (m && !m.hidden) return false;
+  return true;
+}
+function jtKeyDown(e) {
+  if (!jtKeyOk(e)) return;
+  const k = e.key.toLowerCase(); let took = true;
+  if (k === ' ') { if (!e.repeat) jtPress(); }
+  else if (k.startsWith('arrow')) { if (GP.ph === 'plan') took = false; else JTP.keys[k] = true; }
+  else if (GP.ph === 'plan' && JT_KEYS[k]) { const [f, v] = JT_KEYS[k]; jtSelSay(jtSelect({ [f]: v })); }
+  else if (GP.ph === 'plan' && k === 'g') jtSelSay(jtSelect({ suggest: true }));
+  else took = false;
+  if (took) { e.preventDefault(); e.stopPropagation(); }
+}
+function jtSelSay(why) { if (why && GP) { GP.msg = why; jtPicked(); } }
+function jtKeyUp(e) {
+  const k = (e.key || '').toLowerCase();
+  if (k.startsWith('arrow')) { delete JTP.keys[k]; }
+  if (k === ' ' && GP && GP.ph === 'charge' && GP.ch && GP.ch.down) { jtCouch(false); e.preventDefault(); e.stopPropagation(); }
+}
+window.addEventListener('keydown', jtKeyDown, true);
+window.addEventListener('keyup', jtKeyUp, true);
+window.addEventListener('blur', () => { JTP.keys = {}; if (GP) jtNudge(0, 0); });
+
+/* ---------- the pointer: tap to spur, hold to couch, drag to aim and to lean ---------- */
+function jtPtrAt(e) { const r = JTP.cv.getBoundingClientRect(); return { sx: (e.clientX - r.left) * 960 / r.width, sy: (e.clientY - r.top) * 600 / r.height }; }
+JTP.cv.addEventListener('pointerdown', e => {
+  if (!GP || GP.mode !== 'play' || JTP.paused) return;
+  const p = jtPtrAt(e), C = GP.ch;
+  if (GP.ph === 'charge' && C && C.mine) {
+    if (C.p < JT_PLAY.spur.until) { jtSpur(); e.preventDefault(); return; }
+    jtCouch(true); JTP.ptr = { x: p.sx, y: p.sy, hand: Object.assign({}, C.hand), kind: 'aim' };
+  } else if (GP.ph === 'seat' && GP.seatM) JTP.ptr = { x: p.sx, y: p.sy, lean: GP.seatM.lean, kind: 'lean' };
+  else return;
+  try { JTP.cv.setPointerCapture(e.pointerId); } catch (er) { /* a synthetic press */ }
+  e.preventDefault();
+});
+JTP.cv.addEventListener('pointermove', e => {
+  const P = JTP.ptr; if (!P || !GP) return;
+  const q = jtPtrAt(e), dx = q.sx - P.x, dy = q.sy - P.y;
+  // (a drag of a picture-pixel moves the tip a third of an inch; up the picture is up the target)
+  if (P.kind === 'aim') jtAim(P.hand.x + dx / 3, P.hand.y - dy / 3);
+  else if (P.kind === 'lean') jtLeanTo(P.lean + dx / 90);
+});
+function jtPtrUp() {
+  const P = JTP.ptr; JTP.ptr = null;
+  if (P && P.kind === 'aim' && GP && GP.ph === 'charge') jtCouch(false);
+}
+for (const ev of ['pointerup', 'pointercancel', 'lostpointercapture']) JTP.cv.addEventListener(ev, jtPtrUp);
 
 /* the end of the wJT scope: what the Realm may call (w19b-engines.js). Phase 0 is the rules: newMatch(opts) starts a
    match ({ courses: 3 | 5, riders: [each side's two riders, as roster indexes], roster: [two roster sizes], best:
@@ -46401,11 +47684,19 @@ function jtSimMatch(opts) {
    the lists are never on.
    Phase 1 is the course model and one match, CPU against CPU: lists, plan, mounts, zones, stats, skills (the tables),
    rate(kind) and rs(kind) (a kind's ratings, 1 to 12 and 0 to 1), zoneAt(x, y, guard), edge; the pure model, every
-   random number from the rnd passed in (Math.random when left out; planRules is the plan table): sway(o) and speed(o), charge(o, rnd) (a CPU
+   random number from the rnd passed in (Math.random when left out; planRules is the plan table): sway(o) and rideSpeed(o), charge(o, rnd) (a CPU
    rider's ride), strike(a, d, rnd), seat(st, d, lean, rnd), impact(rides, leans, rnd); start(opts) puts a match on
    the lists ({ courses, teams, riders, best, skill: [2], mounts, seed }), turn() rides the next course, rideCourse(plans,
    rides, leans) one with any side's ride or lean given, plan(s) the CPU's plan, summary(), simMatch(opts) a whole
-   match headless (the match on the lists and the random stream left as they were). */
+   match headless (the match on the lists and the random stream left as they were).
+   Phase 2 is the page and riding by hand: start(opts) also puts the match on show ({ mode: 'watch' | 'play' }), and
+   show, hide, on, pause, paused, speed and render drive the canvas (n1-page.js). The beat: phase, msg, call (the
+   herald's), view (a copy of what the page needs), tick(dt), last (the last course as ridden). Your course: select({
+   aim, guard, pace, suggest }) your plan, press (Space: ride, then a spur tap, then the couch), spur, couch(on), aim(x,
+   y) (your hand on the lance, inches), nudge(vx, vy) (the arrows), lean(v) (the balance moment, -1 to 1), setMode;
+   playRules (the beats' numbers); aimScr and aimUn map the target to its panel and back. courseOpen(plans, rides,
+   leans, wait) and courseClose(P, leans) are rideCourse in two halves (the seat held for your balance moment).
+   onPhase, onPick and onOver hear a new beat, a change to your plan and the end. */
 return {
   rules: JSON.parse(JSON.stringify(JT_RULES)), at: JSON.parse(JSON.stringify(JT_AT)), get G() { return G; },
   newMatch: o => jtNewMatch(o), riders: () => jtRiders(), inTilt: () => jtInTilt(), left: () => jtLeft(),
@@ -46416,11 +47707,19 @@ return {
   lists: JSON.parse(JSON.stringify(JT_LISTS)), planRules: JSON.parse(JSON.stringify(JT_PLAN)), mounts: JSON.parse(JSON.stringify(JT_MOUNT)), zones: JSON.parse(JSON.stringify(JT_ZONE)),
   stats: JT_STATS.slice(), skills: JSON.parse(JSON.stringify(JT_SKILL)), model: { sway: JT_SWAY, brk: JT_BREAK, rock: JT_ROCK, seat: JT_SEAT },
   rate: k => jtRate(k), rs: k => jtRs(k), zoneAt: (x, y, g) => jtZoneAt(x, y, g), edge: (z, x, y, g) => jtEdge(z, x, y, g),
-  sway: o => jtSway(o), speed: o => jtSpeed(o), charge: (o, rnd) => jtCharge(o, rnd || Math.random), strike: (a, d, rnd) => jtStrike(a, d, rnd || Math.random),
+  sway: o => jtSway(o), rideSpeed: o => jtSpeed(o), charge: (o, rnd) => jtCharge(o, rnd || Math.random), strike: (a, d, rnd) => jtStrike(a, d, rnd || Math.random),
   seat: (st, d, lean, rnd) => jtSeat(st, d, lean, rnd || Math.random), impact: (rides, leans, rnd) => jtImpact(rides, leans || [.5, .5], rnd || Math.random),
-  start: o => jtStart(o), turn: () => jtTurn(), rideCourse: (p, r, l) => G && G.teams ? jtRideCourse(p, r, l) : null, plan: s => G && G.teams && !G.over ? jtPlan(s) : null,
+  start: o => { jtStart(o); jtPlayStart(o); return G; }, turn: () => GP && ['charge', 'seat'].includes(GP.ph) ? null : jtTurn(), rideCourse: (p, r, l) => G && G.teams ? jtRideCourse(p, r, l) : null, plan: s => G && G.teams && !G.over ? jtPlan(s) : null,
   summary: () => jtSummary(), simMatch: o => jtSimMatch(o),
-  show: () => {}, hide: () => {}, get on() { return false; }
+  courseOpen: (p, r, l, w) => G && G.teams ? jtCourseOpen(p, r, l, w) : null, courseClose: (P, l) => G && G.teams ? jtCourseClose(P, l) : null,
+  // the page and riding by hand (phase 2)
+  modes: JT_MODES.slice(), playRules: JSON.parse(JSON.stringify(JT_PLAY)), get phase() { return GP ? GP.ph : null; }, get msg() { return GP ? GP.msg : ''; }, get call() { return GP ? GP.call : ''; },
+  get view() { return G && G.teams ? jtView() : null; }, get mode() { return GP ? GP.mode : null; }, get last() { return GP && GP.last ? JSON.parse(JSON.stringify(GP.last)) : null; },
+  setMode: m => jtSetMode(m), tick: dt => jtTick(dt), select: o => jtSelect(o), press: () => jtPress(), spur: () => jtSpur(), couch: on => jtCouch(on !== false),
+  aim: (x, y) => jtAim(x, y), nudge: (vx, vy) => jtNudge(vx, vy), lean: v => jtLeanTo(v), aimScr: (x, y) => jtAimScr(x, y), aimUn: (sx, sy) => jtAimUn(sx, sy), eight: (t, amp, pace) => jtEight(t, amp, pace),
+  set onPhase(f) { JT_HOOK.onPhase = f; }, set onPick(f) { JT_HOOK.onPick = f; }, set onOver(f) { JT_HOOK.onOver = f; }, get onPhase() { return JT_HOOK.onPhase; }, get onPick() { return JT_HOOK.onPick; }, get onOver() { return JT_HOOK.onOver; },
+  show: () => jtShow(), hide: () => jtHide(), get on() { return JTP.on; }, render: dt => jtRender(dt || 0),
+  pause: on => { JTP.paused = !!on; }, get paused() { return JTP.paused; }, get speed() { return JTP.speed; }, set speed(n) { JTP.speed = clamp(Math.round(n) || 1, 1, 8); }
 };
 
 })();
@@ -46432,7 +47731,7 @@ return {
    src/hk/, issue #83), Mossgate Links (wGL, golf; src/gl/, issue #92: a round at the Links, Watch or You play), the
    Saltmere Lanes (wBL, bowling; src/bl/, issue #100: a game at the Lanes, Watch, Manage or You play), the Curling Shed
    (wCR, curling; src/cr/, issue #102: a game at the Shed, Watch or You play) and the Tilting Lists (wJT, jousting;
-   src/jt/, issue #117: being built, with no page yet, so never on). Nothing here is saved. */
+   src/jt/, issue #117: a match at the Lists, Watch or You ride). Nothing here is saved. */
 
 const W_ENGINES = { diamond: { api: wBD, view: 'diamond', sport: 'baseball' }, gridiron: { api: wGF, view: 'gridiron', sport: 'football' },
   ring: { api: wBX, view: 'ring', sport: 'boxing' }, court: { api: wBK, view: 'court', sport: 'basketball' },
@@ -66181,6 +67480,212 @@ renderHelp = function () {
   wW146RenderHelp();
   const after = $('wHelpBallPow') || $('wHelpBallKit') || $('wHelpBall'); if (!after || $('wHelpBallGround')) return;
   after.insertAdjacentHTML('afterend', `<p class="hint" id="wHelpBallGround"><b>The Ballpark's ways.</b> ${esc(W_BPARK.help.replace(/^Graftonbury Ballpark has its own ways\. /, ''))} Ask Dusty Marl about the MOUND and the LIGHTS.</p>`);
+};
+/* w147: the Tilting Lists (issue #117, phase 2). The jousting engine runs in the wJT scope (src/jt/ and
+   src/realm/lists/: a canvas in #v-lists, and none of its names reach ours). This part gives it a view beside the
+   world, laid out as the other sports' pages are: the bar with the status line under it, the lists, your course's
+   rows, the tourney board, then This match (every course).
+   A match is Mossgate's riders against a visiting club from Cinderhold: two riders a side, two heats of 3 courses (or
+   5: SET.listsCourses, on the bar and the Settings panel), and the tilt for the crown if level. Ask Sir Ruddock at the
+   Lists to JOUST (GAME and JOUSTING stay the card-game match and how it scores). Nothing is won or lost, and nothing
+   is saved.
+   Two modes on the bar (W_LISTS_MODES): Watch (the CPU rides both sides) and You ride (your courses are yours: the
+   keys are in n1-page.js, and the rows under the lists do the same with a mouse or a finger). Switching goes on with
+   the same match; the last one picked is kept for the next (not saved).
+   The rows, in You ride: before a course, Aim (shield, body, helm), Guard (angled, square), Pace (canter, gallop) and
+   Ride (with your squire's plan again); in the charge, Spur and Couch (the canvas does the same: tap, then hold and
+   drag); in the balance moment, Lean (hold either way).
+   On a phone the scoreboard strip (w86) covers the Lists too: W_SB_VIEWS.lists and W_SB_HTML.lists.
+   Wraps: showView (wW147ShowView: the bar), openPause (wW147OpenPause: not at the Lists), wRunAct (wW147RunAct:
+   'listsjoust'), showPage (wW147ShowPage: the match waits while another page is up), renderHelp (wW147RenderHelp:
+   #wHelpLists and #wListsHow). The Settings row goes in by an observer on the modal, as w122's does. */
+
+const W_LISTS = {
+  home: { kinds: ['werewolf', 'elf', 'gorgon', 'spider'], color: '#3a5a9a', short: 'MOS' },
+  away: { city: 'cinderhold', kinds: ['minotaur', 'golem', 'harpy', 'ogre'], color: '#c94a3a', short: 'CIN' },
+};
+const W_LISTS_MODES = {
+  watch: { n: 'Watch', title: 'The CPU rides both sides. Switching goes on with the same match.' },
+  play: { n: 'You ride', title: 'You ride for the first side on the board: pick the aim, the guard and the pace, then spur, couch and aim the lance, and keep your seat.' },
+};
+let W_LISTS_MODE = 'play', W_LISTS_SPEED = 1, W_LISTS_SKILL = 1;
+const wListsCourses = () => wJT.rules.coursesAt.includes(SET.listsCourses) ? SET.listsCourses : wJT.rules.courses;
+// the match on the lists: plain data, never saved
+let WJT = null;
+
+$('v-lists').insertAdjacentHTML('beforebegin', `<div id="wListsBar" class="wdbar" hidden>
+  <b id="wListsTitle">A tourney at the Tilting Lists</b><span id="wListsNote" class="hint wsnote"></span>
+  <span id="wListsModes" class="wgmodes" role="group" aria-label="Who rides">${Object.entries(W_LISTS_MODES).map(([k, m]) => `<button class="ghost" data-jmode="${k}" title="${esc(m.title)}">${esc(m.n)}</button>`).join('')}</span>
+  <label class="hint" title="How many courses a heat is. Also on the Settings panel.">Courses <select id="wListsCourses">${wJT.rules.coursesAt.map(m => `<option value="${m}">${m}</option>`).join('')}</select></label>
+  <label class="hint" title="How well the other side rides: a Squire picks a plan at random; a Knight reads the score and the heat; an Archmage reads them too, with surer hands, and saves its gallop for when it counts.">Their riders <select id="wListsSkill">${wJT.skills.map((S, i) => `<option value="${i}">${S.n}</option>`).join('')}</select></label>
+  <label class="hint" id="wListsSpeedL" title="How fast the match runs while you watch. In You ride it is always 1.">Speed <select id="wListsSpeed"><option value="1">1×</option><option value="2">2×</option><option value="4">4×</option></select></label>
+  <button class="ghost" id="wListsAgain">Another match</button>
+  <button class="ghost" id="wListsBack">Back to the world</button></div>`);
+$('wListsBar').addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b) return;
+  if (b.dataset.jmode) { W_LISTS_MODE = b.dataset.jmode; if (WJT && !WJT.over) wJT.setMode(W_LISTS_MODE); wListsBarNote(); wListsRows(); }
+  else if (b.id === 'wListsAgain') wListsGame();
+  else if (b.id === 'wListsBack') wLeaveLists();
+});
+function wListsSpeedSet() { const play = wJT.mode === 'play'; wJT.speed = play ? 1 : W_LISTS_SPEED; $('wListsSpeedL').hidden = play || !WJT || !!WJT.over; $('wListsSpeed').value = String(W_LISTS_SPEED); }
+$('wListsSkill').addEventListener('change', e => { W_LISTS_SKILL = +e.target.value; e.target.blur(); $('wListsNote').textContent = `Their riders: ${wJT.skills[W_LISTS_SKILL].n}s, from the next match.`; });
+$('wListsSpeed').addEventListener('change', e => { W_LISTS_SPEED = +e.target.value || 1; wListsSpeedSet(); e.target.blur(); });
+$('wListsCourses').addEventListener('change', e => { SET.listsCourses = +e.target.value; saveSettings(); wListsBarNote(); e.target.blur(); });
+
+// under the lists: your course's rows, the tourney board, this match, and How jousting works
+const W_LISTS_ROWS = { aim: [['shield', 'Shield', '1: the biggest mark; an angled shield turns it into a glance'], ['body', 'Body', '2: the torso the shield leaves open; an angled shield leaves more of it'], ['helm', 'Helm', '3: two points, a small mark']],
+  guard: [['angled', 'Angled', 'Q: turns strikes on your shield aside, but leaves your helm open'], ['square', 'Square', 'W: takes the hit and stays on']],
+  pace: [['canter', 'Canter', 'E: steadier aim, softer hit, saves the mount\'s wind'], ['gallop', 'Gallop', 'R: hits harder and rocks them more, but the tip sways more and the mount tires']] };
+$('v-lists').insertAdjacentHTML('beforeend', `<div id="wListsRows" class="wccalls wscoach" hidden>
+  <div class="wccrow"><span class="wccl">Aim</span><span id="wListsAim"></span></div>
+  <div class="wccrow"><span class="wccl">Guard</span><span id="wListsGuard"></span></div>
+  <div class="wccrow"><span class="wccl">Pace</span><span id="wListsPace"></span></div>
+  <div class="wccrow"><span class="wccl">Ride</span><span id="wListsGo"></span></div></div>
+  <div id="wListsChargeRow" class="wccalls" hidden><div class="wccrow"><span class="wccl">Charge</span><span><button class="ghost" id="wListsSpur">Spur</button> <button class="ghost" id="wListsCouch">Hold to couch</button> <small class="hint">Or on the lists: tap with the hoofbeats, then hold and drag to aim.</small></span></div></div>
+  <div id="wListsSeatRow" class="wccalls" hidden><div class="wccrow"><span class="wccl">Lean</span><span><button class="ghost" id="wListsLeanL">◀ Lean</button> <button class="ghost" id="wListsLeanR">Lean ▶</button> <small class="hint">Hold against the wobble (or the arrows, or drag).</small></span></div></div>
+  <h4 class="wsh">The tourney board</h4><div id="wListsBoard" class="wcbox"></div>
+  <h4 class="wsh">This match</h4><ol id="wListsLog" class="wglog wslog"></ol>
+  <p class="hint wghowlink">How jousting works here: the heats and courses, the plan, the charge and keeping your seat. <button class="ghost" id="wListsHowBtn">How to play jousting</button> <small>The match waits while you read.</small></p>`);
+$('wListsHowBtn').addEventListener('click', () => { showPage('help'); const h = $('wListsHow'); if (h) h.scrollIntoView({ block: 'start' }); });
+$('wListsRows').addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b || b.disabled) return;
+  const d = b.dataset; let why = '';
+  if (d.jf) why = wJT.select({ [d.jf]: d.jv });
+  else if (d.jsuggest) why = wJT.select({ suggest: true });
+  else if (d.jgo) wJT.press();
+  else return;
+  if (why) $('wListsNote').textContent = why;
+  wListsRows(); if (!why) wListsBarNote();
+});
+$('wListsSpur').addEventListener('pointerdown', e => { if (WJT) { wJT.spur(); e.preventDefault(); } });
+for (const [ev, on] of [['pointerdown', true], ['pointerup', false], ['pointerleave', false], ['pointercancel', false]]) $('wListsCouch').addEventListener(ev, e => { if (WJT) { wJT.couch(on); e.preventDefault(); } });
+for (const [id, v] of [['wListsLeanL', -1], ['wListsLeanR', 1]]) for (const [ev, on] of [['pointerdown', true], ['pointerup', false], ['pointerleave', false], ['pointercancel', false]]) $(id).addEventListener(ev, e => { if (WJT) { wJT.nudge(on ? v : 0, 0); e.preventDefault(); } });
+// the rows: your plan before a course, the charge's buttons while you ride, Lean in the balance moment
+function wListsRows() {
+  const V = WJT && !WJT.over && wJT.G && wJT.G.teams ? wJT.view : null, mine = V && V.mode === 'play';
+  $('wListsChargeRow').hidden = !(mine && V.ph === 'charge' && V.charge && V.charge.mine);
+  $('wListsSeatRow').hidden = !(mine && V.ph === 'seat');
+  const box = $('wListsRows'), plan = mine && V.ph === 'plan' && V.sel;
+  box.hidden = !plan; if (!plan) return;
+  const S = V.sel, on = (a, b) => a === b ? ' on' : '';
+  for (const [f, id] of [['aim', 'wListsAim'], ['guard', 'wListsGuard'], ['pace', 'wListsPace']]) $(id).innerHTML = W_LISTS_ROWS[f].map(([k, n, t]) => `<button class="ghost${on(k, S[f])}" data-jf="${f}" data-jv="${k}" title="${esc(t)}">${n}</button>`).join(' ');
+  $('wListsGo').innerHTML = `<button class="ghost on" data-jgo="1" title="Space">Ride</button> <button class="ghost" data-jsuggest="1" title="G: your squire's plan for this course">Squire's plan</button> <small class="hint">${esc(S.why ? 'Your squire: ' + S.why + '.' : '')}</small>`;
+}
+// the two clubs; taken: names already in the match, so nobody shares one
+function wListsTeams(taken) {
+  const g = W_GRDS.find(x => x.id === 'g_lists'), H = W_LISTS.home, A = W_LISTS.away, used = new Set(taken || []);
+  return [Object.assign({ name: wGrdClub(g) }, H), Object.assign({ name: `${W_GRD_CITY[A.city]} ${SPORT_NAME.jousting} Club` }, A)].map(t => ({
+    name: t.name, short: t.short, color: t.color, roster: t.kinds.map(kind => ({ n: wRinkName(kind, used), kind })),
+  }));
+}
+/* one match at the Lists. opts: { teams, courses, seed, mode, title, skill } (anything else goes through to the engine) */
+function wListsGame(opts) {
+  const o = opts || {};
+  WJT = { over: null };
+  $('wListsTitle').textContent = o.title || 'A tourney at the Tilting Lists';
+  const { title, ...rest } = o;
+  wJT.start(Object.assign({}, rest, { teams: o.teams || wListsTeams(), courses: o.courses || wListsCourses(), seed: o.seed, mode: o.mode || W_LISTS_MODE, skill: o.skill || [1, W_LISTS_SKILL] }));
+  showView('lists');
+  wListsBarNote(); wListsRows(); wListsBoard();
+}
+function wListsBarNote() {
+  if (!WJT) return;
+  const mode = WJT.over ? W_LISTS_MODE : wJT.mode || W_LISTS_MODE;
+  for (const b of $('wListsModes').querySelectorAll('button')) { b.classList.toggle('on', b.dataset.jmode === mode); b.setAttribute('aria-pressed', b.dataset.jmode === mode); }
+  wListsSpeedSet();
+  const G = wJT.G, later = !WJT.over && G && G.courses !== wListsCourses();
+  $('wListsNote').textContent = (wJT.msg || '') + (later ? ` (Courses: ${wListsCourses()} a heat from the next match; this one is ${G.courses}.)` : '');
+  $('wListsCourses').value = String(wListsCourses());
+  $('wListsSkill').value = String(W_LISTS_SKILL);
+}
+// the tourney board: a column a course in each heat (and the tilt's), each side's points, the totals
+function wListsBoard() {
+  const G = wJT.G; if (!G || !G.teams) { $('wListsBoard').innerHTML = ''; $('wListsLog').innerHTML = ''; return; }
+  const B = wJT.board(), n = B.courses, tl = B.tilt[0].length, cell = v => v == null ? '' : v > 0 ? `<b>${v}</b>` : String(v);
+  const head = `<tr><th></th>${[0, 1].map(h => Array.from({ length: n }, (_, i) => `<th title="Heat ${h + 1}, course ${i + 1}">${h + 1}·${i + 1}</th>`).join('')).join('')}${Array.from({ length: tl }, (_, i) => `<th title="The tilt for the crown">T${i + 1}</th>`).join('')}<th>Total</th></tr>`;
+  const row = s => `<tr><td style="border-left:4px solid ${G.teams[s].color || '#888'}">${esc(G.teams[s].name)}</td>${[0, 1].map(h => B.sc[s][h].map(cell).map(v => `<td>${v}</td>`).join('')).join('')}${B.tilt[s].map(v => `<td>${cell(v)}</td>`).join('')}<td><b>${B.tot[s]}</b></td></tr>`;
+  $('wListsBoard').innerHTML = `<div style="overflow-x:auto;max-width:100%"><table class="wrpow wcboxt"><caption>${esc(G.teams[0].name)}: ${esc(wJT.matchText(0))}</caption>${head}${row(0)}${row(1)}</table></div>`;
+  $('wListsLog').innerHTML = wListsLogHTML();
+}
+// every course so far, newest first: where each lance landed
+function wListsLogHTML() {
+  const G = wJT.G; if (!G.log.length) return '<li class="hint">No courses ridden yet.</li>';
+  return G.log.slice().reverse().map(e => {
+    const where = e.tilt ? 'Tilt' : `Heat ${e.heat + 1}, course ${e.course + 1}`;
+    const side = s => `${esc(G.teams[s].short || G.teams[s].name)}: ${esc(wJT.atText({ at: e.at[s], unhorse: e.unhorse[s] }))}${e.pts[s] ? ` (<b>${e.pts[s] > 0 ? '+' : ''}${e.pts[s]}</b>)` : ''}`;
+    return `<li><small>${where}</small> ${side(0)}. ${side(1)}.</li>`;
+  }).join('');
+}
+function wLeaveLists() {
+  WJT = null; wJT.pause(false);
+  if (WG) showView('world');
+  else { wJT.hide(); showScreen('title'); renderTitle(); }
+}
+let W_LISTS_BOARDKEY = '';
+wJT.onPhase = ph => {
+  if (!WJT) return; wListsBarNote(); wListsRows();
+  const G = wJT.G, key = G ? [G.n, !!G.over].join('|') : '';
+  if (key !== W_LISTS_BOARDKEY) { W_LISTS_BOARDKEY = key; wListsBoard(); }
+};
+wJT.onPick = () => { if (WJT) { wListsRows(); wListsBarNote(); } };
+wJT.onOver = s => { if (WJT) { WJT.over = s; wListsBarNote(); wListsRows(); wListsBoard(); $('wListsAgain').focus(); } };
+
+// the scoreboard strip on a phone (w86): both sides' totals, and where the match is
+W_SB_VIEWS.lists = 'wSbLists';
+W_SB_HTML.lists = function () {
+  const G = wJT.G, V = wJT.view; if (!G || !G.teams || !V) return '';
+  const where = G.over ? 'Final' : V.inTilt ? 'The tilt' : `Heat ${V.heat + 1}·${V.course + 1}`;
+  return wSbSide(G.teams[0].name, G.teams[0].color, wJT.total(0), false, '') + `<div class="wsbmid"><b>${where}</b><small>${esc(wJT.matchText(0))}</small></div>` + wSbSide(G.teams[1].name, G.teams[1].color, wJT.total(1), false, '');
+};
+
+const wW147ShowView = showView;
+showView = function (v) {
+  wW147ShowView(v);
+  $('wListsBar').hidden = v !== 'lists';
+  if (v === 'lists') $('runbar').hidden = true;
+};
+const wW147OpenPause = openPause;
+openPause = function () { if (UI.view === 'lists') return; return wW147OpenPause.apply(this, arguments); };
+const wW147ShowPage = showPage;
+showPage = function (p) {
+  wW147ShowPage(p);
+  if (WJT && UI.view === 'lists') wJT.pause(p !== 'play');
+};
+
+// Sir Ruddock puts on a tourney (not GAME or JOUSTING: those are the card-game match and how card-game jousting scores)
+(() => {
+  const K = DB.chars.gk_lists; if (!K) return;
+  K.topics.job.t += ' And we joust it for real now, lances on the tilt, two riders a side: ask me to JOUST.';
+  K.topics.joust = { t: 'Two of ours against two from Cinderhold, a heat each, three courses a heat. One for a lance broken on the shield or the body, two on the helm, three if you put them in the sand. Strike the horse or the barrier and I take a point off. Keep your seat.', act: 'listsjoust' };
+})();
+const wW147RunAct = wRunAct;
+wRunAct = function (act, id) { if (act === 'listsjoust') return wListsGame(); return wW147RunAct.apply(this, arguments); };
+
+// the Settings panel: how many courses a heat is (the observer puts the row back whenever the panel redraws)
+function wListsSetRow() {
+  const g = document.querySelector('#modalBox .setgrid'); if (!g || $('sListsCourses')) return;
+  g.insertAdjacentHTML('beforeend', `<label class="rng"><span>Jousting courses</span><select id="sListsCourses">${wJT.rules.coursesAt.map(m => `<option value="${m}" ${wListsCourses() === m ? 'selected' : ''}>${m} a heat</option>`).join('')}</select></label>`);
+  $('sListsCourses').onchange = e => { SET.listsCourses = +e.target.value; saveSettings(); if (WJT) wListsBarNote(); };
+}
+new MutationObserver(wListsSetRow).observe($('modalBox'), { childList: true });
+
+// How to play: Jousting, how it works
+function wListsHowHTML() {
+  const R = wJT.rules, P = R.pts;
+  return `<p class="hint">A match is a tourney between two clubs, two riders a side (the other two of the four are squires). Each side's first rider meets the other's first in a <b>heat</b> of ${R.courses} <b>courses</b> (or ${R.coursesAt.join(' or ')} in Settings), then the second riders ride the second heat. A course is one pass down the <b>tilt</b>, the barrier down the middle of the lists, left side to left side.</p>
+  <p class="hint"><b>Scoring a course.</b> Both riders strike in the same moment, so both can score: <b>${P.shield}</b> for a lance broken on the shield or the body, <b>${P.helm}</b> on the helm, <b>${R.unhorse}</b> for an <b>unhorsing</b> (it ends the heat: the courses left aren't ridden). A glance or a miss scores nothing. A <b>foul</b> (striking the horse, the barrier, or below the belt) takes a point off. Points from both heats are added; level after both, the <b>tilt for the crown</b>: one course at a time between each side's best rider until one is ahead (after ${R.tiltMax} still level, Sir Ruddock's count of lances broken settles it).</p>
+  <p class="hint"><b>Your plan</b>, before each course: the <b>aim</b> (the shield, the body or the helm: 1, 2, 3), the <b>guard</b> (angled turns strikes on your shield aside but leaves your helm open; square takes the hit and helps you stay on: Q, W) and the <b>pace</b> (a canter aims steadier and saves the mount's wind; a gallop hits harder but the tip sways more: E, R). Your squire suggests a plan, with the reason (G).</p>
+  <p class="hint"><b>The charge.</b> Space (or Ride) sets off. <b>Spur:</b> tap Space with the hoofbeats (or tap the lists): taps on the beat build speed, taps off it don't. <b>Couch:</b> after the spur, hold Space (or hold a finger down) to lower the lance. The right moment is marked on the bar: too early and your arm tires and the tip droops (low strikes are fouls), too late and the tip never settles; let go and the lance comes up, a miss. <b>Aim:</b> the tip rides the horse's stride in a figure-eight; hold it on your mark with the arrows, or drag. A good lance rating sways less.</p>
+  <p class="hint"><b>Keep your seat.</b> When their lance breaks on you, your rider rocks: lean against the wobble (the left and right arrows, drag, or the Lean buttons) to stay on. A harder hit (the helm, a gallop) wobbles more; a square guard helps. A glance never unhorses.</p>
+  <p class="hint"><b>Their riders</b> (on the bar): a <b>Squire</b> picks a plan at random; a <b>Knight</b> reads the score and the heat (behind with too few courses left, it goes for the helm); an <b>Archmage</b> reads them too, with surer hands, and saves its gallop for the heat's last course. <b>Watch</b> hands both sides to the CPU, and Speed on the bar runs it faster.</p>`;
+}
+const wW147RenderHelp = renderHelp;
+renderHelp = function () {
+  wW147RenderHelp();
+  const h = $('wHelp'); if (!h || $('wHelpLists') || !$('wHelpGrounds')) return;
+  const after = $('wHelpShed') || $('wHelpLanes') || $('wHelpLinks') || [...h.querySelectorAll('[id^="wHelpG"]')].pop();
+  h.insertAdjacentHTML('beforeend', `<section id="wListsHow" class="wghelp"><h3>Jousting: how it works</h3>${wListsHowHTML()}</section>`);
+  after.insertAdjacentHTML('afterend', `<p class="hint" id="wHelpLists"><b>Real jousting.</b> The Tilting Lists runs jousting on the sand itself now, two riders a side. Ask Sir Ruddock to JOUST: two heats of ${wJT.rules.courses} courses. Pick your plan, spur with the hoofbeats, couch the lance and hold the tip on your mark, then keep your seat; or watch the two sides ride it out, with the tourney board under the lists (see Jousting: how it works). It is an exhibition: nothing is won or lost.</p>`);
 };
 /* w132: owning pets (issue #104, phase 2). Pets are small monsters at your side in the card battles (the rules and the
    pets are Sudden Death's: engine/pets.js, data/pets.js); the Realm is where you own them.

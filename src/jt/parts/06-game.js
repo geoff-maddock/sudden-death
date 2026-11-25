@@ -36,28 +36,40 @@ function jtTurn() {
   if (!G || G.over) return null;
   return jtRideCourse([jtPlan(0), jtPlan(1)]);
 }
-function jtRideCourse(plans, given, leans) {
+function jtRideCourse(plans, given, leans) { const P = jtCourseOpen(plans, given, leans); return P ? jtCourseClose(P) : null; }
+/* a course in two halves, so Play can hold the seat until your balance moment: jtCourseOpen draws any ride not given
+   (and each lean not given, unless wait[s] holds it back for the close), and strikes both lances; jtCourseClose(P,
+   leans) takes the held leans, decides both seats, scores the course and keeps the box score. The random numbers
+   come in the same order as jtImpact's: the rides, the leans, the two strikes, the two seats. P is plain data. */
+function jtCourseOpen(plans, given, leans, wait) {
   const riders = jtRiders(); if (!riders) return null;
-  const heat = G.heat, course = G.course, tilt = jtInTilt();
   const rides = [0, 1].map(s => (given && given[s]) || jtCharge({ plan: plans[s], rs: jtRsOf(s, riders[s]), mount: jtMountOf(s), wind: G.wind[s], hands: jtHands(s) }, R));
-  const lean = [0, 1].map(s => leans && leans[s] != null ? leans[s] : jtLean(s));
-  const lead = [0, 1].map(s => jtTotal(s) - jtTotal(1 - s)), imp = jtImpact(rides, lean, R), rule = jtCourse(imp.res);
+  const lean = [0, 1].map(s => leans && leans[s] != null ? leans[s] : wait && wait[s] ? null : jtLean(s));
+  const st = [jtStrike(rides[0], rides[1], R), jtStrike(rides[1], rides[0], R)];
+  return { heat: G.heat, course: G.course, tilt: jtInTilt(), riders, plans, rides, lean, st, n: G.n };
+}
+function jtCourseClose(P, leans) {
+  if (!P || P.n !== G.n || G.over) return null;
+  const { heat, course, tilt, riders, plans, rides, st } = P, lean = [0, 1].map(s => leans && leans[s] != null ? clamp(+leans[s] || 0, 0, 1) : P.lean[s] != null ? P.lean[s] : .5);
+  const seat = [jtSeat(st[1], rides[0], lean[0], R), jtSeat(st[0], rides[1], lean[1], R)];
+  const imp = { res: [0, 1].map(s => ({ at: st[s].at, unhorse: seat[1 - s].unhorse })), st, seat };
+  const lead = [0, 1].map(s => jtTotal(s) - jtTotal(1 - s)), rule = jtCourse(imp.res);
   // the mounts: the course's wind spent, a little back before the next; fresh mounts for a new heat
   [0, 1].forEach(s => { const M = jtMount(rides[s].mount); G.wind[s] = clamp(G.wind[s] - jtWindCost(rides[s].pace, rides[s].rs) + M.rec * (.6 + .4 * (rides[s].rs.ride ?? .5)), 0, 1); });
   if (rule.tiltNow) G.wind = [JT_TILT_WIND, JT_TILT_WIND]; else if (rule.heatOver) G.wind = [1, 1];
   // the box score
   [0, 1].forEach(s => {
-    const B = G.st[s], P = G.pst[s][riders[s]], st = imp.st[s], seat = imp.seat[s];
-    B.courses++; P.courses++;
-    if (st.broke) { B.breaks++; P.breaks++; if (st.zone === 'helm') { B.helms++; P.helms++; } }
-    else if (st.at === 'glance') B.glances++; else if (st.at === 'miss') B.misses++; else B.fouls++;
-    if (imp.res[s].unhorse) { B.unhorse++; P.unhorse++; G.st[1 - s].unhorsed++; }
-    if (seat.rocked) { B.rocked++; if (!seat.unhorse) B.kept++; }
-    G.plans[s].push({ aim: plans[s].aim, guard: plans[s].guard, pace: plans[s].pace, at: st.at, lead: lead[s] });
+    const B = G.st[s], Pp = G.pst[s][riders[s]], sk = imp.st[s], se = imp.seat[s];
+    B.courses++; Pp.courses++;
+    if (sk.broke) { B.breaks++; Pp.breaks++; if (sk.zone === 'helm') { B.helms++; Pp.helms++; } }
+    else if (sk.at === 'glance') B.glances++; else if (sk.at === 'miss') B.misses++; else B.fouls++;
+    if (imp.res[s].unhorse) { B.unhorse++; Pp.unhorse++; G.st[1 - s].unhorsed++; }
+    if (se.rocked) { B.rocked++; if (!se.unhorse) B.kept++; }
+    G.plans[s].push({ aim: plans[s].aim, guard: plans[s].guard, pace: plans[s].pace, at: sk.at, lead: lead[s] });
   });
   G.n++;
-  const ev = { heat, course, tilt, riders, plans, rides, imp, rule };
-  G.last = { heat, course, tilt, riders, plans: plans.map(p => ({ aim: p.aim, guard: p.guard, pace: p.pace })), res: imp.res, pts: rule.pts };
+  const ev = { heat, course, tilt, riders, plans, rides, lean, imp, rule };
+  G.last = { heat, course, tilt, riders, plans: plans.map(p => ({ aim: p.aim, guard: p.guard, pace: p.pace })), res: imp.res, pts: rule.pts, zone: st.map(x => x.zone) };
   GB = ev;
   return ev;
 }

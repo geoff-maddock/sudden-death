@@ -69,7 +69,7 @@ async def main():
             early: __try(P('shield'), 'square', N, 8, { hands: { aim: 1, couch: 1.6 } }),
             sway: [wJT.sway({ pace: 'canter' }).sigma, wJT.sway({ pace: 'gallop' }).sigma, wJT.sway({ pace: 'canter', couch: -.6 }).droop, wJT.sway({ pace: 'canter', couch: .6 }).sigma,
               wJT.sway({ pace: 'canter', rs: Object.assign(__rs(), { lance: 1 }) }).sigma, wJT.sway({ pace: 'canter', wind: .2 }).sigma],
-            speed: [wJT.speed({ pace: 'canter' }), wJT.speed({ pace: 'gallop' }), wJT.speed({ pace: 'gallop', wind: .2 })] }; })()""")
+            speed: [wJT.rideSpeed({ pace: 'canter' }), wJT.rideSpeed({ pace: 'gallop' }), wJT.rideSpeed({ pace: 'gallop', wind: .2 })] }; })()""")
         check(pl['shAng']['glance'] > pl['shSq']['glance'] + .25 and pl['shAng']['broke'] < pl['shSq']['broke'] - .25, 'an angled shield turns most strikes on the shield into glances', [pl['shSq'], pl['shAng']])
         check(pl['helmAng']['helm'] > pl['helmSq']['helm'] + .1 and pl['bodyAng']['broke'] > pl['bodySq']['broke'] - .05, 'but an angled guard leaves the helm a bigger mark, and the body is as open', [pl['helmSq'], pl['helmAng'], pl['bodySq'], pl['bodyAng']])
         check(pl['helmSq']['miss'] > pl['shSq']['miss'] + .3 and pl['helmSq']['helm'] < .5, 'a helm strike misses far more than a shield strike', [pl['helmSq'], pl['shSq']])
@@ -82,7 +82,7 @@ async def main():
         # ---------- the seat and the mounts ----------
         se = await pg.evaluate("""(() => { const rnd = __rng(11), N = 4000, st = { broke: true, rock: .9, at: 'body' }, gl = { broke: false, rock: .9, at: 'glance' }, c = (d, lean, s) => { let u = 0; for (let i = 0; i < N; i++) if (wJT.seat(s || st, d, lean, rnd).unhorse) u++; return +(u / N).toFixed(3); };
           const d = (seat, guard, mount) => ({ guard, mount: mount || 'courser', rs: Object.assign(__rs(), { seat }) });
-          const M = wJT.mounts, f = m => wJT.speed({ pace: 'gallop', mount: m }) * M[m].hit;
+          const M = wJT.mounts, f = m => wJT.rideSpeed({ pace: 'gallop', mount: m }) * M[m].hit;
           return { weak: c(d(0, 'angled'), 0), strong: c(d(1, 'angled'), 0), square: c(d(0, 'square'), 0), lean: c(d(0, 'angled'), 1), glance: c(d(0, 'angled'), 0, gl),
             mounts: { hit: [f('charger'), f('destrier'), f('courser')], sway: ['charger', 'destrier', 'courser'].map(m => wJT.sway({ pace: 'canter', mount: m }).sigma), rec: [M.charger.rec, M.destrier.rec, M.courser.rec] } }; })()""")
         check(se['weak'] > se['strong'] + .2 and se['weak'] > se['square'] and se['weak'] > se['lean'] + .2 and se['glance'] == 0, 'a hard broken lance unhorses a poor seat; a good seat, a square guard and a good lean keep them on; a glance never unhorses', se)
@@ -130,7 +130,7 @@ async def main():
         # ---------- outside keys: only a table's own (nothing inherited, such as toString) ----------
         ok = await pg.evaluate("""(() => { const fin = o => Object.values(o).every(v => typeof v === 'number' && isFinite(v)), out = {};
           out.rs = ['toString', 'constructor', '__proto__'].every(k => fin(wJT.rs(k)) && fin(wJT.rate(k)));
-          out.sway = ['toString', 'constructor', '__proto__'].every(k => fin(wJT.sway({ pace: k, mount: k })) && isFinite(wJT.speed({ pace: k, mount: k })));
+          out.sway = ['toString', 'constructor', '__proto__'].every(k => fin(wJT.sway({ pace: k, mount: k })) && isFinite(wJT.rideSpeed({ pace: k, mount: k })));
           const c = wJT.charge({ plan: { aim: 'toString', guard: 'valueOf', pace: 'constructor' }, rs: wJT.rs(''), mount: '__proto__', wind: 1 }, __rng(3));
           out.charge = [isFinite(c.tip.x) && isFinite(c.tip.y) && isFinite(c.speed), c.aim, c.guard, c.pace, c.mount];
           const st = wJT.strike(c, { guard: 'toString', rs: wJT.rs(''), mount: 'toString' }, __rng(4)); out.strike = isFinite(st.force) && isFinite(st.rock) && typeof st.at === 'string';

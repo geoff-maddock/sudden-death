@@ -9,11 +9,19 @@
    the lists are never on.
    Phase 1 is the course model and one match, CPU against CPU: lists, plan, mounts, zones, stats, skills (the tables),
    rate(kind) and rs(kind) (a kind's ratings, 1 to 12 and 0 to 1), zoneAt(x, y, guard), edge; the pure model, every
-   random number from the rnd passed in (Math.random when left out; planRules is the plan table): sway(o) and speed(o), charge(o, rnd) (a CPU
+   random number from the rnd passed in (Math.random when left out; planRules is the plan table): sway(o) and rideSpeed(o), charge(o, rnd) (a CPU
    rider's ride), strike(a, d, rnd), seat(st, d, lean, rnd), impact(rides, leans, rnd); start(opts) puts a match on
    the lists ({ courses, teams, riders, best, skill: [2], mounts, seed }), turn() rides the next course, rideCourse(plans,
    rides, leans) one with any side's ride or lean given, plan(s) the CPU's plan, summary(), simMatch(opts) a whole
-   match headless (the match on the lists and the random stream left as they were). */
+   match headless (the match on the lists and the random stream left as they were).
+   Phase 2 is the page and riding by hand: start(opts) also puts the match on show ({ mode: 'watch' | 'play' }), and
+   show, hide, on, pause, paused, speed and render drive the canvas (n1-page.js). The beat: phase, msg, call (the
+   herald's), view (a copy of what the page needs), tick(dt), last (the last course as ridden). Your course: select({
+   aim, guard, pace, suggest }) your plan, press (Space: ride, then a spur tap, then the couch), spur, couch(on), aim(x,
+   y) (your hand on the lance, inches), nudge(vx, vy) (the arrows), lean(v) (the balance moment, -1 to 1), setMode;
+   playRules (the beats' numbers); aimScr and aimUn map the target to its panel and back. courseOpen(plans, rides,
+   leans, wait) and courseClose(P, leans) are rideCourse in two halves (the seat held for your balance moment).
+   onPhase, onPick and onOver hear a new beat, a change to your plan and the end. */
 return {
   rules: JSON.parse(JSON.stringify(JT_RULES)), at: JSON.parse(JSON.stringify(JT_AT)), get G() { return G; },
   newMatch: o => jtNewMatch(o), riders: () => jtRiders(), inTilt: () => jtInTilt(), left: () => jtLeft(),
@@ -24,9 +32,17 @@ return {
   lists: JSON.parse(JSON.stringify(JT_LISTS)), planRules: JSON.parse(JSON.stringify(JT_PLAN)), mounts: JSON.parse(JSON.stringify(JT_MOUNT)), zones: JSON.parse(JSON.stringify(JT_ZONE)),
   stats: JT_STATS.slice(), skills: JSON.parse(JSON.stringify(JT_SKILL)), model: { sway: JT_SWAY, brk: JT_BREAK, rock: JT_ROCK, seat: JT_SEAT },
   rate: k => jtRate(k), rs: k => jtRs(k), zoneAt: (x, y, g) => jtZoneAt(x, y, g), edge: (z, x, y, g) => jtEdge(z, x, y, g),
-  sway: o => jtSway(o), speed: o => jtSpeed(o), charge: (o, rnd) => jtCharge(o, rnd || Math.random), strike: (a, d, rnd) => jtStrike(a, d, rnd || Math.random),
+  sway: o => jtSway(o), rideSpeed: o => jtSpeed(o), charge: (o, rnd) => jtCharge(o, rnd || Math.random), strike: (a, d, rnd) => jtStrike(a, d, rnd || Math.random),
   seat: (st, d, lean, rnd) => jtSeat(st, d, lean, rnd || Math.random), impact: (rides, leans, rnd) => jtImpact(rides, leans || [.5, .5], rnd || Math.random),
-  start: o => jtStart(o), turn: () => jtTurn(), rideCourse: (p, r, l) => G && G.teams ? jtRideCourse(p, r, l) : null, plan: s => G && G.teams && !G.over ? jtPlan(s) : null,
+  start: o => { jtStart(o); jtPlayStart(o); return G; }, turn: () => GP && ['charge', 'seat'].includes(GP.ph) ? null : jtTurn(), rideCourse: (p, r, l) => G && G.teams ? jtRideCourse(p, r, l) : null, plan: s => G && G.teams && !G.over ? jtPlan(s) : null,
   summary: () => jtSummary(), simMatch: o => jtSimMatch(o),
-  show: () => {}, hide: () => {}, get on() { return false; }
+  courseOpen: (p, r, l, w) => G && G.teams ? jtCourseOpen(p, r, l, w) : null, courseClose: (P, l) => G && G.teams ? jtCourseClose(P, l) : null,
+  // the page and riding by hand (phase 2)
+  modes: JT_MODES.slice(), playRules: JSON.parse(JSON.stringify(JT_PLAY)), get phase() { return GP ? GP.ph : null; }, get msg() { return GP ? GP.msg : ''; }, get call() { return GP ? GP.call : ''; },
+  get view() { return G && G.teams ? jtView() : null; }, get mode() { return GP ? GP.mode : null; }, get last() { return GP && GP.last ? JSON.parse(JSON.stringify(GP.last)) : null; },
+  setMode: m => jtSetMode(m), tick: dt => jtTick(dt), select: o => jtSelect(o), press: () => jtPress(), spur: () => jtSpur(), couch: on => jtCouch(on !== false),
+  aim: (x, y) => jtAim(x, y), nudge: (vx, vy) => jtNudge(vx, vy), lean: v => jtLeanTo(v), aimScr: (x, y) => jtAimScr(x, y), aimUn: (sx, sy) => jtAimUn(sx, sy), eight: (t, amp, pace) => jtEight(t, amp, pace),
+  set onPhase(f) { JT_HOOK.onPhase = f; }, set onPick(f) { JT_HOOK.onPick = f; }, set onOver(f) { JT_HOOK.onOver = f; }, get onPhase() { return JT_HOOK.onPhase; }, get onPick() { return JT_HOOK.onPick; }, get onOver() { return JT_HOOK.onOver; },
+  show: () => jtShow(), hide: () => jtHide(), get on() { return JTP.on; }, render: dt => jtRender(dt || 0),
+  pause: on => { JTP.paused = !!on; }, get paused() { return JTP.paused; }, get speed() { return JTP.speed; }, set speed(n) { JTP.speed = clamp(Math.round(n) || 1, 1, 8); }
 };

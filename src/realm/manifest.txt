@@ -183,6 +183,8 @@ src/realm/w143-gfroar.js
 src/realm/w144-ashbowl.js
 src/realm/w145-anvilring.js
 src/realm/w146-ballpark.js
+# the Tilting Lists, jousting on its own engine (issue #117): the view, riding by hand, Sir Ruddock's JOUST
+src/realm/w147-lists.js
 src/realm/w132-pets.js
 src/realm/w133-petegg.js
 src/realm/w134-petshop.js

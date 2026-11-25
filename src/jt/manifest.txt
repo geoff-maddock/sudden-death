@@ -1,9 +1,14 @@
 # The Tilting Lists, the jousting engine at the Tilting Lists (issue #117). Its parts, in load order. The Realm takes
 # them inside a scope (src/realm/lists/manifest.txt, through `scope wJT ...`), so none of their names reach the page.
 src/scoped/util.js
+# the riders, drawn (the scoped engines' one file); the mounts are this engine's own drawing (08-draw.js)
+src/figures/figures.js
 src/jt/parts/02-rules.js
 # phase 1: the lists, the mounts, the plan and the ratings; the pure course model; the CPU's plan; a match headless
 src/jt/parts/03-lists.js
 src/jt/parts/04-course.js
 src/jt/parts/05-cpu.js
 src/jt/parts/06-game.js
+# phase 2: the match on show and riding by hand; the drawing
+src/jt/parts/07-play.js
+src/jt/parts/08-draw.js
