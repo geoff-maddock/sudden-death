@@ -194,6 +194,16 @@ async def main():
           const hit = { broke: true, rock: 1 }, me = { guard: 'square', rs, mount: 'destrier', aim: 'shield' }, low = wJT.strike(Object.assign({}, a, { tip: { x: -4, y: 4 } }), d, () => .99);
           return { high: own.high, reach: wJT.seat(hit, me, .5, () => .5, own).reach, lowReach: wJT.seat(hit, Object.assign({}, me, { aim: 'helm' }), .5, () => .5, low).reach }; })()""")
         check(rc == {'high': True, 'reach': True, 'lowReach': False}, 'the helm\'s cost goes with where the tip went: a shield plan dragged high that doesn\'t break leaves you reaching; a helm plan whose tip stayed low doesn\'t', rc)
+        # (phase 3's review) a lance never couched points high, but it isn't reaching for the helm: it costs the strike,
+        # not the seat. Unhorsed when their lance broke, a lance left up against one couched (no lean either way)
+        lu = await pg.evaluate("""(() => { const rs = wJT.rs(''), up = wJT.strike({ aim: 'shield', guard: 'square', pace: 'canter', mount: 'destrier', rs, speed: 8, couch: 1, tip: { x: -4, y: 44 }, up: true }, { guard: 'square', rs, mount: 'destrier' }, () => .5);
+          const run = upq => { let un = 0, br = 0; for (let s = 0; s < 260; s++) { wListsGame({ seed: 7000 + s, mode: 'play', skill: [1, 1] }); wJT.pause(true); __to('plan');
+            wJT.select({ aim: 'shield', guard: 'square', pace: 'canter' }); wJT.press(); let m = 0; while (wJT.phase === 'charge' && wJT.view.charge.p < wJT.playRules.couch.ideal && m++ < 1000) wJT.tick(.01); if (!upq) wJT.couch(true);
+            m = 0; while (wJT.phase === 'charge' && m++ < 1000) wJT.tick(.01); m = 0; while (wJT.phase === 'seat' && m++ < 1000) { wJT.lean(0); wJT.tick(.02); }
+            const L = wJT.last; if (L.broke[1]) { br++; if (L.res[1].unhorse) un++; } } return [un, br]; };
+          return { high: up.high, up: run(true), couched: run(false) }; })()""")
+        print('   (unhorsed when their lance broke: a lance left up', lu['up'], ', couched', lu['couched'], ')')
+        check(lu['high'] is False and lu['up'][0] / max(1, lu['up'][1]) <= lu['couched'][0] / max(1, lu['couched'][1]) + .06, 'a lance never couched isn\'t reaching: it doesn\'t make its rider easier to unhorse', lu)
         # the best hand play is rewarding but not far beyond an Archmage: a tip held perfectly on the mark (perfect spur and couch)
         hp = await pg.evaluate("""(() => { const out = {}; for (const [aim, g] of [['shield', 'square'], ['body', 'angled'], ['helm', 'angled']]) { let pts = 0, cpu = 0; const N = 120;
             const rnd = (() => { let a = 99; return () => { a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; })();
