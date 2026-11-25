@@ -1,7 +1,7 @@
 """Realm jousting balance bot (issue #117, phase 12): headless jousting matches and Gilded Lances in dist/realm.html.
 
   python3 test/realm_lists_lab.py 400            400 matches for every cell, and 400 cups
-  python3 test/realm_lists_lab.py 400 'W_JTG.oppBonus = { 1: 0, 2: 1, 3: 2 }'    a tuning override, run in the page first
+  python3 test/realm_lists_lab.py 400 'W_JTG.oppBonus = { 1: 0, 2: 1, 3: 2 }'    a tuning override, run in the page first (the CPU's odds cleared after it)
   python3 test/realm_lists_lab.py 600 '' tiers,gaps    only some parts (tiers, gaps, skills, sides, powers, plans, mounts,
                                                        squires, ground, kits, cups, single, umbral)
   python3 test/realm_lists_lab.py 400 '' umbral nadir,mist    only those rows of the Umbral (to run rows in several processes)
@@ -123,7 +123,7 @@ async def main():
         await pg.evaluate("(() => { const kinds = ['elf', 'spider', 'gorgon', 'dwarf']; let i = 0; while (wRoster().length < 4) wAddPlayer(wMakePlayer({ kind: kinds[i++], lvl: 3 }, 'tavern')); for (const q of wRoster()) { q.lvl = 3; delete q.jt; wJtOf(q); } WG.lists = null; wListsSync(); LAB = true; })()")
         await pg.evaluate(SETUP)
         await pg.evaluate("__lab.kinds = wListsMine().roster.map(m => m.kind); __lab.clubs = wBallClubs()")
-        if OVR: await pg.evaluate(OVR)
+        if OVR: await pg.evaluate(OVR); await pg.evaluate('wJT.model.reset()')
         print('your four:', await pg.evaluate("__lab.kinds.join(', ')"), f'({N} a cell)')
         fmt = lambda v: f"{v['win']}% ({v['pts']}-{v['opp']}, brk {v['brk']})"
 

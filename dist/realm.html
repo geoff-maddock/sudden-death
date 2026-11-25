@@ -46776,11 +46776,11 @@ const jtAtText = st => !st || !jtOwn(JT_AT, st.at) ? '' : st.unhorse && jtFair(s
    to the left, the barrier (a foul, 'barrier'); anywhere else, a miss.
    The plan (JT_PLAN): an aim (shield, body or helm, each with its aim point), a guard (angled or square) and a pace
    (canter or gallop). A gallop hits harder and spends more of the mount's wind, but the tip sways more.
-   The mounts (JT_MOUNT): Charger (fast, hits hard, sways more), Destrier (steady, easy to aim, sits a hit better, hits
-   softer), Courser (light in the hit, but quick to get its wind back, and easy on it at a gallop). Each rider rides one
+   The mounts (JT_MOUNT): Charger (fast, hits hard, sways more, and its weight carries its rider through a hit),
+   Destrier (steady, easy to aim, hits softer), Courser (light in the hit, but quick to get its wind back, and easy on it at a gallop). Each rider rides one
    (opts.mounts, picked on the Lists tab in the Realm); left out, JT_MOUNT_DEF.
    The ratings (JT_STATS, 1 to 12, worked on as 0 to 1): lance (the sway), couch (the couch window, and how long the
-   arm holds it), seat (the balance after a hit), shield (a strike on the shield breaks less), ride (pace and the
+   arm holds it), seat (the balance after a hit), shield (a strike on the shield breaks less), ride (pace, the seat a little, and the
    mount's wind), nerve (the pressure: the last course of a heat when behind, the tilt for the crown), care (a squire's
    jobs between courses). A row of seven by kind (JT_KIND, phase 3); a rider of no kind is JT_KIND._ . A roster
    member may carry its own (r, 1 to 12, the rest from its kind; or rs, 0 to 1), as the Realm sends. */
@@ -46809,10 +46809,14 @@ const JT_PLAN = {
 };
 // (phase 12's lab: as first set, a Charger (hit 1.08, steady 0) and a Courser (steady 0) left their riders unhorsed in 85
 // to 96% of matches against 37% on Destriers. A Charger and a Courser now steady the seat nearly as a Destrier does, and the
-// Charger hits a little softer (1.02) and sways a little less (1.2); with the captain putting fewer riders on them, the
-// Realm's matches see an unhorsing about as often as the engine's own calibration. Each is still the best pick somewhere)
+// Charger hits a little softer (1.02) and sways a little less (1.2). Each is still the best pick somewhere.
+// Phase 12's follow-up: a four with a steady lance on a Charger (an elf: seat 5) still saw an unhorsing in 72% of its
+// matches, where fours without one saw 11 to 42%: a Charger's broken lance at a gallop threw its rider 29% of the time
+// against a Destrier's 16%, and the CPU gallops on it in 93% of courses. A Charger's weight now carries its own rider
+// through a hit (steady 0.06 to 0.2), and the ride rating sits a hit too (JT_SEAT.ride, 04-course.js): 42%, its case for
+// an elf in a short heat kept)
 const JT_MOUNT = {
-  charger: { n: 'Charger', speed: 1.06, hit: 1.02, sway: 1.2, steady: .06, rec: .12, wind: 1.3 },
+  charger: { n: 'Charger', speed: 1.06, hit: 1.02, sway: 1.2, steady: .2, rec: .12, wind: 1.3 },
   destrier: { n: 'Destrier', speed: .95, hit: .95, sway: .82, steady: .07, rec: .12, wind: 1 },
   courser: { n: 'Courser', speed: 1.02, hit: .93, sway: .97, steady: .06, rec: .3, wind: .65 }
 };
@@ -46868,9 +46872,10 @@ function jtEdge(zone, x, y, guard) {
    does) with a chance that grows with the
    force (speed and mount, a clean couch) and falls toward the zone's edge and with the defender's shield rating; it
    doesn't break, it glances. A strike's rock is how hard it hits the other rider (JT_ROCK).
-   The seat (jtSeat): a rider rocked by a broken lance leans against it. Their hold (JT_SEAT: the seat rating, a
-   square guard taking the hit, a steady mount, the lean) against the rock, shaken a little: short of it, they are
-   unhorsed. A rider whose tip went high (at the head: JT_SEAT.high inches up or more) and didn't break has reached
+   The seat (jtSeat): a rider rocked by a broken lance leans against it. Their hold (JT_SEAT: the seat rating, the
+   ride rating (a rider who drives a mount hard sits its hit as well: the speed a good ride gives and the seat to take
+   the other's grow together; phase 12's follow-up), a square guard taking the hit, a steady mount, the lean) against the
+   rock, shaken a little: short of it, they are unhorsed. A rider whose tip went high (at the head: JT_SEAT.high inches up or more) and didn't break has reached
    past the head, and sits the other lance worse (JT_SEAT.reach off the hold): a strike at the helm scores big but its
    misses cost, whatever the plan said (a hand that drags a shield plan onto the helm pays it too: phase 2's review);
    a lance never couched (a ride's up) points high but reaches for nothing, but one couched and let go (lowered, with
@@ -46879,7 +46884,7 @@ function jtEdge(zone, x, y, guard) {
 const JT_SWAY = { base: 3.6, lance: .35, wind: .5, late: .9, early: .35, droop: 7 };
 const JT_BREAK = { shield: { square: .9, angled: .45 }, body: { square: .95, angled: .95 }, helm: { square: .7, angled: .8 }, edge: .25, shieldR: .2, force: .3 };
 const JT_ROCK = { shield: { square: .8, angled: .6 }, body: 1, helm: 1.15, glance: .3 };
-const JT_SEAT = { reach: .3, high: 15, base: .55, seat: .45, square: .1, lean: .3, shake: .22, rocked: .7 };
+const JT_SEAT = { reach: .3, high: 15, base: .55, seat: .45, ride: .35, square: .1, lean: .3, shake: .22, rocked: .7 };
 const jtGauss = rnd => { let u = 0, v = 0; while (!u) u = rnd(); while (!v) v = rnd(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); };
 
 // the tip's spread at impact (inches, one sigma) and its droop (inches down), from the pace, the mount and its wind,
@@ -46949,7 +46954,8 @@ function jtStrike(a, d, rnd) {
 function jtSeat(st, d, lean, rnd, own) {
   const r = d.rs || {}, M = jtMount(d.mount), reach = !!own && !own.broke && (own.high != null ? !!own.high : d.aim === 'helm');
   // (phase 3: a girth tightened between courses holds them on; a rider still shaken from a rocking hit sits worse)
-  const hold = JT_SEAT.base + JT_SEAT.seat * (r.seat ?? .5) + (d.guard === 'angled' ? 0 : JT_SEAT.square) + M.steady + JT_SEAT.lean * clamp(lean ?? .5, 0, 1) - (reach ? JT_SEAT.reach : 0)
+  // (phase 12's follow-up: the ride rating holds them on too, from an average ride's 0.5, so two average riders are as before)
+  const hold = JT_SEAT.base + JT_SEAT.seat * (r.seat ?? .5) + JT_SEAT.ride * ((r.ride ?? .5) - .5) + (d.guard === 'angled' ? 0 : JT_SEAT.square) + M.steady + JT_SEAT.lean * clamp(lean ?? .5, 0, 1) - (reach ? JT_SEAT.reach : 0)
     + clamp(+d.girth || 0, 0, .2) - JT_SHAKE.seat * clamp(+d.shaken || 0, 0, 1) + (d.fx ? d.fx.hold : 0);
   const hit = st.rock * (1 + JT_SEAT.shake * jtGauss(rnd)), margin = hold - hit;
   // (phase 6: a rider who can't be unhorsed this course (stay) isn't; a lance broken on the helm under a Grave Charge unhorses)
@@ -46999,6 +47005,9 @@ const JT_ODDS = { n: 400, seed: 117, winds: 5 };
    - Your squire's word on Play (jtSuggest) is the Archmage's read with a Knight's hands: the best plan by the odds
      against how the other side rides. */
 const JT_ODDS_CACHE = new Map(), JT_MIX_CACHE = new Map();
+// the odds and the mixes are kept by the rider's ratings, the mount's id and the hands' index, not the model's numbers:
+// a lab that changes a model table (wJT.model) clears them with this, or the CPU plans on the old numbers
+function jtClearOdds() { JT_ODDS_CACHE.clear(); JT_MIX_CACHE.clear(); }
 const JT_AIMS = ['shield', 'body', 'helm'], JT_PACES = ['canter', 'gallop'], JT_GUARDS = ['angled', 'square'];
 const JT_PLANS = []; for (const aim of JT_AIMS) for (const pace of JT_PACES) for (const guard of JT_GUARDS) JT_PLANS.push({ aim, pace, guard });
 // how much an Archmage's read leans on what it expects (prior courses' worth), the step its read is rounded to, the
@@ -48170,7 +48179,7 @@ function jtMountFor(rs, courses) {
   const r = rs || {}, long = (courses || JT_RULES.courses) >= 5;
   if ((r.lance ?? .5) >= .8 && !long) return { m: 'charger', why: 'a lance that steady can take its sway for the harder hit' };
   if ((r.ride ?? .5) >= .7 && long) return { m: 'courser', why: 'it keeps up a gallop all heat and gets its wind back quickly' };
-  return { m: 'destrier', why: long ? 'steady to aim from and to sit a hit on, over a long heat' : 'steady to aim from and to sit a hit on' };
+  return { m: 'destrier', why: long ? 'steady to aim from over a long heat' : 'steady to aim from' };
 }
 
 // what the page shows of each side's squad now (a copy)
@@ -49780,7 +49789,8 @@ for (const ev of ['pointerup', 'pointercancel', 'lostpointercapture']) JTP.cv.ad
    rules and at (the herald's words) are the tables. G is the match, plain JSON. The page comes in phase 2: until then
    the lists are never on.
    Phase 1 is the course model and one match, CPU against CPU: lists, plan, mounts, zones, stats, skills (the tables, copies;
-   model holds the live ones the model reads, sway, brk, rock, seat, mount, skill, job, arm, shake and corner, for a lab to tune in the page),
+   model holds the live ones the model reads, sway, brk, rock, seat, mount, skill, job, arm, shake and corner, for a lab to tune in the page;
+   model.reset() clears the CPU's odds, kept by a mount's id and the hands' index, so call it after changing any of them),
    rate(kind) and rs(kind) (a kind's ratings, 1 to 12 and 0 to 1), zoneAt(x, y, guard), edge; the pure model, every
    random number from the rnd passed in (Math.random when left out; planRules is the plan table): sway(o) and rideSpeed(o), charge(o, rnd) (a CPU
    rider's ride), strike(a, d, rnd), seat(st, d, lean, rnd), impact(rides, leans, rnd); start(opts) puts a match on
@@ -49855,7 +49865,7 @@ return {
   heatTotal: (s, h) => jtHeatTotal(s, h), total: s => jtTotal(s), board: () => jtBoard(), matchText: s => jtMatchText(s),
   // the course model and a match (phase 1)
   lists: JSON.parse(JSON.stringify(JT_LISTS)), planRules: JSON.parse(JSON.stringify(JT_PLAN)), mounts: JSON.parse(JSON.stringify(JT_MOUNT)), zones: JSON.parse(JSON.stringify(JT_ZONE)),
-  stats: JT_STATS.slice(), skills: JSON.parse(JSON.stringify(JT_SKILL)), model: { sway: JT_SWAY, brk: JT_BREAK, rock: JT_ROCK, seat: JT_SEAT, mount: JT_MOUNT, skill: JT_SKILL, job: JT_JOB, arm: JT_ARM, shake: JT_SHAKE, corner: JT_CORNER },
+  stats: JT_STATS.slice(), skills: JSON.parse(JSON.stringify(JT_SKILL)), model: { sway: JT_SWAY, brk: JT_BREAK, rock: JT_ROCK, seat: JT_SEAT, mount: JT_MOUNT, skill: JT_SKILL, job: JT_JOB, arm: JT_ARM, shake: JT_SHAKE, corner: JT_CORNER, reset: () => jtClearOdds() },
   rate: k => jtRate(k), rs: k => jtRs(k), zoneAt: (x, y, g) => jtZoneAt(x, y, g), edge: (z, x, y, g) => jtEdge(z, x, y, g),
   sway: o => jtSway(o), rideSpeed: o => jtSpeed(o), charge: (o, rnd) => jtCharge(o, rnd || Math.random), strike: (a, d, rnd) => jtStrike(a, d, rnd || Math.random),
   seat: (st, d, lean, rnd, own) => jtSeat(st, d, lean, rnd || Math.random, own), impact: (rides, leans, rnd) => jtImpact(rides, leans || [.5, .5], rnd || Math.random),
@@ -69910,7 +69920,7 @@ const W_JTR = {
   cuKinds: ['spider', 'elf', 'golem', 'kobold', 'werewolf', 'witch'],
   stat: { lance: ['Lan', 'Lance: how little the tip sways'], couch: ['Cou', 'Couch: the moment to lower the lance, and how long the arm holds it'],
     seat: ['Sea', 'Seat: staying on after a hit'], shield: ['Shi', 'Shield: a lance on the shield breaks less'],
-    ride: ['Rid', 'Ride: pace, and the mount\'s wind'], nerve: ['Ner', 'Nerve: steady in the last course when behind, and in the tilt for the crown'],
+    ride: ['Rid', 'Ride: pace, the mount\'s wind, and sitting a hit'], nerve: ['Ner', 'Nerve: steady in the last course when behind, and in the tilt for the crown'],
     care: ['Car', 'Care: how much a squire does between courses'] },
   role: ['the first heat\'s rider', 'the second heat\'s rider', 'a squire', 'a squire'],
   short: ['1st', '2nd', 'Sq', 'Sq'],
@@ -70076,7 +70086,7 @@ function wListsRow(k, C) {
 function wCampLists(C) {
   const res = wListsReserves(C), M = wJT.mounts;
   return `<p class="hint">Your four at the Tilting Lists: two ride, one a heat (the first rider meets their first, then the second meets their second), and two squire. A rider wants a steady <b>lance</b>, a good <b>seat</b>, the <b>couch</b>, the <b>shield</b> and the <b>ride</b>; the second heat and the tilt for the crown want <b>nerve</b>. A squire wants <b>care</b>: between courses each squire does one job (tend the mount, steady the rider or tighten the girth), and care sets how much.</p>
-    <p class="hint">Each rider rides a mount from Sir Ruddock's stable: the <b>${M.charger.n}</b> is fast and hits hard but sways more (for a steady lance), the <b>${M.destrier.n}</b> is easy to aim from and to sit a hit on but hits softer, the <b>${M.courser.n}</b> is light in the hit but gets its wind back quickly (for a long heat, or a rider who gallops).</p>
+    <p class="hint">Each rider rides a mount from Sir Ruddock's stable: the <b>${M.charger.n}</b> is fast, hits hard and carries its rider through a hit, but sways more (for a steady lance), the <b>${M.destrier.n}</b> is the easiest to aim from but hits softer, the <b>${M.courser.n}</b> is light in the hit but gets its wind back quickly (for a long heat, or a rider who gallops).</p>
     <h4>The four</h4><ol class="wroster wnine wcourt wlistsfour">${C.four.map(k => wListsRow(k, C)).join('')}</ol>
     <h4>Reserves</h4>${res.length ? `<ol class="wroster wnine wcourtb wlistsres">${res.map(k => wListsRow(k, C)).join('')}</ol>` : '<p class="hint">Nobody: every player you have is in the four.</p>'}
     <div class="row wnbtn"><button class="ghost" data-jauto>The captain's pick</button><button class="btn" data-jpractice>Practice match</button></div>`;
@@ -70155,9 +70165,9 @@ wListsRows = function () {
 /* ---------- How to play ---------- */
 const wW148ListsHow = wListsHowHTML;
 wListsHowHTML = function () {
-  return wW148ListsHow() + `<p class="hint"><b>Ratings.</b> Each player has seven: <b>lance</b> (how little the tip sways), <b>couch</b> (the moment to lower it, and how long the arm holds it), <b>seat</b> (staying on after a hit), <b>shield</b> (a lance on the shield breaks less), <b>ride</b> (pace, and the mount's wind), <b>nerve</b> and <b>care</b> (a squire's). Each level adds a point, mostly to what their kind is good at.</p>
+  return wW148ListsHow() + `<p class="hint"><b>Ratings.</b> Each player has seven: <b>lance</b> (how little the tip sways), <b>couch</b> (the moment to lower it, and how long the arm holds it), <b>seat</b> (staying on after a hit), <b>shield</b> (a lance on the shield breaks less), <b>ride</b> (pace, the mount's wind, and sitting a hit), <b>nerve</b> and <b>care</b> (a squire's). Each level adds a point, mostly to what their kind is good at.</p>
   <p class="hint"><b>Riders and squires.</b> The Lists tab on the Team screen sets your four: the first heat's rider, the second's, and two squires. Left alone, the captain picks the two best riders (the steadier nerve rides the second heat) and the two best squires. In the tilt for the crown your best rider by nerve and lance rides.</p>
-  <p class="hint"><b>Mounts.</b> Each rider rides one of Sir Ruddock's: the <b>Charger</b> (fast, hits hard, sways more), the <b>Destrier</b> (easy to aim from and to sit a hit on, hits softer) or the <b>Courser</b> (light in the hit, gets its wind back quickly). A course spends the mount's wind, a gallop most; a blown mount is slower and the tip sways more. Each heat's rider starts on a fresh mount.</p>
+  <p class="hint"><b>Mounts.</b> Each rider rides one of Sir Ruddock's: the <b>Charger</b> (fast, hits hard, carries you through a hit, sways more), the <b>Destrier</b> (the easiest to aim from, hits softer) or the <b>Courser</b> (light in the hit, gets its wind back quickly). A course spends the mount's wind, a gallop most; a blown mount is slower and the tip sways more. Each heat's rider starts on a fresh mount.</p>
   <p class="hint"><b>The arm and the shake.</b> Every couch tires the lance arm, an early one most: a tired arm sways and the tip droops. A rider rocked by a broken lance who stays on is shaken for the next course: more sway and a worse seat.</p>
   <p class="hint"><b>Your squires.</b> Between courses each squire does one job, two of the three: <b>tend the mount</b> (some of its lost wind back), <b>steady the rider</b> (the shake gone, some of the arm back) or <b>tighten the girth</b> (a better seat next course). Their care sets how much. In You ride you pick the jobs before you ride (your corner suggests); the CPU's corner picks by its skill.</p>
   <p class="hint"><b>Nerve.</b> The last course of a heat when you're behind, and every course of the tilt for the crown, weigh on a rider: the tip sways more and the couch is harder to time, less for a steady nerve. The CPU's riders feel it too.</p>`;

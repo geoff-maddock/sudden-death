@@ -211,6 +211,14 @@ async def main():
         check(d['same'] and d['repeat'] and d['differ'] and d['stream'] and d['json'], 'simMatch leaves the match on the lists and its seeded stream alone; the same seed rides the same match; the match is plain JSON', d)
         check(d['turn'] and d['box'] == ['courses', 'breaks', 'helms', 'unhorse', 'unhorsed', 'glances', 'misses', 'fouls', 'rocked', 'kept'], 'a course ridden says each side\'s plan (with its reason), ride and result; the box score counts breaks, helms, unhorsings and seats kept', d)
 
+        # ---------- a lab's tuning reaches the CPU (phase 12's review) ----------
+        # the CPU's odds are kept by the mount's id and the hands' index: a model table changed in the page plans on the
+        # old numbers until model.reset() clears them
+        rz = await pg.evaluate("""(() => { const M = wJT.model.mount.charger, keep = M.hit, mix = () => { wJT.start({ seed: 9, skill: [1, 1], mounts: [['charger', 'charger'], ['destrier', 'destrier']] }); return JSON.stringify(wJT.planMix(0)); };
+          try { const a = mix(); M.hit = 1.6; const stale = mix(); wJT.model.reset(); const fresh = mix(); return { stale: stale === a, fresh: fresh !== a }; }
+          finally { M.hit = keep; wJT.model.reset(); } })()""")
+        check(rz['stale'] and rz['fresh'], 'a model table changed in the page reaches the CPU\'s plans once model.reset() clears its odds', rz)
+
         check(not errs, 'no page errors', errs[:5])
         await br.close()
     print('FAILURES: ' + str(len(FAILS)) if FAILS else 'all ok')

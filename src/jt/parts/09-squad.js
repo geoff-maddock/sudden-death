@@ -257,7 +257,7 @@ function jtMountFor(rs, courses) {
   const r = rs || {}, long = (courses || JT_RULES.courses) >= 5;
   if ((r.lance ?? .5) >= .8 && !long) return { m: 'charger', why: 'a lance that steady can take its sway for the harder hit' };
   if ((r.ride ?? .5) >= .7 && long) return { m: 'courser', why: 'it keeps up a gallop all heat and gets its wind back quickly' };
-  return { m: 'destrier', why: long ? 'steady to aim from and to sit a hit on, over a long heat' : 'steady to aim from and to sit a hit on' };
+  return { m: 'destrier', why: long ? 'steady to aim from over a long heat' : 'steady to aim from' };
 }
 
 // what the page shows of each side's squad now (a copy)

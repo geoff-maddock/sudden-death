@@ -16,9 +16,10 @@
    does) with a chance that grows with the
    force (speed and mount, a clean couch) and falls toward the zone's edge and with the defender's shield rating; it
    doesn't break, it glances. A strike's rock is how hard it hits the other rider (JT_ROCK).
-   The seat (jtSeat): a rider rocked by a broken lance leans against it. Their hold (JT_SEAT: the seat rating, a
-   square guard taking the hit, a steady mount, the lean) against the rock, shaken a little: short of it, they are
-   unhorsed. A rider whose tip went high (at the head: JT_SEAT.high inches up or more) and didn't break has reached
+   The seat (jtSeat): a rider rocked by a broken lance leans against it. Their hold (JT_SEAT: the seat rating, the
+   ride rating (a rider who drives a mount hard sits its hit as well: the speed a good ride gives and the seat to take
+   the other's grow together; phase 12's follow-up), a square guard taking the hit, a steady mount, the lean) against the
+   rock, shaken a little: short of it, they are unhorsed. A rider whose tip went high (at the head: JT_SEAT.high inches up or more) and didn't break has reached
    past the head, and sits the other lance worse (JT_SEAT.reach off the hold): a strike at the helm scores big but its
    misses cost, whatever the plan said (a hand that drags a shield plan onto the helm pays it too: phase 2's review);
    a lance never couched (a ride's up) points high but reaches for nothing, but one couched and let go (lowered, with
@@ -27,7 +28,7 @@
 const JT_SWAY = { base: 3.6, lance: .35, wind: .5, late: .9, early: .35, droop: 7 };
 const JT_BREAK = { shield: { square: .9, angled: .45 }, body: { square: .95, angled: .95 }, helm: { square: .7, angled: .8 }, edge: .25, shieldR: .2, force: .3 };
 const JT_ROCK = { shield: { square: .8, angled: .6 }, body: 1, helm: 1.15, glance: .3 };
-const JT_SEAT = { reach: .3, high: 15, base: .55, seat: .45, square: .1, lean: .3, shake: .22, rocked: .7 };
+const JT_SEAT = { reach: .3, high: 15, base: .55, seat: .45, ride: .35, square: .1, lean: .3, shake: .22, rocked: .7 };
 const jtGauss = rnd => { let u = 0, v = 0; while (!u) u = rnd(); while (!v) v = rnd(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); };
 
 // the tip's spread at impact (inches, one sigma) and its droop (inches down), from the pace, the mount and its wind,
@@ -97,7 +98,8 @@ function jtStrike(a, d, rnd) {
 function jtSeat(st, d, lean, rnd, own) {
   const r = d.rs || {}, M = jtMount(d.mount), reach = !!own && !own.broke && (own.high != null ? !!own.high : d.aim === 'helm');
   // (phase 3: a girth tightened between courses holds them on; a rider still shaken from a rocking hit sits worse)
-  const hold = JT_SEAT.base + JT_SEAT.seat * (r.seat ?? .5) + (d.guard === 'angled' ? 0 : JT_SEAT.square) + M.steady + JT_SEAT.lean * clamp(lean ?? .5, 0, 1) - (reach ? JT_SEAT.reach : 0)
+  // (phase 12's follow-up: the ride rating holds them on too, from an average ride's 0.5, so two average riders are as before)
+  const hold = JT_SEAT.base + JT_SEAT.seat * (r.seat ?? .5) + JT_SEAT.ride * ((r.ride ?? .5) - .5) + (d.guard === 'angled' ? 0 : JT_SEAT.square) + M.steady + JT_SEAT.lean * clamp(lean ?? .5, 0, 1) - (reach ? JT_SEAT.reach : 0)
     + clamp(+d.girth || 0, 0, .2) - JT_SHAKE.seat * clamp(+d.shaken || 0, 0, 1) + (d.fx ? d.fx.hold : 0);
   const hit = st.rock * (1 + JT_SEAT.shake * jtGauss(rnd)), margin = hold - hit;
   // (phase 6: a rider who can't be unhorsed this course (stay) isn't; a lance broken on the helm under a Grave Charge unhorses)

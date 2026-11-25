@@ -14,11 +14,11 @@
    to the left, the barrier (a foul, 'barrier'); anywhere else, a miss.
    The plan (JT_PLAN): an aim (shield, body or helm, each with its aim point), a guard (angled or square) and a pace
    (canter or gallop). A gallop hits harder and spends more of the mount's wind, but the tip sways more.
-   The mounts (JT_MOUNT): Charger (fast, hits hard, sways more), Destrier (steady, easy to aim, sits a hit better, hits
-   softer), Courser (light in the hit, but quick to get its wind back, and easy on it at a gallop). Each rider rides one
+   The mounts (JT_MOUNT): Charger (fast, hits hard, sways more, and its weight carries its rider through a hit),
+   Destrier (steady, easy to aim, hits softer), Courser (light in the hit, but quick to get its wind back, and easy on it at a gallop). Each rider rides one
    (opts.mounts, picked on the Lists tab in the Realm); left out, JT_MOUNT_DEF.
    The ratings (JT_STATS, 1 to 12, worked on as 0 to 1): lance (the sway), couch (the couch window, and how long the
-   arm holds it), seat (the balance after a hit), shield (a strike on the shield breaks less), ride (pace and the
+   arm holds it), seat (the balance after a hit), shield (a strike on the shield breaks less), ride (pace, the seat a little, and the
    mount's wind), nerve (the pressure: the last course of a heat when behind, the tilt for the crown), care (a squire's
    jobs between courses). A row of seven by kind (JT_KIND, phase 3); a rider of no kind is JT_KIND._ . A roster
    member may carry its own (r, 1 to 12, the rest from its kind; or rs, 0 to 1), as the Realm sends. */
@@ -47,10 +47,14 @@ const JT_PLAN = {
 };
 // (phase 12's lab: as first set, a Charger (hit 1.08, steady 0) and a Courser (steady 0) left their riders unhorsed in 85
 // to 96% of matches against 37% on Destriers. A Charger and a Courser now steady the seat nearly as a Destrier does, and the
-// Charger hits a little softer (1.02) and sways a little less (1.2); with the captain putting fewer riders on them, the
-// Realm's matches see an unhorsing about as often as the engine's own calibration. Each is still the best pick somewhere)
+// Charger hits a little softer (1.02) and sways a little less (1.2). Each is still the best pick somewhere.
+// Phase 12's follow-up: a four with a steady lance on a Charger (an elf: seat 5) still saw an unhorsing in 72% of its
+// matches, where fours without one saw 11 to 42%: a Charger's broken lance at a gallop threw its rider 29% of the time
+// against a Destrier's 16%, and the CPU gallops on it in 93% of courses. A Charger's weight now carries its own rider
+// through a hit (steady 0.06 to 0.2), and the ride rating sits a hit too (JT_SEAT.ride, 04-course.js): 42%, its case for
+// an elf in a short heat kept)
 const JT_MOUNT = {
-  charger: { n: 'Charger', speed: 1.06, hit: 1.02, sway: 1.2, steady: .06, rec: .12, wind: 1.3 },
+  charger: { n: 'Charger', speed: 1.06, hit: 1.02, sway: 1.2, steady: .2, rec: .12, wind: 1.3 },
   destrier: { n: 'Destrier', speed: .95, hit: .95, sway: .82, steady: .07, rec: .12, wind: 1 },
   courser: { n: 'Courser', speed: 1.02, hit: .93, sway: .97, steady: .06, rec: .3, wind: .65 }
 };

@@ -35,6 +35,9 @@ const JT_ODDS = { n: 400, seed: 117, winds: 5 };
    - Your squire's word on Play (jtSuggest) is the Archmage's read with a Knight's hands: the best plan by the odds
      against how the other side rides. */
 const JT_ODDS_CACHE = new Map(), JT_MIX_CACHE = new Map();
+// the odds and the mixes are kept by the rider's ratings, the mount's id and the hands' index, not the model's numbers:
+// a lab that changes a model table (wJT.model) clears them with this, or the CPU plans on the old numbers
+function jtClearOdds() { JT_ODDS_CACHE.clear(); JT_MIX_CACHE.clear(); }
 const JT_AIMS = ['shield', 'body', 'helm'], JT_PACES = ['canter', 'gallop'], JT_GUARDS = ['angled', 'square'];
 const JT_PLANS = []; for (const aim of JT_AIMS) for (const pace of JT_PACES) for (const guard of JT_GUARDS) JT_PLANS.push({ aim, pace, guard });
 // how much an Archmage's read leans on what it expects (prior courses' worth), the step its read is rounded to, the
