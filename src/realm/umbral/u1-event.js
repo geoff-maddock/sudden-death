@@ -19,7 +19,7 @@
 
    W_UMB1, wUmbScene, wUmbBlight, wUmbEclipse
    Wraps: wNextPrompt (wWU1NextPrompt: the scene, once, after the Crown's ending), wSay (wWU1Say: an innkeeper's hello
-   names the DREAMS), wStart (wWU1Start: the herald in or out of the Coliseum),
+   names the DREAMS; the herald's SEAL and PIECES count an older Umbral's nine, wUmbHeraldCount), wStart (wWU1Start: the herald in or out of the Coliseum),
    wUmbralUnlock (wWU1UmbralUnlock: the herald, the flag topics wait on), wDarkness (wWU1Darkness: the eclipse),
    wNewDay (wWU1NewDay: the eclipse said at dawn), wEncounterHook (wWU1EncounterHook: the blight's hunters), wAudit (wWU1Audit: the herald is placed by the unlock), wAmbient (wWU1Ambient: the dreams), wLookText (wWU1LookText: the
    statue), wOpenJournal (wWU1OpenJournal: the chapter shows once open), wRenderJournal (wWU1RenderJournal: its
@@ -69,8 +69,18 @@ wSay = function (id, kw) {
   // (after the Seal, the dreams are over)
   if (kw && r && r.key === 'dreams' && W_UMB1_INNS.includes(id) && wUmb() && wUmb().sealed) r.text = 'The dreams? They stopped, the night the sun came back. Folk eat their breakfast again.';
   if (!kw && r && r.text && wFlag('umbral_open') && wUmbOpen() && W_UMB1_INNS.includes(id)) r.text += ' You look tired. Everyone does, since the DREAMS started.';
+  // (an Umbral opened before jousting's champion: the herald counts the pieces its Seal asks for; phase 11's review)
+  if (id === 'uherald' && r && (r.key === 'seal' || r.key === 'pieces')) { const t = wUmbHeraldCount(r.key); if (t) r.text = t; }
   return r;
 };
+// the herald's SEAL and PIECES for a Seal that asks for fewer pieces than there are (u3's wUmbNeed), or '' as written
+function wUmbHeraldCount(k) {
+  const all = Object.keys(W_UMB_PIECES), need = wUmbNeed(); if (need.length >= all.length) return '';
+  const n = wUmbNum(need.length), N = n.charAt(0).toUpperCase() + n.slice(1), sp = need.map(p => W_UMB_PIECES[p].sport.replace(/^the /, '')), more = all.filter(p => !need.includes(p)).map(p => W_UMB_PIECES[p].sport);
+  const list = 'the ' + sp.slice(0, -1).join(', the ') + ' and the ' + sp[sp.length - 1];
+  if (k === 'seal') return `The Seal of the Crown. ${N} pieces, one for each way there was to play when it broke. Win them all, bring them to the portal, and it can be forged whole again. Then the door shuts.`;
+  return `${N}. ${list.charAt(0).toUpperCase() + list.slice(1)}. Each one held by a Nadir champion, each in their own region. There is a piece for ${more.join(' and ')} on the other side too now, but your Seal broke before it came: win it if you like, the Seal doesn't need it.`;
+}
 
 /* ---------- the herald in the Coliseum ---------- */
 function wUmbHeraldSync() {

@@ -241,6 +241,24 @@ async def main():
               'an Umbral opened before jousting\'s champion asks for the nine it opened with: loaded with them, the Seal plays, and never picks jousting for a round', sc)
         check(sc['mid'] == {'need': 9, 'entry': None, 'sports': ['baseball', 'card', 'football']} and sc['got2'] == 9 and sc['boon'] == 3,
               'mid-Seal it carries on with the round it was on; its jousting piece, won, sings but isn\'t counted', sc)
+        # (phase 11's review) an Umbral opened before: a Legend's Shard can still be spent in the Seal, and every word of the
+        # count reads its own nine (the jousting piece isn't "still out" for it: it can be won, but the Seal doesn't need it)
+        os_ = await pg.evaluate("""(() => { wDrain(); const U = WG.umbral, out = {}; U.pieces = W_UMB_NINE.slice(); U.finale = 0; U.finaleSports = null; U.sealed = 0; U.shards = 1; U.shardOn = null;
+          const say = k => (wSay('uherald', k).text || ''); out.seal = say('seal'); out.pieces = say('pieces');
+          out.panel = wUmbSealPanel(); out.lanceOut = /Splintered Lance<\\/b> <small>still out/.test(out.panel); out.rows = (out.panel.match(/<li/g) || []).length;
+          wUmbFinale(); out.shard = !document.getElementById('modal').hidden && /Legend's Shard/.test(document.getElementById('modalBox').textContent);
+          for (let i = 0; i < 6 && !document.getElementById('modal').hidden; i++) { const b = document.querySelector('#modalBox [data-ushard=""], #wUjtNo, #modalBox [data-close], #modalBox button.ghost'); if (!b) break; b.click(); }
+          wDrain(); U.finale = 0; U.finaleSports = null; U.shards = 0;
+          // the Seal forged with the lance won too: nine pieces lock together
+          U.pieces = W_UMB_NINE.concat('jousting'); const keepEnter = wEnterMap; wEnterMap = () => {}; LAB = true; try { wUmbSeal(); } finally { LAB = false; wEnterMap = keepEnter; }
+          out.forged = (WLOG.slice(-6).find(l => /The Seal is forged/.test(l[0])) || [''])[0];
+          wUmbSealScene(); out.scene = /Nine pieces, from nine games/.test(document.getElementById('modalBox').textContent); const sb = document.getElementById('wUmbSealed'); if (sb) sb.click();
+          U.sealed = 0; U.sealScene = 0; U.finale = 0; U.sealedYear = null; wUmbHeraldSync();
+          return out; })()""")
+        check(os_['shard'], 'an Umbral opened before: holding its nine pieces and a Legend\'s Shard, the Seal offers to spend it', os_)
+        check('Nine' in os_['seal'] and 'Ten' not in os_['seal'] and os_['pieces'].startswith('Nine.') and 'Ten' not in os_['pieces'], 'the herald counts the nine an older Umbral asks for (the SEAL and the PIECES)', [os_['seal'], os_['pieces']])
+        check(not os_['lanceOut'] and os_['rows'] == 9, 'the Seal panel of an older Umbral lists its nine, and never the jousting piece as still out', os_['rows'])
+        check('The nine pieces lock together' in os_['forged'] and os_['scene'], 'forged with the lance won as well, an older Umbral\'s Seal is nine pieces, in the log and the scene', os_['forged'])
 
         # ---------- the redeemed champion ----------
         rd = await pg.evaluate("""(() => { const s = wStar('nadir_lists'), p = wMakePlayer({ kind: s.kind, n: s.name, num: s.num, lvl: 6, star: s.id }, 'redeemed'), m = wListsPlayer(p);

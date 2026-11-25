@@ -98,7 +98,7 @@ W_ON_END.nadir = function (r, ref) {
 };
 function wUmbSeal() {
   const U = wUmb(); U.sealed = WG.dayAbs; U.sealedYear = WG.year; U.finale = W_UMB5.rounds;
-  wLog(`The Seal is forged. The ${wUmbNum(U.pieces.length)} pieces lock together in your captain's hands, the portal at the end of the Road to Nowhere closes, and the eclipse lifts. Year ${WG.year}.`, 'g');
+  wLog(`The Seal is forged. The ${wUmbNum(wUmbNeed().length)} pieces lock together in your captain's hands, the portal at the end of the Road to Nowhere closes, and the eclipse lifts. Year ${WG.year}.`, 'g');
   wUmbHeraldSync(); // (the herald has nothing more to say: he goes)
   const m = MAPS.coliseum; wEnterMap('coliseum', m.spawn[0], m.spawn[1]); WG.face = 'u';
   wInvalidate('umbralden'); wSave();
@@ -106,7 +106,7 @@ function wUmbSeal() {
   if (!LAB) U.sealScene = 1;
 }
 function wUmbSealScene() {
-  const U = wUmb(), n = wUmbNum(U ? U.pieces.length : wUmbNeed().length), N = n.charAt(0).toUpperCase() + n.slice(1);
+  const n = wUmbNum(wUmbNeed().length), N = n.charAt(0).toUpperCase() + n.slice(1);
   const close = modal(`<header><h3>The Seal of the Crown</h3></header>
     <div class="wumblines"><p class="wumbn">The last whistle goes, and the Hollow Coliseum goes very quiet.</p>
     <p class="wumbn">${N} pieces, from ${n} games, lock together in your captain's hands: a seal, warm, and heavier than it looks.</p>

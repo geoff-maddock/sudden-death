@@ -226,7 +226,8 @@ wUmbFinaleEntry = function () {
 /* ---------- the Seal panel, in the journal ---------- */
 function wUmbSealPanel() {
   const U = wUmb(); if (!U) return '';
-  const rows = Object.keys(W_UMB_PIECES).map(p => {
+  // (the pieces this Umbral's Seal asks for, and any other held: an older Umbral's jousting piece, won, is listed, but never as still out)
+  const need = wUmbNeed(), rows = Object.keys(W_UMB_PIECES).filter(p => need.includes(p) || U.pieces.includes(p)).map(p => {
     const r = wUmbResonance(p), B8 = W_UMB8J.boons[p], F = wUmbFeat(wUmbChampOf(p) || ''), v = r ? B8.v[r - 1] : 0;
     const unit = x => B8.u === '%' ? x + '%' : x + ' ' + B8.u, now = !r ? '' : B8.u ? `: now ${unit(v)}` : ': yes';
     return `<li class="${r ? 'wfhave' : ''}"><b>${esc(W_UMB_PIECES[p].n)}</b> <small>${r === 2 ? 'won well' : r ? 'won' : 'still out'}. ${esc(B8.n)}${B8.u ? ` (${unit(B8.v[0])}, or ${unit(B8.v[1])} won well)` : ''}${now}.${F && !r ? ` The feat: ${esc(F.n)}.` : ''}</small></li>`;

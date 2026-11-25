@@ -72854,7 +72854,7 @@ wStart = function (save) {
 
    W_UMB1, wUmbScene, wUmbBlight, wUmbEclipse
    Wraps: wNextPrompt (wWU1NextPrompt: the scene, once, after the Crown's ending), wSay (wWU1Say: an innkeeper's hello
-   names the DREAMS), wStart (wWU1Start: the herald in or out of the Coliseum),
+   names the DREAMS; the herald's SEAL and PIECES count an older Umbral's nine, wUmbHeraldCount), wStart (wWU1Start: the herald in or out of the Coliseum),
    wUmbralUnlock (wWU1UmbralUnlock: the herald, the flag topics wait on), wDarkness (wWU1Darkness: the eclipse),
    wNewDay (wWU1NewDay: the eclipse said at dawn), wEncounterHook (wWU1EncounterHook: the blight's hunters), wAudit (wWU1Audit: the herald is placed by the unlock), wAmbient (wWU1Ambient: the dreams), wLookText (wWU1LookText: the
    statue), wOpenJournal (wWU1OpenJournal: the chapter shows once open), wRenderJournal (wWU1RenderJournal: its
@@ -72904,8 +72904,18 @@ wSay = function (id, kw) {
   // (after the Seal, the dreams are over)
   if (kw && r && r.key === 'dreams' && W_UMB1_INNS.includes(id) && wUmb() && wUmb().sealed) r.text = 'The dreams? They stopped, the night the sun came back. Folk eat their breakfast again.';
   if (!kw && r && r.text && wFlag('umbral_open') && wUmbOpen() && W_UMB1_INNS.includes(id)) r.text += ' You look tired. Everyone does, since the DREAMS started.';
+  // (an Umbral opened before jousting's champion: the herald counts the pieces its Seal asks for; phase 11's review)
+  if (id === 'uherald' && r && (r.key === 'seal' || r.key === 'pieces')) { const t = wUmbHeraldCount(r.key); if (t) r.text = t; }
   return r;
 };
+// the herald's SEAL and PIECES for a Seal that asks for fewer pieces than there are (u3's wUmbNeed), or '' as written
+function wUmbHeraldCount(k) {
+  const all = Object.keys(W_UMB_PIECES), need = wUmbNeed(); if (need.length >= all.length) return '';
+  const n = wUmbNum(need.length), N = n.charAt(0).toUpperCase() + n.slice(1), sp = need.map(p => W_UMB_PIECES[p].sport.replace(/^the /, '')), more = all.filter(p => !need.includes(p)).map(p => W_UMB_PIECES[p].sport);
+  const list = 'the ' + sp.slice(0, -1).join(', the ') + ' and the ' + sp[sp.length - 1];
+  if (k === 'seal') return `The Seal of the Crown. ${N} pieces, one for each way there was to play when it broke. Win them all, bring them to the portal, and it can be forged whole again. Then the door shuts.`;
+  return `${N}. ${list.charAt(0).toUpperCase() + list.slice(1)}. Each one held by a Nadir champion, each in their own region. There is a piece for ${more.join(' and ')} on the other side too now, but your Seal broke before it came: win it if you like, the Seal doesn't need it.`;
+}
 
 /* ---------- the herald in the Coliseum ---------- */
 function wUmbHeraldSync() {
@@ -75387,7 +75397,7 @@ W_ON_END.nadir = function (r, ref) {
 };
 function wUmbSeal() {
   const U = wUmb(); U.sealed = WG.dayAbs; U.sealedYear = WG.year; U.finale = W_UMB5.rounds;
-  wLog(`The Seal is forged. The ${wUmbNum(U.pieces.length)} pieces lock together in your captain's hands, the portal at the end of the Road to Nowhere closes, and the eclipse lifts. Year ${WG.year}.`, 'g');
+  wLog(`The Seal is forged. The ${wUmbNum(wUmbNeed().length)} pieces lock together in your captain's hands, the portal at the end of the Road to Nowhere closes, and the eclipse lifts. Year ${WG.year}.`, 'g');
   wUmbHeraldSync(); // (the herald has nothing more to say: he goes)
   const m = MAPS.coliseum; wEnterMap('coliseum', m.spawn[0], m.spawn[1]); WG.face = 'u';
   wInvalidate('umbralden'); wSave();
@@ -75395,7 +75405,7 @@ function wUmbSeal() {
   if (!LAB) U.sealScene = 1;
 }
 function wUmbSealScene() {
-  const U = wUmb(), n = wUmbNum(U ? U.pieces.length : wUmbNeed().length), N = n.charAt(0).toUpperCase() + n.slice(1);
+  const n = wUmbNum(wUmbNeed().length), N = n.charAt(0).toUpperCase() + n.slice(1);
   const close = modal(`<header><h3>The Seal of the Crown</h3></header>
     <div class="wumblines"><p class="wumbn">The last whistle goes, and the Hollow Coliseum goes very quiet.</p>
     <p class="wumbn">${N} pieces, from ${n} games, lock together in your captain's hands: a seal, warm, and heavier than it looks.</p>
@@ -77394,7 +77404,7 @@ wUmbFinale = function () {
   const U = wUmb();
   // (a shard set for a hex on a round that has none left by the time it starts, a ward readied since, say: given back)
   if (U && !U.sealed && wUmbShardSet('hex') && !wUmbFinaleLive() && !wUmbShardRoom()) { U.shardOn = null; if (!LAB) wLog('This round draws no hexes now, so your Legend\'s Shard would take nothing off. You keep it.', 'm'); wSave(); }
-  if (!U || LAB || U.sealed || !((U.shards || 0) > 0) || Object.keys(W_UMB_PIECES).some(p => !U.pieces.includes(p))) return wWU8IFinale.apply(this, arguments);
+  if (!U || LAB || U.sealed || !((U.shards || 0) > 0) || wUmbNeed().some(p => !U.pieces.includes(p))) return wWU8IFinale.apply(this, arguments);
   const r = U.finale || 0, piece = wUmbFinaleSports()[r], eng = W_UMB5.engine[piece], card = !eng;
   // (a game of the round left half-played picks up where it was: its hexes were drawn at its kickoff)
   if (wUmbFinaleLive()) return wWU8IFinale.apply(this, arguments);
@@ -77721,7 +77731,8 @@ wUmbFinaleEntry = function () {
 /* ---------- the Seal panel, in the journal ---------- */
 function wUmbSealPanel() {
   const U = wUmb(); if (!U) return '';
-  const rows = Object.keys(W_UMB_PIECES).map(p => {
+  // (the pieces this Umbral's Seal asks for, and any other held: an older Umbral's jousting piece, won, is listed, but never as still out)
+  const need = wUmbNeed(), rows = Object.keys(W_UMB_PIECES).filter(p => need.includes(p) || U.pieces.includes(p)).map(p => {
     const r = wUmbResonance(p), B8 = W_UMB8J.boons[p], F = wUmbFeat(wUmbChampOf(p) || ''), v = r ? B8.v[r - 1] : 0;
     const unit = x => B8.u === '%' ? x + '%' : x + ' ' + B8.u, now = !r ? '' : B8.u ? `: now ${unit(v)}` : ': yes';
     return `<li class="${r ? 'wfhave' : ''}"><b>${esc(W_UMB_PIECES[p].n)}</b> <small>${r === 2 ? 'won well' : r ? 'won' : 'still out'}. ${esc(B8.n)}${B8.u ? ` (${unit(B8.v[0])}, or ${unit(B8.v[1])} won well)` : ''}${now}.${F && !r ? ` The feat: ${esc(F.n)}.` : ''}</small></li>`;
