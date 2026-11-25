@@ -1,5 +1,5 @@
-/* w112: Quick start, the simple how-to for each sport you can play by hand: golf, bowling, baseball, football,
-   boxing, basketball and hockey. A few numbered steps with a screenshot each (W_QUICK_IMG, w112a, taken from the game by
+/* w112: Quick start, the simple how-to for each sport you can play by hand: golf, bowling, curling, jousting,
+   baseball, football, boxing, basketball and hockey. A few numbered steps with a screenshot each (W_QUICK_IMG, w112a, taken from the game by
    test/realm_quick_shots.py), the keys you need and nothing else, then where the full rules are.
    It sits at the top of How to play (#wQuick, before #wHelp), one tab a sport. Each sport's bar gets a Quick start
    button beside its How to play button (baseball's beside Back to the world), which opens the page on that sport's
@@ -42,6 +42,19 @@ const W_QUICK = [
     tip: 'Before your stone, cast your curler\'s power (P) or the ultimate at the start of an end (U). Press C for the ice chart: every stone\'s path, and where the pebble is worn.',
     keys: [['Space', 'throw (two presses), then hold to sweep'], ['1 to 6', 'the shot'], ['Arrows', 'move the broom'], ['I, O', 'the handle'], ['G', 'the skip\'s call again'], ['P, U, K', 'a power, the ultimate, Steady'], ['C', 'the ice chart']],
     phone: 'On a phone, touch the house to put the broom down, then drag back from the stone and let go: how far you pull is the weight. Hold the button marked Hold to sweep while it slides.' },
+  { id: 'lists', n: 'Jousting', where: 'the Tilting Lists', more: 'wListsHow',
+    lede: 'Your squire has already picked a plan. Press Space to ride, tap Space with the hoofbeats, hold it to couch the lance, and keep the tip on your mark. The keys are all you need; the buttons under the lists do the same.',
+    steps: [
+      { img: 'lists-plan', h: 'Look at the plan', t: 'Before each course your squire picks an aim (1 the shield, 2 the body, 3 the helm: two points, but a small mark), a guard (Q angled, W square) and a pace (E canter, R gallop), and says why. The herald\'s card above shows the rider you meet and how their side has ridden. Change anything you like, or press G for your squire\'s plan again, then press Space (or Ride).' },
+      { img: 'lists-spur', h: 'Spur: tap Space with the hoofbeats', t: 'Your rider sets off and the hoofbeats roll towards the white line on the bar. Tap Space as each one crosses it (it grows and turns yellow): taps on the beat build speed, taps off it cost a little. A faster horse hits harder.' },
+      { img: 'lists-couch', h: 'Couch: hold Space at the green mark', t: 'After the spur, press Space and keep it held when the marker reaches the green couch mark: that lowers the lance. Too early and the arm tires and the tip droops; too late and it never settles. Let go and the lance comes up: a miss.' },
+      { img: 'lists-aim', h: 'Aim: keep the tip on your mark', t: 'The panel at the top right is the other rider as your lance sees them. The white dot is your tip, swaying with the horse\'s stride; the yellow crosshair is your mark. Hold the dot on it with the arrow keys until the riders meet.' },
+      { img: 'lists-seat', h: 'Keep your seat: lean against the wobble', t: 'When their lance breaks on you, your rider rocks. Keep the needle in the green at the top: if it swings right, hold the left arrow, and the other way round. Fall and you\'re unhorsed: three points to them, and your heat is over.' },
+      { img: 'lists-between', h: 'Between courses: your squires and the bag', t: 'Before every course after a heat\'s first, each of your two squires does one job: tend the mount (its wind), steady the rider (a shake, the arm) or tighten the girth (the seat). Your corner has picked; change it if you like. In a match, the Bag row gives one potion a course.' },
+    ],
+    tip: 'Before you ride you can cast a power: P your rider\'s lance power, K the shield power, U the ultimate, M a situation power that fits. At the Lists the wind and the ruts count too: L rides in the rut or beside it, and your squire says how far to hold into the wind.',
+    keys: [['Space', 'ride; tap with the hoofbeats to spur; then hold to couch'], ['1, 2, 3', 'aim: the shield, the body, the helm'], ['Q, W', 'guard: angled, square'], ['E, R', 'pace: canter, gallop'], ['G', 'your squire\'s plan again'], ['L', 'your line: in the rut or beside it'], ['Arrows', 'hold the tip on your mark; left and right lean to keep your seat'], ['P, K, U, M', 'lance power, shield power, ultimate, situation power']],
+    phone: 'On a phone, tap the lists in time with the hoofbeats to spur, then press and hold to couch the lance, and drag while you hold to move the tip onto your mark. When a hit rocks you, hold the Lean buttons under the lists (or drag left and right). The buttons under the lists pick the plan and Ride, and Spur and Hold to couch work too.' },
   { id: 'ball', n: 'Baseball', where: 'the Ballpark', more: 'wHelpBall',
     lede: 'You bat first. Batting is two things: put the circle over the ball, and swing when it turns gold. Running and fielding happen by themselves.',
     steps: [
@@ -98,7 +111,7 @@ function wQuickHTML() {
     <p class="hint">${s.phone}</p>
     <p class="hint"><small>${s.foot || `That's all you need for a first game. The full rules, and everything optional (powers, stances, calls), are further down: <a href="#" data-wqmore="${s.more}">${s.n}: how it works</a>.`}</small></p></div>`).join('');
   return `<section id="wQuick" class="whelp"><h3>Quick start: playing the sports</h3>
-    <p class="hint">Eight sports have games you can play yourself at their grounds; the last tab is for pets. Pick one for the few things you need to know.</p>
+    <p class="hint">Nine sports have games you can play yourself at their grounds; the last tab is for pets. Pick one for the few things you need to know.</p>
     <div class="wqtabs">${tabs}</div>${panes}</section>`;
 }
 function wQuickShow(id) {
@@ -126,7 +139,7 @@ renderHelp = function () {
 };
 
 // the Quick start buttons: beside each sport's How to play button (baseball's on its bar)
-for (const [how, id] of [['wLinksHowBtn', 'links'], ['wLanesHowBtn', 'lanes'], ['wShedHowBtn', 'shed'], ['wGridHowBtn', 'grid'], ['wRingHowBtn', 'ring'], ['wCourtHowBtn', 'court'], ['wRinkHowBtn', 'rink']]) {
+for (const [how, id] of [['wLinksHowBtn', 'links'], ['wLanesHowBtn', 'lanes'], ['wShedHowBtn', 'shed'], ['wListsHowBtn', 'lists'], ['wGridHowBtn', 'grid'], ['wRingHowBtn', 'ring'], ['wCourtHowBtn', 'court'], ['wRinkHowBtn', 'rink']]) {
   const b = $(how); if (!b) continue;
   b.insertAdjacentHTML('beforebegin', `<button class="ghost" id="wQuick_${id}">Quick start</button> `);
   $('wQuick_' + id).addEventListener('click', () => wQuickOpen(id));

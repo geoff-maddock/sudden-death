@@ -290,8 +290,10 @@ jtTargetDraw = function (c, plan, guard, tip) {
 // the ground's panel, top right: the wind across a little plan of the lists, and each lane's rut
 function jtGroundDraw(c) {
   const V = jtGroundView(); if (!V) return;
-  const x0 = JT_VIEW.w - 250, y0 = 10, w = 240, h = 56;
-  c.save(); c.fillStyle = 'rgba(24,20,16,.78)'; rr(c, x0, y0, w, h, 8); c.fill();
+  // (as wide as its words need: a long wind's words stayed inside it, phase 13)
+  c.save(); c.font = '700 12px "Alegreya Sans", sans-serif';
+  const w = Math.max(240, Math.ceil(c.measureText(V.words).width) + 92), x0 = JT_VIEW.w - w - 10, y0 = 10, h = 56;
+  c.fillStyle = 'rgba(24,20,16,.78)'; rr(c, x0, y0, w, h, 8); c.fill();
   // the plan of the lists: the tilt down the middle, the gallery side on top; the wind's arrow across it
   const px = x0 + 10, py = y0 + 10, pw = 60, ph = 36, mid = py + ph / 2;
   c.strokeStyle = 'rgba(242,236,224,.5)'; c.lineWidth = 1; c.strokeRect(px, py, pw, ph);

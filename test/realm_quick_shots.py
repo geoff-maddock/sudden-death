@@ -3,10 +3,12 @@
 # look changes, then rebuild. Each shot sets the game up through its API (a setup may wait on the game), freezes it,
 # lays labels with arrows over it and takes the picture: the canvas, and any bar above it that the step is about.
 #   python3 test/realm_quick_shots.py              every sport
-#   python3 test/realm_quick_shots.py links lanes   some sports (the others' shots are kept; shed is curling; pets and
-#                                                   petfield are the Pets tab's)
+#   python3 test/realm_quick_shots.py links lanes   some sports (the others' shots are kept; shed is curling, lists is
+#                                                   jousting; pets and petfield are the Pets tab's)
 # A label: { t: text, x, y: where the arrow points, in the canvas's own pixels (or el: a page element, the arrow at its
 # middle), dx, dy: where the text sits from there (canvas pixels), al: 'l' or 'r' to hang the text off that side }.
+# A shot is (id, setup, labels), or with (..., more, region): page elements to take with it (in place of the sport's
+# 'more'), and an element to take in place of the canvas (its own pixels then; jousting's plan and between courses).
 import asyncio, base64, os, re, subprocess, sys
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 sys.path.insert(0, os.path.dirname(__file__))
@@ -187,6 +189,54 @@ SHED = {
   ],
 }
 
+# ---------- jousting ----------
+# (the charge's meter, in the canvas's pixels: the bar from x 20 (the start) to x 540 (the impact) at y 531, the couch's
+# green mark at x 363, the hoofbeats' white line at x 60, y 506; the target panel at the top right, wJT.aimScr; the seat's
+# gauge centred on x 420, its green at the top, y 120. The plan and between courses are the rows under the lists.)
+LISTS = {
+  'prep': r"""(() => { for (const kind of ['elf', 'werewolf', 'gorgon']) if (wRoster().length < 5) wAddPlayer(wMakePlayer({ kind, lvl: 3 }, 'tavern'));
+     wAddItem('jtliniment', 2); wAddItem('jttonic', 1); wAddItem('draught', 1); __closeModals();
+     window.__to = (ph, n) => { let i = 0; while (wJT.phase !== ph && i++ < (n || 20000)) wJT.tick(0.05); return wJT.phase === ph; };
+     window.__p = p => { const R = wJT.playRules; let n = 0; while (wJT.phase === 'charge' && wJT.view.charge.p < p - 1e-9 && n++ < 400) wJT.tick(Math.min(.02, (p - wJT.view.charge.p) * R.charge + 1e-6)); };
+     // (hold the tip off the mark by (ox, oy) inches, as the charge goes on to p)
+     window.__hold = (p, ox, oy) => { const A = wJT.planRules.aim[wJT.view.sel.aim]; let n = 0; while (wJT.phase === 'charge' && wJT.view.charge.p < p && n++ < 400) { const C = wJT.view.charge; if (C.tip) wJT.aim(C.hand.x - (C.tip.x - A.x - ox), C.hand.y - (C.tip.y - A.y - oy)); wJT.tick(.01); } };
+     window.__settle = () => { for (let i = 0; i < 40; i++) wJT.render(0.05); };
+     // (where to point at a page element, in the region's own units (W of them across ref): just right of it, or at its top)
+     window.__at = (el, ref, mode, W) => { const r = el.getBoundingClientRect(), B = ref.getBoundingClientRect(), k = B.width / (W || B.width);
+       return mode === 'top' ? { x: (r.left + Math.min(r.width / 2, 30) - B.left) / k, y: (r.top - 2 - B.top) / k } : { x: (r.right + 4 - B.left) / k, y: (r.top + r.height / 2 - B.top) / k }; };
+     window.__cv = () => document.querySelector('#v-lists canvas');
+     W_LISTS_MODE = 'play'; })()""",
+  'cv': "document.querySelector('#v-lists canvas')", 'W': 960,
+  'shots': [
+    ('lists-plan', "(() => { wStartLists({ club: 'local', how: 'play' }); wJT.pause(true); __to('plan'); wJT.select({ suggest: true }); __settle(); document.getElementById('wListsRows').scrollIntoView({ block: 'start' }); })()",
+     """(() => { const B = document.getElementById('wListsRows'), at = (id, m) => __at(document.getElementById(id), B, m);
+       return [Object.assign({ t: 'Aim: 1, 2, 3', dx: 90, dy: 0, al: 'l' }, at('wListsAim')), Object.assign({ t: 'Guard: Q, W', dx: 90, dy: 0, al: 'l' }, at('wListsGuard')), Object.assign({ t: 'Pace: E, R', dx: 90, dy: 0, al: 'l' }, at('wListsPace')),
+         Object.assign({ t: 'Space: ride. Your squire says why, beside it', dx: 330, dy: -26, al: 'l' }, at('wListsRideBtn', 'top')),
+         { t: 'The rider you meet, and how their side rides', el: document.getElementById('wListsCard'), dx: 120, dy: -10, al: 'l' }]; })()""", [], "document.getElementById('wListsRows')"),
+    ('lists-spur', "(() => { scrollTo(0, 0); wJT.press(); const R = wJT.playRules, b = R.spur.beat[wJT.view.sel.pace]; for (let k = 1; k <= 3; k++) { __p(k * b / R.charge); wJT.spur(); } __p((3.97 * b) / R.charge); __settle(); })()",
+     """[{ t: 'Tap Space as each hoofbeat crosses the white line', x: 60, y: 496, dx: 60, dy: -110, al: 'l' }, { t: 'The charge: the spur, then the couch', x: 150, y: 531, dx: 200, dy: -60, al: 'l' },
+       Object.assign({ t: 'On a phone: tap the lists, or Spur', dx: 300, dy: -50, al: 'l' }, __at(document.getElementById('wListsSpur'), __cv(), 'top', 960))]""", ["document.getElementById('wListsChargeRow')"]),
+    ('lists-couch', "(() => { __p(0.64); wJT.couch(true); __p(0.71); __settle(); })()",
+     """[{ t: 'Hold Space from the green mark: the lance comes down', x: 363, y: 526, dx: 20, dy: -130, al: 'l' }, { t: 'Keep holding: let go and it comes up', x: 20 + 0.71 * 520 + 2, y: 528, dx: 170, dy: -40, al: 'l' },
+       Object.assign({ t: 'On a phone: press and hold the lists, or Hold to couch', dx: 260, dy: -26, al: 'l' }, __at(document.getElementById('wListsCouch'), __cv(), 'top', 960))]""", ["document.getElementById('wListsChargeRow')"]),
+    ('lists-aim', "(() => { __hold(0.9, 3, -3); __settle(); })()",
+     """(() => { const V = wJT.view, A = wJT.planRules.aim[V.plans[V.you].aim], [ax, ay] = wJT.aimScr(A.x, A.y), t = V.charge.tip, [tx, ty] = wJT.aimScr(t.x, t.y);
+       return [{ t: 'Your mark: the crosshair', x: ax + 12, y: ay - 8, dx: -240, dy: -40, al: 'r' }, { t: 'Your tip: hold it on the mark with the arrows', x: tx - 6, y: ty + 4, dx: -260, dy: 80, al: 'r' }]; })()"""),
+    ('lists-between', """(() => { let n = 0; while (wJT.phase === 'charge' && n++ < 400) wJT.tick(.02); n = 0; while (wJT.phase === 'seat' && n++ < 400) wJT.tick(.02);
+       for (let k = 0; k < 12; k++) { __to('plan'); if (wJT.view && wJT.view.jobs) break; wJT.press(); __p(0.66); wJT.couch(true); let m = 0; while (['charge', 'seat'].includes(wJT.phase) && m++ < 800) wJT.tick(.02); }
+       wJT.select({ corner: true }); __settle(); document.getElementById('wListsRows').scrollIntoView({ block: 'start' }); })()""",
+     """(() => { const B = document.getElementById('wListsRowSq'), q = document.querySelectorAll('#wListsSq .wjtsq'), bags = document.querySelectorAll('#wListsBag button');
+       return [Object.assign({ t: 'Each squire: one job (your corner has picked)', dx: 40, dy: -26, al: 'l' }, __at(q[0], B, 'top')), Object.assign({ t: 'The other squire\\'s job', dx: 40, dy: 0, al: 'l' }, __at(q[1], B))]
+         .concat(bags.length ? [Object.assign({ t: 'In a match: one potion a course', dx: 40, dy: 0, al: 'l' }, __at(bags[bags.length - 1], B))] : []); })()""",
+     ["document.getElementById('wListsRowLine')", "document.getElementById('wListsRowGo')", "document.getElementById('wListsPowRow')", "document.getElementById('wListsBagRow')"], "document.getElementById('wListsRowSq')"),
+    ('lists-seat', """(() => { const go = () => { wJT.press(); __p(0.66); wJT.couch(true); let m = 0; while (wJT.phase === 'charge' && m++ < 800) wJT.tick(.02); };
+       for (let k = 0, seed = 21; k < 60 && wJT.phase !== 'seat'; k++) { if (!wJT.G || wJT.G.over) { WJT = null; wListsGame({ seed: seed++, mode: 'play' }); wJT.pause(true); } __to('plan'); if (wJT.phase !== 'plan') continue; go(); if (wJT.phase === 'seat') break; let m = 0; while (wJT.phase === 'seat' && m++ < 400) wJT.tick(.02); }
+       for (let i = 0; i < 9; i++) wJT.tick(.02); __settle(); scrollTo(0, 0); })()""",
+     """[{ t: 'Keep the needle in the green', x: 420, y: 116, dx: 230, dy: 20, al: 'l' }, { t: 'It swings right? Hold the left arrow (and the other way round)', x: 420, y: 190, dx: 210, dy: 150, al: 'l' },
+       Object.assign({ t: 'On a phone: hold the Lean buttons', dx: 330, dy: -50, al: 'l' }, __at(document.getElementById('wListsLeanR'), __cv(), 'top', 960))]""", ["document.getElementById('wListsSeatRow')"]),
+  ],
+}
+
 # ---------- pets: the Pets tab and a hatching (dialogs), a match with both pets on the field ----------
 PETS = {
   'prep': "0",
@@ -209,7 +259,7 @@ PETFIELD = {
   ],
 }
 
-SHOTS = {'links': GOLF, 'lanes': LANES, 'shed': SHED, 'ball': BALL, 'grid': GRID, 'ring': RING, 'court': COURT, 'rink': RINK, 'pets': PETS, 'petfield': PETFIELD}
+SHOTS = {'links': GOLF, 'lanes': LANES, 'shed': SHED, 'lists': LISTS, 'ball': BALL, 'grid': GRID, 'ring': RING, 'court': COURT, 'rink': RINK, 'pets': PETS, 'petfield': PETFIELD}
 
 async def main():
     only = sys.argv[1:] or list(SHOTS)
@@ -234,12 +284,16 @@ async def main():
             await pg.wait_for_function("UI.view === 'world' && !!WG && document.getElementById('modal').hidden")
             await pg.evaluate(HELP_JS)
             if S.get('prep'): await pg.evaluate(S['prep'])
-            for sid, setup, labels_js in S['shots']:
+            for shot in S['shots']:
+                # (a shot may bring its own page elements to take with it, and its own region in place of the canvas)
+                sid, setup, labels_js = shot[:3]
+                more = shot[3] if len(shot) > 3 else S.get('more', [])
+                cv, W = (shot[4], f"{shot[4]}.getBoundingClientRect().width") if len(shot) > 4 else (S['cv'], S['W'])
                 try:
                     await pg.evaluate(setup)
                     if S.get('still'): await pg.wait_for_function(S['still'], polling=200, timeout=10000)
                     await pg.wait_for_timeout(400)   # (a few frames, so the frozen moment is drawn)
-                    clip = await pg.evaluate(f"() => __label({S['cv']}, {S['W']}, [{','.join(S.get('more', []))}], {labels_js})")
+                    clip = await pg.evaluate(f"() => __label({cv}, {W}, [{','.join(more)}], {labels_js})")
                     png = await pg.screenshot(clip=clip, type='jpeg', quality=85)
                     await pg.evaluate("document.querySelectorAll('.__qlab').forEach(e => e.remove())")
                     # scaled to WIDTH in the page itself (a canvas), so no image library is needed

@@ -307,5 +307,7 @@ function jtView() {
     sel: GP.sel ? Object.assign({}, GP.sel) : null, plans: GP.plans ? JSON.parse(JSON.stringify(GP.plans)).map((p, s) => !jtCommitted() && s !== GP.you ? null : p) : null,
     jobs: GP.jobs ? GP.jobs.slice() : null, squad: jtSquadView(),
     charge: C ? { p: C.p, mine: C.mine, pace: C.pace, hits: C.hit.length, bad: C.bad, spurQ: jtSpurQ(C), down: C.down, downAt: C.downAt, couch: jtCouchErr(C), hand: Object.assign({}, C.hand), tip: C.tipNow ? Object.assign({}, C.tipNow) : null } : null,
-    seat: M ? { t: M.t, w: M.w, lean: M.lean, q: jtLeanQ(M) } : null, wind: G.wind.slice() };
+    seat: M ? { t: M.t, w: M.w, lean: M.lean, q: jtLeanQ(M) } : null, wind: G.wind.slice(),
+    // (phase 13: both lances as they met, while your balance moment holds the course open: the Realm's sound hears them)
+    hits: GP.P && GP.P.st ? GP.P.st.map(k => ({ broke: !!k.broke, zone: k.zone, at: k.at })) : null };
 }

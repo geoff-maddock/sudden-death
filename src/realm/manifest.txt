@@ -203,6 +203,8 @@ src/realm/w155-listsground.js
 src/realm/w156-listsstars.js
 # the Gilded Lance, the weekly jousting cup (issue #117, phase 10)
 src/realm/w157-listscup.js
+# the feel of jousting: sound at the Lists, the Lists' music, tips, medals (issue #117, phase 13; its Quick start is w112's)
+src/realm/w158-listsfeel.js
 src/realm/w132-pets.js
 src/realm/w133-petegg.js
 src/realm/w134-petshop.js
