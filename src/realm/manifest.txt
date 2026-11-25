@@ -195,6 +195,8 @@ src/realm/w151-listsyard.js
 src/realm/w152-listsfenna.js
 # powers at the Lists: mana, lance and shield powers, curses and the squire's lift, the cheer and the ultimate (issue #117, phase 6)
 src/realm/w153-listspowers.js
+# jousting gear and potions: Sir Ruddock's rack, the Bag row (issue #117, phase 7)
+src/realm/w154-listskit.js
 src/realm/w132-pets.js
 src/realm/w133-petegg.js
 src/realm/w134-petshop.js

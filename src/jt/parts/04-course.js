@@ -80,7 +80,8 @@ function jtStrike(a, d, rnd) {
   const fa = a.fx || null, fd = d.fx || null, gb = fa && fa.pierce && zone === 'shield' ? 'square' : g;
   const base = JT_BREAK[zone][gb], edge = jtEdge(zone, a.tip.x, a.tip.y, g);
   const shieldK = zone === 'shield' ? 1 + JT_BREAK.shieldR * (.5 - ((d.rs || {}).shield ?? .5)) * 2 : 1;
-  let pb = clamp(base * (1 - JT_BREAK.force + JT_BREAK.force * Math.min(1.2, force)) * (1 - JT_BREAK.edge * edge) * shieldK * (fa ? fa.brk : 1) * (fd ? fd.turn : 1), 0, .98);
+  let pb = clamp(base * (1 - JT_BREAK.force + JT_BREAK.force * Math.min(1.2, force)) * (1 - JT_BREAK.edge * edge) * shieldK * (fa ? fa.brk : 1) * (fd ? fd.turn : 1)
+    * (fd && zone === 'shield' && g === 'angled' ? fd.kite ?? 1 : 1) * (fd && zone === 'helm' ? fd.helmTurn ?? 1 : 1), 0, .98);
   if (fa && fa.splinter) pb = .98;
   const broke = rnd() < pb;
   const rock = force * (broke ? (zone === 'shield' ? JT_ROCK.shield[g] : JT_ROCK[zone]) : JT_ROCK.glance) * (fa ? fa.rock : 1) * (fd ? fd.soak : 1);

@@ -21,3 +21,5 @@ src/jt/parts/11-world.js
 # phase 6: monster powers: mana, the lance and shield powers by kind, curses and the squire's lift, the gallery's cheer and
 # the ultimate, situation powers, the CPU's casts
 src/jt/parts/12-powers.js
+# phase 7: gear (a rider's piece, in the powers' vocabulary) and potions (one a side a course, the CPU's at its skill)
+src/jt/parts/13-kit.js

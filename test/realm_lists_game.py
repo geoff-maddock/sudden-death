@@ -189,7 +189,8 @@ async def main():
           f.g = 'g_lists'; f.done = 0; const club = f.a === 'me' ? f.b : f.a;
           wOpenGrdCard('g_lists'); const btns = [...document.querySelectorAll('#modalBox [data-jtfixhow]')].map(b => b.dataset.jtfixhow); document.querySelector('#modalBox [data-close]').click();
           const L = wLeague(), n0 = L.results.length, r = wJtfixPlay('sim'); for (let i = 0; i < 6 && !document.getElementById('modal').hidden; i++) document.querySelector('#modalBox .btn, #modalBox button').click();
-          const res = L.results[0];
+          // (its own result: the round may roll on while the world's clock runs, putting other grounds' results on top)
+          const res = L.results.find(x => x.g === 'g_lists' && (x.a === 'me' || x.b === 'me')) || L.results[0];
           const others = Object.keys(L.table).filter(c => c !== 'me' && c !== club).slice(0, 2), w0 = others.map(c => L.table[c].w + L.table[c].l), sim = wSimAt(others[0], others[1], 'g_lists');
           return { btns, r, done: f.done, kind: WG.jtg.games[0] && WG.jtg.games[0].name, res: { sport: res.sport, g: res.g, me: res.a === 'me' || res.b === 'me' }, added: L.results.length > n0,
             sim: { sport: sim.sport, apart: sim.sa > sim.sb, played: others.map((c, i) => L.table[c].w + L.table[c].l - w0[i]) }, again: wJtfixPlay('sim') }; })()""")

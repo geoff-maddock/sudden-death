@@ -135,10 +135,10 @@ function jtEight(t, amp, pace) { const w = Math.PI / jtBeat(pace); return { x: a
 // your sway now: sway() for your plan, your rider and mount, and the couch as it stands (late if still up)
 function jtYourSway(C) {
   const s = GP.you, ri = C.riders[s], e = jtCouchErr(C);
-  const X = jtRideX(s), fx = G.powers ? jtFxFor(s) : null;
+  const X = jtRideX(s), fx = jtRideFx(s);
   // (phase 6: with powers, what your rider has on this course: a curse's late couch, a sway, no pressure, no shake)
   return jtSway({ pace: GP.plans[s].pace, mount: jtMountOf(s), rs: jtRsOf(s, ri), wind: G.wind[s], couch: e == null ? 0 : fx ? clamp(e + fx.late, -1, 1) : e, hands: 1, arm: X.arm,
-    shaken: fx && fx.calm ? 0 : X.shaken, press: fx && fx.nerve ? 0 : X.press, fx });
+    shaken: fx && fx.calm ? 0 : X.shaken, press: fx ? X.press * (1 - fx.nerve) : X.press, fx });
 }
 // where your tip is now (inches, on their target), once couched; null while the lance is up
 function jtTipNow(C) {
@@ -148,7 +148,7 @@ function jtTipNow(C) {
 }
 // your ride at impact, for the model
 function jtYourRide(C) {
-  const s = GP.you, ri = C.riders[s], plan = GP.plans[s], rs = jtRsOf(s, ri), mount = jtMountOf(s), q = jtSpurQ(C), fx = G.powers ? jtFxFor(s) : null, e0 = jtCouchErr(C), e = e0 != null && fx ? clamp(e0 + fx.late, -1, 1) : e0;
+  const s = GP.you, ri = C.riders[s], plan = GP.plans[s], rs = jtRsOf(s, ri), mount = jtMountOf(s), q = jtSpurQ(C), fx = jtRideFx(s), e0 = jtCouchErr(C), e = e0 != null && fx ? clamp(e0 + fx.late, -1, 1) : e0;
   const speed = jtSpeed({ pace: plan.pace, mount, rs, wind: G.wind[s], fx }) * (JT_PLAY.spur.min + (1 - JT_PLAY.spur.min) * q);
   // (phase 6: the ride carries its fx, for the strike and the seat)
   const A = JT_PLAN.aim[plan.aim], X = jtRideX(s), sq = Object.assign({ girth: X.girth, shaken: fx && fx.calm ? 0 : X.shaken }, fx ? { fx } : {});

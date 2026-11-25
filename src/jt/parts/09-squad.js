@@ -103,7 +103,8 @@ function jtRideOpts(s, plan) {
   const ri = (jtRiders() || [])[s];
   const o = Object.assign({ plan, rs: jtRsOf(s, ri), mount: jtMountOf(s), wind: G.wind[s], hands: jtHands(s) }, jtRideX(s));
   // (phase 6: with powers, what the rider has on this course; no pressure under nerve, no shake under calm)
-  if (G.powers) { const fx = jtFxFor(s); o.fx = fx; if (fx.nerve) o.press = 0; if (fx.calm) o.shaken = 0; }
+  // (phase 7: and its gear and potions, jtRideFx; nerve takes that share of the pressure off)
+  const fx = jtRideFx(s); if (fx) { o.fx = fx; if (fx.nerve) o.press = o.press * (1 - fx.nerve); if (fx.calm) o.shaken = 0; }
   return o;
 }
 // after a course (06-game.js, once the wind is done): the arm spent, the shake taken or wearing off, the girth used,

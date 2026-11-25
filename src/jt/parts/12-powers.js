@@ -29,7 +29,8 @@
    Effects (JT_FX0), read by the model (04-course.js) from a ride's fx (jtFxFor: the side's own power this course, what
    the other side laid on it this course, a curse on it, the course's mark, its situation power):
    - its own ride: sway (the tip's spread), speed (the mount's speed at impact) and wind (what the course costs the
-     mount) multiply; late adds to the couch's error (later); nerve (no pressure) and calm (any shake counts for nothing);
+     mount) multiply; late adds to the couch's error (later); nerve (the share of the pressure taken off: 1, none) and
+     calm (any shake counts for nothing);
    - its strike: brk (the chance the lance breaks) and rock (how hard a broken lance rocks them) multiply; pierce (a
      strike on an angled shield breaks as on a square one), splinter (a fair touch always breaks), helmUn (a helm break
      unhorses) and drain (a lance broken drinks this much of their cheer);
@@ -38,8 +39,9 @@
    The plan knows none of them: a power makes a lance truer or a seat firmer, never a different plan. */
 const JT_MANA = { start: 2, max: 6, brk: 1, kept: 1, clean: 1, pow: 2, curse: 2 };
 const JT_CHEER = { max: 100, ult: 50, brk: 10, helm: 10, unhorse: 30, kept: 15 };
-const JT_FX0 = { sway: 1, speed: 1, wind: 1, late: 0, nerve: 0, calm: 0, brk: 1, rock: 1, pierce: 0, splinter: 0, helmUn: 0, drain: 0, hold: 0, turn: 1, soak: 1, stay: 0 };
-const JT_FX_MUL = new Set(['sway', 'speed', 'wind', 'brk', 'rock', 'turn', 'soak']), JT_FX_ADD = new Set(['late', 'hold']);
+// (phase 7's gear adds kite, a strike on an angled shield's chance to break, and helmTurn, a strike on the helm's)
+const JT_FX0 = { sway: 1, speed: 1, wind: 1, late: 0, nerve: 0, calm: 0, brk: 1, rock: 1, pierce: 0, splinter: 0, helmUn: 0, drain: 0, hold: 0, turn: 1, soak: 1, stay: 0, kite: 1, helmTurn: 1 };
+const JT_FX_MUL = new Set(['sway', 'speed', 'wind', 'brk', 'rock', 'turn', 'soak', 'kite', 'helmTurn']), JT_FX_ADD = new Set(['late', 'hold']);
 const JT_PW_ROLES = ['lance', 'shield'];
 // the squire's fourth job, only while their rider is cursed
 const JT_LIFT = { n: 'Lift the curse', v: 'lifts the curse' };
@@ -192,6 +194,9 @@ function jtFxFor(s) {
   if (G.sitOn[s] && jtOwn(JT_SIT, G.sitOn[s])) add(JT_SIT[G.sitOn[s]].fx);
   return f;
 }
+// what side s's rider rides with this course, for the model: the powers' fx, or null without them (phase 7 adds gear and
+// potions)
+function jtRideFx(s) { return G && G.powers ? jtFxFor(s) : null; }
 const jtPowIdOf = (s, k) => k === 'lance' || k === 'shield' ? (jtPowNow(s, k) || {}).id : k === 'ult' ? jtUltOf(s).id : k;
 // '' when side s's moment fits situation power k, or why not
 function jtSitMoment(s, k) {

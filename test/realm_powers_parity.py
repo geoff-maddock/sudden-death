@@ -253,6 +253,9 @@ SPORTS = [
          # (off until you press its button in Manage, as curling's: pressed here, through the page)
          auto=dict(have="'autoPow' in wJT", live="(() => { const b = document.querySelector('[data-jtauto]'); if (!b || wJT.mode !== 'manage') return false; if (!wJT.autoPow) b.click(); return wJT.autoPow === true && wJT.G.powSides[0] === true; })()",
                    help=('wListsHowPow', [r'Auto powers'])),
+         # (phase 7) a rider's piece reaches the engine's copy of the rider; their bag by tier, yours the page's
+         gear=dict(got="(m, id) => !!m.gear && m.gear.id === id", help=('wHelpListsKit', [r'gear'])),
+         potions=dict(table="wJT.potions", fn='potionWhy', live="__bags(wJT.G.bags, Object.assign({}, W_LISTS_KIT.opp[wBallTier('local')] || {}), null)", help=('wHelpListsKit', [r'potion'])),
          # (Manage waits at your plan beat for your calls: Send them, and on)
          play=dict(adv="(() => { if (wJT.phase === 'plan') wJT.press(); wJT.tick(0.05); })()", over="wJT.phase === 'over'",
                    until={'auto': ('your side casts as the match goes on', "wJT.G.casts.some(c => c.side === 0)"),

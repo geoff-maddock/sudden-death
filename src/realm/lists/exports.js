@@ -50,7 +50,12 @@
    fxFor(s), cpuPower(s, plan), tip(s), jobsFor(s) (the jobs side s's squires may do: the lift while cursed); autoPow
    (Manage's Auto powers, kept in the snapshot). A roster member brings its pick as pw: { lance, shield } (0 or 1).
    select({ job: [squire, 'lift'] }) lifts a curse in place of a job; card(s) adds the other rider's powers and the
-   curses (pow, curse); summary() adds powers (the casts, the mana, the cheer). */
+   curses (pow, curse); summary() adds powers (the casts, the mana, the cheer).
+   Phase 7 is gear and potions (13-kit.js): a roster member's gear ({ id, name, fx }) reaches the model as gx (fx without
+   r); start(opts) and simMatch(opts) take bags ([yours or null, theirs]: a match without bags has no potions); potions
+   (the table), kitRules, potionWhy(s, id), potion(id) (yours, in your plan beat: '' or why not), advice(bag) (your
+   squire's word), cpuPotion(s), potionValues(s, bag), rideFx(s) (what a rider rides with this course: powers, gear and
+   potions, or null), rideOpts(s, plan) (what the model is given for side s's rider on a plan). */
 return {
   rules: JSON.parse(JSON.stringify(JT_RULES)), at: JSON.parse(JSON.stringify(JT_AT)), get G() { return G; },
   newMatch: o => jtNewMatch(o), riders: () => jtRiders(), inTilt: () => jtInTilt(), left: () => jtLeft(),
@@ -91,5 +96,9 @@ return {
   ultOf: (s, ri) => G && G.teams ? jtUltOf(s, ri) : null, powWhy: (s, k) => jtPowWhy(s, k), cast: (s, k, why) => jtCast(s, k, why || 'by hand'), castMine: k => jtCastMine(k),
   sitFits: (s, k) => jtSitFits(s, k), fxFor: s => jtFxFor(s), cpuPower: (s, plan) => G && G.teams ? jtCpuPower(s, plan || jtPlan(s)) : [], tip: s => jtPowerTip(s),
   jobsFor: s => G && G.teams ? jtJobsFor(s).slice() : JT_JOBS.slice(), get autoPow() { return !!(GP && GP.autoPow); }, set autoPow(v) { if (GP) GP.autoPow = !!v; },
+  // gear and potions (phase 7)
+  potions: JSON.parse(JSON.stringify(JT_POTIONS)), kitRules: JSON.parse(JSON.stringify(JT_KIT)), potionWhy: (s, id) => jtPotionWhy(s, id), potion: id => jtPotion(id),
+  advice: bag => jtPotionAdvice(bag), cpuPotion: s => G && G.teams && G.bags ? jtCpuPotion(s) : '', potionValues: (s, bag) => G && G.teams && G.bags ? jtPotionValues(s, bag || {}) : [],
+  rideFx: s => G && G.teams ? jtRideFx(s) : null, rideOpts: (s, plan) => G && G.teams && !G.over ? jtRideOpts(s, plan || { aim: 'shield', guard: 'square', pace: 'canter' }) : null,
   mountFor: (rs, n) => jtMountFor(rs, n), squadRules: JSON.parse(JSON.stringify({ role: JT_ROLE, arm: JT_ARM, shake: JT_SHAKE, nerve: JT_NERVE, corner: JT_CORNER }))
 };
